@@ -31,6 +31,9 @@ class TokenData(BaseModel):
     email: Optional[str] = None
     role: Optional[str] = None
 
+class GoogleLoginRequest(BaseModel):
+    id_token: str
+
 
 # --- Product Schemas ---
 class ProductBase(BaseModel):

@@ -1,4 +1,5 @@
 import os
+from typing import Optional
 from dotenv import load_dotenv
 
 # Locate and load backend/.env file relative to this file
@@ -10,6 +11,7 @@ class Settings:
     SECRET_KEY: str = os.getenv("SECRET_KEY", "verivision_super_secret_key_change_me_in_production")
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 1440  # 24 Hours
+    GOOGLE_CLIENT_ID: Optional[str] = os.getenv("GOOGLE_CLIENT_ID", None)
 
     # Database
     DATABASE_URL: str = os.getenv("DATABASE_URL", "sqlite:///./verivision.db")
