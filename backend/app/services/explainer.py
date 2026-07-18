@@ -16,25 +16,52 @@ def generate_explanation(metrics: dict) -> str:
     ocr_mismatches = metrics.get("ocr_mismatches", [])
     recommended_action = metrics.get("recommended_action", "Accept")
     
-    # Check for Gemini API key
+    # 1. Check for OpenRouter API key first
+    openrouter_key = os.getenv("OPENROUTER_API_KEY")
+    openrouter_model = os.getenv("OPENROUTER_MODEL", "google/gemini-2.5-flash")
+    
+    prompt = (
+        f"You are an AI Explainer Agent for an enterprise manufacturing QC audit platform.\n"
+        f"Explain the following part inspection metrics in a professional, audit-ready manner:\n"
+        f"- SSIM Structural Similarity: {ssim:.2f}\n"
+        f"- OCR Expected Label: '{expected_text}'\n"
+        f"- OCR Detected Label: '{detected_text}'\n"
+        f"- Character Mismatches: {ocr_mismatches}\n"
+        f"- Fraud Score: {fraud_score}/100\n"
+        f"- Verdict Category: {verdict.upper()}\n"
+        f"- Recommended Action: {recommended_action}\n\n"
+        f"Write a concise 2-3 sentence technical justification summarizing what visual abnormalities were found "
+        f"and why this verdict/action was chosen. Keep it formal."
+    )
+
+    if openrouter_key:
+        try:
+            url = "https://openrouter.ai/api/v1/chat/completions"
+            headers = {
+                "Authorization": f"Bearer {openrouter_key}",
+                "Content-Type": "application/json",
+                "HTTP-Referer": "https://github.com/IdeaForg-e/VeriVision-AI",
+                "X-Title": "VeriVision QC Platform"
+            }
+            payload = {
+                "model": openrouter_model,
+                "messages": [
+                    {"role": "user", "content": prompt}
+                ]
+            }
+            response = requests.post(url, json=payload, headers=headers, timeout=8)
+            if response.status_code == 200:
+                res_data = response.json()
+                explanation = res_data["choices"][0]["message"]["content"].strip()
+                return explanation
+        except Exception as e:
+            print(f"OpenRouter API Call failed: {e}. Trying native Gemini...")
+
+    # 2. Check for Native Gemini API key
     api_key = os.getenv("GEMINI_API_KEY")
     if api_key:
         try:
             url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
-            prompt = (
-                f"You are an AI Explainer Agent for an enterprise manufacturing QC audit platform.\n"
-                f"Explain the following part inspection metrics in a professional, audit-ready manner:\n"
-                f"- SSIM Structural Similarity: {ssim:.2f}\n"
-                f"- OCR Expected Label: '{expected_text}'\n"
-                f"- OCR Detected Label: '{detected_text}'\n"
-                f"- Character Mismatches: {ocr_mismatches}\n"
-                f"- Fraud Score: {fraud_score}/100\n"
-                f"- Verdict Category: {verdict.upper()}\n"
-                f"- Recommended Action: {recommended_action}\n\n"
-                f"Write a concise 2-3 sentence technical justification summarizing what visual abnormalities were found "
-                f"and why this verdict/action was chosen. Keep it formal."
-            )
-            
             headers = {"Content-Type": "application/json"}
             payload = {
                 "contents": [
