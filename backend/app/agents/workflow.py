@@ -36,7 +36,6 @@ class InspectionState(TypedDict):
     template_match_score: Optional[float]
     template_match_found: Optional[bool]
     color_hist_similarity: Optional[float]
-    heatmap_img: Optional[np.ndarray]   # numpy array of heatmap
     heatmap_path: Optional[str]
     
     # Decision/Policy results
@@ -109,6 +108,10 @@ def detect_anomalies_node(state: InspectionState) -> Dict[str, Any]:
     Runs the vision detection suite (SSIM difference, EasyOCR string checking, Keypoint counts).
     """
     case_id = state["case_id"]
+    if state.get("status") == "failed" or state.get("triage_status") == "fail":
+        logger.warning(f"[Node: Anomaly Ensemble] Skipping anomaly detection because previous step failed for Case {case_id}")
+        return {}
+
     logger.info(f"[Node: Anomaly Ensemble] Running CV detectors (SSIM, Keypoints, Template, Color, OCR) for Case {case_id}")
     
     aligned_img = state["aligned_image"]
@@ -153,7 +156,6 @@ def detect_anomalies_node(state: InspectionState) -> Dict[str, Any]:
         "template_match_score": ensemble_results.get("template_match_score", 1.0),
         "template_match_found": ensemble_results.get("template_match_found", True),
         "color_hist_similarity": ensemble_results.get("color_hist_similarity", 1.0),
-        "heatmap_img": ensemble_results["heatmap_img"],
         "heatmap_path": heatmap_path
     }
 
@@ -163,6 +165,10 @@ def decision_node(state: InspectionState) -> Dict[str, Any]:
     Evaluates detectors output to compute final fraud score, verdict, confidence, and recommended action.
     """
     case_id = state["case_id"]
+    if state.get("status") == "failed" or state.get("triage_status") == "fail":
+        logger.warning(f"[Node: Decision Judge] Skipping decision judging because previous step failed for Case {case_id}")
+        return {}
+
     logger.info(f"[Node: Decision Judge] Evaluating metrics using LLM Compliance Judge for Case {case_id}")
     
     ensemble_results = {
@@ -193,6 +199,10 @@ def explainer_node(state: InspectionState) -> Dict[str, Any]:
     Generates natural language explanation for findings.
     """
     case_id = state["case_id"]
+    if state.get("status") == "failed" or state.get("triage_status") == "fail":
+        logger.warning(f"[Node: Explainer Agent] Skipping explanation generation because previous step failed for Case {case_id}")
+        return {}
+
     logger.info(f"[Node: Explainer Agent] Writing audit reasoning for Case {case_id}")
     
     metrics_for_explain = {
@@ -283,7 +293,6 @@ def run_inspection_pipeline(initial_state: Dict[str, Any]) -> Dict[str, Any]:
         "template_match_score": None,
         "template_match_found": None,
         "color_hist_similarity": None,
-        "heatmap_img": None,
         "heatmap_path": None,
         "fraud_score": None,
         "verdict": None,

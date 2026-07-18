@@ -2,13 +2,14 @@ import os
 import requests
 import logging
 from typing import Dict
+from app.config import settings
 
 logger = logging.getLogger(__name__)
 
 def generate_explanation(metrics: dict) -> str:
     """
     Generates a natural language explanation of the inspection findings.
-    If OPENROUTER_API_KEY is present in env, it queries OpenRouter.
+    If OPENROUTER_API_KEY is present in settings, it queries OpenRouter.
     Otherwise, it falls back to a clean rule-based template generator.
     """
     ssim = metrics.get("ssim_score", 1.0)
@@ -27,8 +28,8 @@ def generate_explanation(metrics: dict) -> str:
     logger.info(f"Generate Explanation called for verdict={verdict.upper()}, fraud_score={fraud_score}")
 
     # 1. Check for OpenRouter API key first
-    openrouter_key = os.getenv("OPENROUTER_API_KEY")
-    openrouter_model = os.getenv("OPENROUTER_MODEL", "nvidia/nemotron-3-ultra-550b-a55b:free")
+    openrouter_key = settings.OPENROUTER_API_KEY
+    openrouter_model = settings.OPENROUTER_MODEL
     
     prompt = (
         f"You are an AI Explainer Agent for an enterprise manufacturing QC audit platform.\n"

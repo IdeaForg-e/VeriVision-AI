@@ -42,8 +42,8 @@ def make_decision(ensemble_results: dict) -> dict:
     # ==========================================
     # 🧠 METHOD 1: Try OpenRouter LLM Compliance Judge
     # ==========================================
-    openrouter_key = os.getenv("OPENROUTER_API_KEY")
-    openrouter_model = os.getenv("OPENROUTER_MODEL", "nvidia/nemotron-3-ultra-550b-a55b:free")
+    openrouter_key = settings.OPENROUTER_API_KEY
+    openrouter_model = settings.OPENROUTER_MODEL
 
     if openrouter_key:
         logger.info(f"Initiating OpenRouter Compliance Judge Query using model: {openrouter_model}")

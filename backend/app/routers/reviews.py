@@ -52,6 +52,13 @@ def submit_review_decision(
         res.confidence = 1.0
         res.recommended_action = "Accept" if res.verdict == "clean" else res.recommended_action
     
+    elif review.action == "reject":
+        new_verdict = "tampered"
+        res.verdict = new_verdict
+        res.confidence = 1.0  # Confirmed by reviewer
+        res.recommended_action = "Quarantine & Escalate"
+        res.fraud_score = 95  # High score for explicit reviewer rejection
+        
     elif review.action == "override":
         if not review.override_verdict:
             raise HTTPException(status_code=400, detail="Override verdict is required for override action")
@@ -69,7 +76,7 @@ def submit_review_decision(
             res.fraud_score = 90  # High score for overridden anomaly
 
     else:
-        raise HTTPException(status_code=400, detail="Invalid action. Must be 'approve' or 'override'")
+        raise HTTPException(status_code=400, detail="Invalid action. Must be 'approve', 'reject' or 'override'")
 
     # Create Audit Log record
     log_entry = models.AuditLog(

@@ -13,6 +13,10 @@ class Settings:
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 1440  # 24 Hours
     GOOGLE_CLIENT_ID: Optional[str] = os.getenv("GOOGLE_CLIENT_ID", None)
 
+    # OpenRouter API Integration
+    OPENROUTER_API_KEY: Optional[str] = os.getenv("OPENROUTER_API_KEY", None)
+    OPENROUTER_MODEL: str = os.getenv("OPENROUTER_MODEL", "nvidia/nemotron-3-ultra-550b-a55b:free")
+
     # Database
     DATABASE_URL: str = os.getenv("DATABASE_URL", "sqlite:///./verivision.db")
 
