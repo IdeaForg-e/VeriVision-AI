@@ -65,6 +65,34 @@ def align_images(src_img: np.ndarray, ref_img: np.ndarray) -> tuple[np.ndarray, 
 
     return aligned_img, match_rate
 
+def normalize_illumination(src_img: np.ndarray, ref_img: np.ndarray) -> np.ndarray:
+    """
+    Normalizes the illumination of src_img to match the average brightness
+    and contrast of ref_img using mean/std scaling in Lab color space.
+    """
+    # Convert BGR images to LAB color space
+    src_lab = cv2.cvtColor(src_img, cv2.COLOR_BGR2LAB)
+    ref_lab = cv2.cvtColor(ref_img, cv2.COLOR_BGR2LAB)
+    
+    # Split channels
+    l_src, a_src, b_src = cv2.split(src_lab)
+    l_ref, a_ref, b_ref = cv2.split(ref_lab)
+    
+    # Calculate mean and standard deviation of L channel (Lightness)
+    mean_src, std_src = l_src.mean(), l_src.std()
+    mean_ref, std_ref = l_ref.mean(), l_ref.std()
+    
+    # Scale L channel to match reference mean & std (avoid divide by zero)
+    if std_src > 0.001:
+        l_norm = ((l_src - mean_src) * (std_ref / std_src)) + mean_ref
+        l_norm = np.clip(l_norm, 0, 255).astype(np.uint8)
+    else:
+        l_norm = l_src
+        
+    # Merge normalized lightness back with original chromaticity channels
+    norm_lab = cv2.merge([l_norm, a_src, b_src])
+    return cv2.cvtColor(norm_lab, cv2.COLOR_LAB2BGR)
+
 def process_and_validate(image_path: str, golden_path: str) -> dict:
     """
     Loads and runs validation on the source image, and registers/aligns it with the golden image.
@@ -107,6 +135,11 @@ def process_and_validate(image_path: str, golden_path: str) -> dict:
 
     # 3. Geometric Alignment
     aligned_img, align_rate = align_images(src, ref)
+    
+    # 4. Illumination and contrast normalization (Lighting correction)
+    if align_rate > 0.01:
+        aligned_img = normalize_illumination(aligned_img, ref)
+        
     result["aligned_image"] = aligned_img
     result["alignment_rate"] = align_rate
 
