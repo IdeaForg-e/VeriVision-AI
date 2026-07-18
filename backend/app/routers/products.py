@@ -31,7 +31,10 @@ def create_product(
     return new_product
 
 @router.get("", response_model=List[schemas.ProductResponse])
-def get_products(db: Session = Depends(get_db)):
+def get_products(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(utils.get_current_user)
+):
     return db.query(models.Product).all()
 
 @router.post("/{product_id}/golden", response_model=schemas.GoldenReferenceResponse, status_code=status.HTTP_201_CREATED)

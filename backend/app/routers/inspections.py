@@ -138,12 +138,35 @@ async def create_inspection(
     return db_inspection
 
 @router.get("", response_model=List[schemas.InspectionResponse])
-def list_inspections(db: Session = Depends(get_db)):
-    return db.query(models.Inspection).order_by(models.Inspection.created_at.desc()).all()
+def list_inspections(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(utils.get_current_user)
+):
+    logger.info(f"User {current_user.email} listing inspections (Role: {current_user.role})")
+    if current_user.role == "admin":
+        return db.query(models.Inspection).order_by(models.Inspection.created_at.desc()).all()
+    else:
+        return db.query(models.Inspection).filter(
+            models.Inspection.user_id == current_user.id
+        ).order_by(models.Inspection.created_at.desc()).all()
 
 @router.get("/{case_id}", response_model=schemas.InspectionResponse)
-def get_inspection_by_case(case_id: str, db: Session = Depends(get_db)):
+def get_inspection_by_case(
+    case_id: str, 
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(utils.get_current_user)
+):
+    logger.info(f"User {current_user.email} requesting details for case: {case_id}")
     inspection = db.query(models.Inspection).filter(models.Inspection.case_id == case_id).first()
     if not inspection:
         raise HTTPException(status_code=404, detail="Inspection case not found")
+        
+    # Authorization verification: Admin can read all, Normal user only their own
+    if current_user.role != "admin" and inspection.user_id != current_user.id:
+        logger.warning(f"Unauthorized access attempt by user {current_user.email} for case: {case_id}")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You are not authorized to view this inspection case details."
+        )
+        
     return inspection
