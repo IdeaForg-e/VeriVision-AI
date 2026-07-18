@@ -1,5 +1,5 @@
-import { Layout } from "../components/layout/index.jsx";
-import { PerceptionThresholds, BusinessPolicyRouting, PrivacySecurity, AdjustmentHistory, SavePipelineButton } from "../components/feedback/index.jsx";
+import { Layout } from "../components/layout.jsx";
+import { PerceptionThresholds, BusinessPolicyRouting, PrivacySecurity, AdjustmentHistory, SavePipelineButton } from "../components/feedback.jsx";
 import { useFeedbackConfig } from "../hooks/useFeedbackConfig.js";
 
 export default function FeedbackPanelPage() {

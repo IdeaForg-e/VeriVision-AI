@@ -1,5 +1,5 @@
-import { Layout } from "../components/layout/index.jsx";
-import { EvidencePanel, ConfidenceBadge, CaseVelocity, CaseStatusTracker, ReviewerComment, ReviewDecision } from "../components/review/index.jsx";
+import { Layout } from "../components/layout.jsx";
+import { EvidencePanel, ConfidenceBadge, CaseVelocity, CaseStatusTracker, ReviewerComment, ReviewDecision } from "../components/review.jsx";
 import { useReview } from "../hooks/useReview.js";
 
 export default function HumanReviewPage() {

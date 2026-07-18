@@ -1,7 +1,7 @@
 import { useState } from "react";
 
-import { Layout } from "../components/layout/index.jsx";
-import { StatsCards, QueueFilters, QueueTable, PipelineStatus } from "../components/triage/index.jsx";
+import { Layout } from "../components/layout.jsx";
+import { StatsCards, QueueFilters, QueueTable, PipelineStatus } from "../components/triage.jsx";
 
 export default function DailyTriagePage() {
   // Search & Filter
