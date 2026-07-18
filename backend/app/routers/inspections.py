@@ -32,10 +32,7 @@ async def create_inspection(
         raise HTTPException(status_code=404, detail="Product not found")
 
     # 2. Verify Golden Reference exists for this product and angle
-    golden_ref = db.query(models.GoldenReference).filter(
-        models.GoldenReference.product_id == product_id,
-        models.GoldenReference.angle == capture_angle
-    ).first()
+    golden_ref = services.select_golden_reference(product_id, capture_angle, db)
     if not golden_ref:
         logger.warning(f"Inspection failed: No Golden Reference found for Product {product_id} at angle {capture_angle}")
         raise HTTPException(
