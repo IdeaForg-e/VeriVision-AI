@@ -93,7 +93,7 @@ class Report(Base):
     csv_data = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
-    inspection = relationship("Inspection", backpopulates="reports")
+    inspection = relationship("Inspection", back_populates="reports")
 
 class AuditLog(Base):
     __tablename__ = "audit_logs"
