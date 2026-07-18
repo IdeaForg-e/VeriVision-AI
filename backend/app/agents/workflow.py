@@ -95,7 +95,6 @@ def select_reference_node(state: InspectionState) -> Dict[str, Any]:
         logger.error(f"[Node: Ref Selector] Golden Reference missing on disk for Case {case_id}: {golden_path}")
         return {
             "status": "failed",
-            "triage_status": "fail",
             "triage_detail": "Golden reference image file missing from disk."
         }
         

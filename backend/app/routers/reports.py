@@ -21,6 +21,13 @@ def get_pdf_report(
     if not inspection:
         raise HTTPException(status_code=404, detail="Inspection case not found")
     
+    # Authorization verification: Admin can read all, Normal user only their own
+    if current_user.role != "admin" and inspection.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You are not authorized to view this inspection report."
+        )
+
     if not inspection.result:
         raise HTTPException(status_code=400, detail="Inspection has no result data yet")
 
@@ -50,7 +57,7 @@ def get_pdf_report(
 @router.get("/export/csv")
 def export_csv_report(
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(utils.get_current_user)
+    current_user: models.User = Depends(utils.require_role(["admin"]))
 ):
     """
     Generates and returns a bulk CSV export of all inspection records.
