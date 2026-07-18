@@ -1,0 +1,68 @@
+import { API_BASE_URL, STORAGE_KEYS } from "../utils/constants.js";
+
+/**
+ * Thin fetch wrapper: attaches the auth token, base URL, and JSON handling
+ * in one place. Every real service call (once the backend is live) should
+ * go through `apiRequest` instead of calling `fetch` directly, so auth
+ * refresh / error handling / logging only has to be written once.
+ *
+ * Currently unused by reviewService.js / feedbackService.js because those
+ * are still fully mocked — wire them through this once endpoints exist.
+ */
+
+class ApiError extends Error {
+  constructor(message, status, body) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+    this.body = body;
+  }
+}
+
+function getToken() {
+  try {
+    return localStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
+  } catch {
+    return null;
+  }
+}
+
+export async function apiRequest(path, { method = "GET", body, headers = {}, auth = true } = {}) {
+  const token = auth ? getToken() : null;
+
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    method,
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...headers,
+    },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+
+  let data = null;
+  const text = await response.text();
+  try {
+    data = text ? JSON.parse(text) : null;
+  } catch {
+    data = text;
+  }
+
+  if (!response.ok) {
+    // TODO(backend): on 401, trigger a token refresh via authService and retry once,
+    // rather than failing immediately. Left simple until refresh-token flow is confirmed.
+    throw new ApiError(data?.message || `Request failed (${response.status})`, response.status, data);
+  }
+
+  return data;
+}
+
+export const api = {
+  get: (path, opts) => apiRequest(path, { ...opts, method: "GET" }),
+  post: (path, body, opts) => apiRequest(path, { ...opts, method: "POST", body }),
+  put: (path, body, opts) => apiRequest(path, { ...opts, method: "PUT", body }),
+  patch: (path, body, opts) => apiRequest(path, { ...opts, method: "PATCH", body }),
+  delete: (path, opts) => apiRequest(path, { ...opts, method: "DELETE" }),
+};
+
+export { ApiError };

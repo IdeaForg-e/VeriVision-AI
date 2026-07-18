@@ -1,0 +1,64 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── Base ──────────────────────────────────────────────────────────────────── */
+@layer base {
+  html {
+    font-family: "Inter", system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  body {
+    @apply bg-background text-on-surface;
+  }
+}
+
+/* ── Custom utility classes for design tokens ──────────────────────────────── */
+@layer utilities {
+  /* Typography helpers referenced in JSX as className="font-tech-code …" */
+  .font-tech-code {
+    font-family: "JetBrains Mono", monospace;
+    font-weight: 700;
+  }
+
+  .font-headline-lg { font-size: 1.5rem;    line-height: 2rem;    font-weight: 700; }
+  .font-headline-md { font-size: 1.25rem;   line-height: 1.75rem; font-weight: 700; }
+  .font-headline-sm { font-size: 1rem;      line-height: 1.5rem;  font-weight: 700; }
+  .font-body-lg     { font-size: 1rem;      line-height: 1.5rem; }
+  .font-body-md     { font-size: 0.875rem;  line-height: 1.25rem; }
+  .font-body-sm     { font-size: 0.75rem;   line-height: 1rem; }
+  .font-label-caps  { font-size: 0.6875rem; line-height: 1rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; }
+
+  /* Gap / padding design tokens not inferrable from Tailwind config alone */
+  .gap-gutter       { gap: 24px; }
+  .p-card-padding   { padding: 24px; }
+  .space-y-stack-gap > * + * { margin-top: 16px; }
+}
+
+/* ── Range input styling ───────────────────────────────────────────────────── */
+input[type="range"] {
+  -webkit-appearance: none;
+  height: 6px;
+  border-radius: 9999px;
+  background: #d3e4fe;
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 9999px;
+  background: #004ac6;
+  cursor: pointer;
+  border: 3px solid white;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+}
+input[type="range"]::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 9999px;
+  background: #004ac6;
+  cursor: pointer;
+  border: 3px solid white;
+}
+
