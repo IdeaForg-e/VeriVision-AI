@@ -49,7 +49,7 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
         raise credentials_exception
     return user
 
-# Helper to check roles (e.g. check if current user has QA or Admin role)
+# Helper to check roles (admin-only actions)
 def require_role(allowed_roles: list):
     def dependency(current_user: models.User = Depends(get_current_user)):
         if current_user.role not in allowed_roles:

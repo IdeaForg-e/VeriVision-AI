@@ -15,7 +15,7 @@ class User(Base):
     name = Column(String, nullable=False)
     email = Column(String, unique=True, index=True, nullable=False)
     hashed_password = Column(String, nullable=False)
-    role = Column(String, default="inspector")  # inspector, qa, admin
+    role = Column(String, default="user")  # user, admin
     created_at = Column(DateTime, default=datetime.utcnow)
 
     inspections = relationship("Inspection", back_populates="inspector")
