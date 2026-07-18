@@ -128,63 +128,87 @@ VeriVision-AI/
 │   └── run.py                         # [NEW] [Dev-1] Quick launch script
 │
 ├── frontend/
-│   ├── public/
-│   │   └── vite.svg
-│   ├── src/
-│   │   ├── assets/                    # [Dev 2] Static assets (logos, icons)
-│   │   ├── components/
-│   │   │   ├── layout/
-│   │   │   │   ├── Sidebar.jsx        # [Dev 2] Left navigation sidebar
-│   │   │   │   ├── Header.jsx         # [Dev 2] Top bar with user info
-│   │   │   │   └── Layout.jsx         # [Dev 2] Main layout wrapper
-│   │   │   │
-│   │   │   ├── dashboard/
-│   │   │   │   ├── StatsCard.jsx      # [Dev 2] Reusable stat card component
-│   │   │   │   ├── FraudChart.jsx     # [Dev 2] Recharts chart for fraud categories
-│   │   │   │   └── RecentActivity.jsx # [Dev 2] Recent inspections table
-│   │   │   │
-│   │   │   ├── inspection/
-│   │   │   │   ├── ImageUploader.jsx  # [Dev 2] Drag-and-drop image upload
-│   │   │   │   ├── ImageCompare.jsx   # [Dev 2] Side-by-side golden vs defective
-│   │   │   │   ├── HeatmapOverlay.jsx # [Dev 2] Heatmap overlay on defective image
-│   │   │   │   ├── AnomalyList.jsx    # [Dev 2] Detected anomalies list
-│   │   │   │   └── VerdictBadge.jsx   # [Dev 2] Color-coded verdict badge
-│   │   │   │
-│   │   │   ├── review/
-│   │   │   │   ├── ReviewPanel.jsx    # [Dev 2] QA review with Approve/Reject
-│   │   │   │   └── CommentBox.jsx     # [Dev 2] Reviewer comments textarea
-│   │   │   │
-│   │   │   └── common/
-│   │   │       ├── Button.jsx         # [Dev 2] Reusable button component
-│   │   │       ├── Modal.jsx          # [Dev 2] Modal dialog
-│   │   │       ├── Loader.jsx         # [Dev 2] Loading spinner
-│   │   │       └── Badge.jsx          # [Dev 2] Generic status badge
-│   │   │
-│   │   ├── pages/
-│   │   │   ├── LoginPage.jsx          # [Dev 2] Login form with JWT auth
-│   │   │   ├── DashboardPage.jsx      # [Dev 2] Main dashboard with stats & charts
-│   │   │   ├── NewInspectionPage.jsx  # [Dev 2] Upload image + metadata form
-│   │   │   ├── InspectionDetailPage.jsx # [Dev 2] Full result view with evidence
-│   │   │   ├── ReviewPage.jsx         # [Dev 2] QA review queue
-│   │   │   ├── ReportsPage.jsx        # [Dev 2] Reports listing + PDF download
-│   │   │   ├── HistoryPage.jsx        # [Dev 2] Inspection history with filters
-│   │   │   └── AdminPage.jsx          # [Dev 2] Admin panel
-│   │   │
-│   │   ├── services/
-│   │   │   └── api.js                 # [Dev 2] Axios wrapper for all API calls
-│   │   │
-│   │   ├── context/
-│   │   │   └── AuthContext.jsx        # [Dev 2] JWT auth state management
-│   │   │
-│   │   ├── App.jsx                    # [Dev 2] React Router setup
-│   │   ├── main.jsx                   # [Dev 2] ReactDOM entry point
-│   │   └── index.css                  # [Dev 2] Tailwind + global styles
+│
+├── public/
+│   └── vite.svg
+│
+├── src/
+│   ├── assets/                        # [Dev 2] Static assets (logos, icons)
 │   │
-│   ├── tailwind.config.js             # [Dev 2] Theme config (dark mode, colors)
-│   ├── postcss.config.js              # [Dev 2] PostCSS for Tailwind
-│   ├── vite.config.js                 # [Dev 2] Vite config with API proxy
-│   ├── package.json
-│   └── index.html
+│   ├── components/
+│   │   ├── layout/
+│   │   │   ├── Sidebar.jsx            # [Dev 2] Left navigation sidebar
+│   │   │   ├── Header.jsx             # [Dev 2] Top bar with user info
+│   │   │   ├── Layout.jsx             # [Dev 2] Main layout wrapper
+│   │   │   └── ProtectedRoute.jsx     #   CORE — blocks pages if not logged in
+│   │   │
+│   │   ├── dashboard/
+│   │   │   ├── StatsCard.jsx          # [Dev 2] Reusable stat card component
+│   │   │   ├── FraudChart.jsx         # [Dev 2] Recharts chart for fraud categories
+│   │   │   └── RecentActivity.jsx     # [Dev 2] Recent inspections table
+│   │   │
+│   │   ├── inspection/
+│   │   │   ├── ImageUploader.jsx      # [Dev 2] Drag-and-drop image upload
+│   │   │   ├── ImageCompare.jsx       # [Dev 2] Side-by-side golden vs defective
+│   │   │   ├── HeatmapOverlay.jsx     # [Dev 2] Heatmap overlay on defective image
+│   │   │   ├── AnomalyList.jsx        # [Dev 2] Detected anomalies list
+│   │   │   ├── VerdictBadge.jsx       # [Dev 2] Color-coded verdict badge
+│   │   │   └── MetadataForm.jsx       #   CORE — part_id, commodity, angle, site form
+│   │   │
+│   │   ├── review/
+│   │   │   ├── ReviewPanel.jsx        # [Dev 2] QA review with Approve/Reject
+│   │   │   └── CommentBox.jsx         # [Dev 2] Reviewer comments textarea
+│   │   │
+│   │   ├── reports/                   #   IF TIME — only if Reports page gets built
+│   │   │   ├── ReportCard.jsx         #   Single report preview card
+│   │   │   └── ExportButton.jsx       #   CSV/PDF export button
+│   │   │
+│   │   └── common/
+│   │       ├── Button.jsx             # [Dev 2] Reusable button component
+│   │       ├── Modal.jsx              # [Dev 2] Modal dialog
+│   │       ├── Loader.jsx             # [Dev 2] Loading spinner
+│   │       ├── Badge.jsx              # [Dev 2] Generic status badge
+│   │       ├── Table.jsx              #   IF TIME — shared table for History/Reports
+│   │       ├── EmptyState.jsx         #   SKIP unless spare time — "no data" placeholder
+│   │       └── ErrorMessage.jsx       #   SKIP unless spare time — reusable error display
+│   │
+│   ├── pages/
+│   │   ├── LoginPage.jsx              # [Dev 2] Login form with JWT auth
+│   │   ├── DashboardPage.jsx          # [Dev 2] Main dashboard with stats & charts
+│   │   ├── NewInspectionPage.jsx      # [Dev 2] Upload image + metadata form
+│   │   ├── InspectionDetailPage.jsx   # [Dev 2] Full result view with evidence
+│   │   ├── ReviewPage.jsx             # [Dev 2] QA review queue
+│   │   ├── ReportsPage.jsx            # [Dev 2] Reports listing + PDF download
+│   │   ├── HistoryPage.jsx            # [Dev 2] Inspection history with filters
+│   │   ├── AdminPage.jsx              # [Dev 2] Admin panel
+│   │   └── NotFoundPage.jsx           #   SKIP unless spare time — 404 page
+│   │
+│   ├── services/
+│   │   ├── api.js                     # [Dev 2] Axios wrapper for all API calls (base instance)
+│   │   ├── authService.js             #   CORE — login, logout, token calls
+│   │   ├── inspectionService.js       #   CORE — upload, get inspections, get results
+│   │   └── reportService.js           #   CORE — get reports, CSV/PDF export calls
+│   │
+│   ├── context/
+│   │   └── AuthContext.jsx            # [Dev 2] JWT auth state management
+│   │
+│   ├── hooks/                         #   SKIP unless spare time
+│   │   ├── useAuth.js                 #   Shortcut to read AuthContext
+│   │   └── useFetch.js                #   Reusable data-fetching hook
+│   │
+│   ├── utils/
+│   │   ├── formatDate.js              #   SKIP unless spare time — format timestamps
+│   │   └── constants.js               #   CORE — fraud categories, actions, status colors
+│   │
+│   ├── App.jsx                        # [Dev 2] React Router setup
+│   ├── main.jsx                       # [Dev 2] ReactDOM entry point
+│   └── index.css                      # [Dev 2] Tailwind + global styles
+│
+├── tailwind.config.js                 # [Dev 2] Theme config (dark mode, colors)
+├── postcss.config.js                  # [Dev 2] PostCSS for Tailwind
+├── vite.config.js                     # [Dev 2] Vite config with API proxy
+├── package.json
+└── index.html
 │
 ├── docs/
 │   ├── architecture.md                # [Dev-5] System architecture doc
