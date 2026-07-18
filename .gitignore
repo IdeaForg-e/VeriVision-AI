@@ -23,6 +23,7 @@ coverage.xml
 backend/data/
 backend/verivision.db
 .env
+backend/.env
 
 # Frontend ignore
 node_modules/

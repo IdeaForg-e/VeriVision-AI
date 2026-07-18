@@ -55,26 +55,7 @@ def generate_explanation(metrics: dict) -> str:
                 explanation = res_data["choices"][0]["message"]["content"].strip()
                 return explanation
         except Exception as e:
-            print(f"OpenRouter API Call failed: {e}. Trying native Gemini...")
-
-    # 2. Check for Native Gemini API key
-    api_key = os.getenv("GEMINI_API_KEY")
-    if api_key:
-        try:
-            url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
-            headers = {"Content-Type": "application/json"}
-            payload = {
-                "contents": [
-                    {"parts": [{"text": prompt}]}
-                ]
-            }
-            response = requests.post(url, json=payload, headers=headers, timeout=5)
-            if response.status_code == 200:
-                res_data = response.json()
-                explanation = res_data["candidates"][0]["content"]["parts"][0]["text"].strip()
-                return explanation
-        except Exception as e:
-            print(f"Gemini API Call failed: {e}. Falling back to template explainer.")
+            print(f"OpenRouter API Call failed: {e}. Falling back to template explainer.")
 
     # Rule-Based Fallback template
     reasons = []

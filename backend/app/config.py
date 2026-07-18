@@ -1,8 +1,9 @@
 import os
 from dotenv import load_dotenv
 
-# Load .env file
-load_dotenv()
+# Locate and load backend/.env file relative to this file
+base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+load_dotenv(os.path.join(base_dir, ".env"))
 
 class Settings:
     # Security
