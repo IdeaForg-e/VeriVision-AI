@@ -3,18 +3,23 @@ from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 import requests
 import uuid
+import logging
 from app.config import settings
 
 from app.database import get_db
 from app import models, schemas, utils
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
 @router.post("/register", response_model=schemas.UserResponse, status_code=status.HTTP_201_CREATED)
 def register(user_in: schemas.UserCreate, db: Session = Depends(get_db)):
+    logger.info(f"Register request received for email: {user_in.email}")
     # Check if email is already taken
     existing_user = db.query(models.User).filter(models.User.email == user_in.email).first()
     if existing_user:
+        logger.warning(f"Registration failed: Email {user_in.email} already exists")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Email already registered",
@@ -35,14 +40,18 @@ def register(user_in: schemas.UserCreate, db: Session = Depends(get_db)):
 
 @router.post("/login", response_model=schemas.Token)
 def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+    logger.info(f"Password login request received for user: {form_data.username}")
     # Verify user existence and password
     user = db.query(models.User).filter(models.User.email == form_data.username).first()
     if not user or not utils.verify_password(form_data.password, user.hashed_password):
+        logger.warning(f"Login failed: Invalid credentials for user {form_data.username}")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect email or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
+    
+    logger.info(f"User {form_data.username} logged in successfully with role: {user.role}")
     
     # Create JWT access token
     access_token = utils.create_access_token(data={"sub": user.email, "role": user.role})
@@ -64,12 +73,14 @@ def google_login(payload: schemas.GoogleLoginRequest, db: Session = Depends(get_
     and return customized JWT access token.
     """
     token = payload.id_token
+    logger.info("Google OAuth login request received")
     
     try:
         # Validate Google token using official Google API
         google_url = f"https://oauth2.googleapis.com/tokeninfo?id_token={token}"
         response = requests.get(google_url, timeout=5)
         if response.status_code != 200:
+            logger.warning(f"Google token validation rejected by Google API (status {response.status_code})")
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid or expired Google OAuth token."
@@ -78,6 +89,7 @@ def google_login(payload: schemas.GoogleLoginRequest, db: Session = Depends(get_
     except Exception as e:
         if isinstance(e, HTTPException):
             raise e
+        logger.error(f"Google verification network error: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=f"Google OAuth verification failed: {str(e)}"
@@ -87,6 +99,7 @@ def google_login(payload: schemas.GoogleLoginRequest, db: Session = Depends(get_
     if settings.GOOGLE_CLIENT_ID:
         aud = user_info.get("aud")
         if aud != settings.GOOGLE_CLIENT_ID:
+            logger.warning(f"Google OAuth audience mismatch: {aud} != {settings.GOOGLE_CLIENT_ID}")
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Google OAuth audience mismatch (client ID does not match settings)."
@@ -96,14 +109,17 @@ def google_login(payload: schemas.GoogleLoginRequest, db: Session = Depends(get_
     name = user_info.get("name", email.split("@")[0] if email else "Google User")
     
     if not email:
+        logger.warning("Google token contains no verified email address")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Google token payload does not contain a verified email address."
         )
 
     # Check if user exists, if not, register them automatically
+    logger.info(f"Google OAuth verified email: {email}, checking local database profile")
     user = db.query(models.User).filter(models.User.email == email).first()
     if not user:
+        logger.info(f"First-time Google login: auto-registering new profile for {email}")
         random_pass = str(uuid.uuid4())
         hashed_password = utils.get_password_hash(random_pass)
         user = models.User(
