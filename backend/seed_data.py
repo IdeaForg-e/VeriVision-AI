@@ -70,6 +70,11 @@ def seed():
         if os.path.exists(ref_motherboard_src):
             mb_golden_dest = os.path.join(settings.GOLDEN_DIR, "golden_mb_top.png")
             shutil.copy(ref_motherboard_src, mb_golden_dest)
+            
+            # Copy to cases folder as well to satisfy /data/cases/... queries in UI
+            mb_case_dest = os.path.join(os.path.dirname(settings.GOLDEN_DIR), "cases", "golden_mb_top.png")
+            shutil.copy(ref_motherboard_src, mb_case_dest)
+            
             references.append(
                 models.GoldenReference(
                     product_id=products["XPS-MB-409"].id,
@@ -87,6 +92,11 @@ def seed():
         if os.path.exists(ref_label_src):
             label_golden_dest = os.path.join(settings.GOLDEN_DIR, "golden_label_close.png")
             shutil.copy(ref_label_src, label_golden_dest)
+            
+            # Copy to cases folder as well
+            label_case_dest = os.path.join(os.path.dirname(settings.GOLDEN_DIR), "cases", "golden_label_close.png")
+            shutil.copy(ref_label_src, label_case_dest)
+            
             references.append(
                 models.GoldenReference(
                     product_id=products["XPS-LABEL-03"].id,
