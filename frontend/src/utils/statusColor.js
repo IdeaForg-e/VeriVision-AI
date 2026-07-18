@@ -1,1 +1,0 @@
-// statusColor.js
