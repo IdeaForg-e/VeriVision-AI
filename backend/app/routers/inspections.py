@@ -8,6 +8,7 @@ import uuid
 from app.database import get_db
 from app.config import settings
 from app import models, schemas, utils, services
+from app.agents.workflow import run_inspection_pipeline
 
 router = APIRouter(prefix="/inspections", tags=["Inspections"])
 
@@ -63,71 +64,58 @@ async def create_inspection(
     db.commit()
     db.refresh(db_inspection)
 
-    # 5. Run Ingestion & Alignment Quality check
-    triage_result = services.process_and_validate(file_path, golden_ref.image_path)
-    if triage_result["status"] == "fail":
-        # Ingestion Quality check failed (Blurry or Poor light) -> Update status to retake_needed
+    # 5. Run Ingestion, Alignment & Anomaly Detection using the LangGraph Workflow
+    initial_state = {
+        "case_id": case_id,
+        "image_path": file_path,
+        "golden_path": golden_ref.image_path,
+        "expected_serial": golden_ref.expected_serial,
+        "roi_config": golden_ref.roi_config
+    }
+    
+    try:
+        pipeline_result = run_inspection_pipeline(initial_state)
+    except Exception as e:
+        db_inspection.status = "failed"
+        db.commit()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Inspection pipeline execution failed: {str(e)}"
+        )
+        
+    if pipeline_result["status"] == "retake_needed":
         db_inspection.status = "retake_needed"
         db.commit()
-        db.refresh(db_inspection)
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail={
-                "message": triage_result["detail"],
+                "message": pipeline_result["triage_detail"],
                 "case_id": case_id,
                 "status": "retake_needed"
             }
         )
+        
+    if pipeline_result["status"] == "failed":
+        db_inspection.status = "failed"
+        db.commit()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=pipeline_result.get("triage_detail", "Internal engine failure during inspection processing.")
+        )
 
-    # 6. Run Vision Anomaly Detection Ensemble
-    aligned_img = triage_result["aligned_image"]
-    ref_img = cv2.imread(golden_ref.image_path)
-    
-    # Get Golden Reference ROI Config (to crop labels and check expected text)
-    roi_config = {
-        "label_roi": golden_ref.roi_config.get("label_roi") if golden_ref.roi_config else None,
-        "expected_serial": golden_ref.expected_serial
-    }
-    
-    ensemble_results = services.run_anomaly_ensemble(aligned_img, ref_img, roi_config)
-
-    # 7. Run Decision Agent
-    decision = services.make_decision(ensemble_results)
-
-    # 8. Save Anomaly heatmaps to files
-    heatmap_name = f"{case_id}_heatmap{file_ext}"
-    heatmap_path = os.path.join(settings.UPLOAD_DIR, heatmap_name)
-    try:
-        cv2.imwrite(heatmap_path, ensemble_results["heatmap_img"])
-    except Exception as e:
-        print(f"Error saving heatmap image: {e}")
-        heatmap_path = None
-
-    # 9. Run Explainer Agent
-    metrics_for_explain = {
-        "ssim_score": ensemble_results["ssim_score"],
-        "verdict": decision["verdict"],
-        "fraud_score": decision["fraud_score"],
-        "detected_text": ensemble_results["detected_text"],
-        "expected_text": golden_ref.expected_serial,
-        "ocr_mismatches": ensemble_results["ocr_mismatches"],
-        "recommended_action": decision["recommended_action"]
-    }
-    explanation = services.generate_explanation(metrics_for_explain)
-
-    # 10. Commit results to Database
+    # 6. Commit results to Database
     db_result = models.InspectionResult(
         inspection_id=db_inspection.id,
-        ssim_score=ensemble_results["ssim_score"],
-        keypoint_match_rate=triage_result["alignment_rate"],
-        ocr_detected_text=ensemble_results["detected_text"],
-        ocr_expected_text=golden_ref.expected_serial,
-        fraud_score=decision["fraud_score"],
-        verdict=decision["verdict"],
-        confidence=decision["confidence"],
-        recommended_action=decision["recommended_action"],
-        explanation=explanation,
-        heatmap_path=heatmap_path
+        ssim_score=pipeline_result["ssim_score"],
+        keypoint_match_rate=pipeline_result["alignment_rate"],
+        ocr_detected_text=pipeline_result["ocr_detected_text"],
+        ocr_expected_text=pipeline_result["ocr_expected_text"],
+        fraud_score=pipeline_result["fraud_score"],
+        verdict=pipeline_result["verdict"],
+        confidence=pipeline_result["confidence"],
+        recommended_action=pipeline_result["recommended_action"],
+        explanation=pipeline_result["explanation"],
+        heatmap_path=pipeline_result["heatmap_path"]
     )
     db.add(db_result)
 

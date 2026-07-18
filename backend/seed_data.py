@@ -104,7 +104,7 @@ def seed():
             db.add_all(references)
             db.commit()
 
-        print("Database Seeding Completed Successfully! ✅")
+        print("Database Seeding Completed Successfully! [SUCCESS]")
         print("\nDefault Logins:")
         print("- Admin: admin@verivision.com / admin123")
         print("- User: user@verivision.com / user123")
