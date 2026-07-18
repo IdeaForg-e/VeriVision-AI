@@ -141,7 +141,7 @@ def get_triage_stats(
     pending = query.filter(models.Inspection.status == "pending").count()
     auto_approved = query.filter(
         models.Inspection.status == "completed",
-        models.Inspection.has_result == True,
+        models.Inspection.result != None,
     ).count()
 
     return schemas.TriageStats(
