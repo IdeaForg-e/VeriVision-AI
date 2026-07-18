@@ -1,5 +1,5 @@
-import Layout from "../components/layout/Layout";
-import LoginForm from "../components/auth/LoginForm";
+import { Layout } from "../components/layout/index.jsx";
+import LoginForm from "../components/auth/LoginForm.jsx";
 
 export default function LoginPage() {
   return (

@@ -2,16 +2,9 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 
-import Layout from "../components/layout/Layout.jsx";
-import Loader from "../components/common/Loader.jsx";
-import MetadataCard from "../components/case/MetadataCard.jsx";
-import FraudScore from "../components/case/FraudScore.jsx";
-import ImageComparison from "../components/case/ImageComparison.jsx";
-import HeatmapViewer from "../components/case/HeatmapViewer.jsx";
-import OCRResults from "../components/case/OCRResults.jsx";
-import DetectorMetrics from "../components/case/DetectorMetrics.jsx";
-import EvidenceTimeline from "../components/case/EvidenceTimeline.jsx";
-import RecommendationCard from "../components/case/RecommendationCard.jsx";
+import { Layout } from "../components/layout/index.jsx";
+import { Loader } from "../components/common/index.jsx";
+import { MetadataCard, FraudScore, ImageComparison, HeatmapViewer, OCRResults, DetectorMetrics, EvidenceTimeline, RecommendationCard } from "../components/case/index.jsx";
 
 import { getCaseById } from "../services/caseService.js";
 import { fetchCaseForReview } from "../services/reviewService.js";
