@@ -1,63 +1,79 @@
 import { STORAGE_KEYS } from "../utils/constants.js";
-// import { api } from "./api.js"; // TODO(backend): uncomment once /auth endpoints exist
+import { api } from "./api.js";
 
 /**
- * Auth service. Mocked for now — swap each function body for a real call
- * through `api.js` once the backend auth flow (JWT vs session, refresh
- * token lifetime, etc.) is confirmed.
- *
- * TODO(backend):
- *   POST /auth/login       { email, password } -> { user, token, refreshToken }
- *   POST /auth/logout
- *   POST /auth/refresh     { refreshToken } -> { token }
- *   GET  /auth/me          -> { user }
+ * Auth service. Connects to the backend /api/auth endpoints.
  */
 
-const MOCK_LATENCY = 600;
+export async function login(email, password) {
+  const formData = new URLSearchParams();
+  formData.append("username", email);
+  formData.append("password", password);
 
-const MOCK_USER = {
-  id: "u_chaitanya",
-  name: "Chaitanya",
-  email: "chaitanya@fraudshield.dev",
-  role: "reviewer",
-};
-
-export function login(email, password) {
-  return new Promise((resolve, reject) => {
-    setTimeout(() => {
-      if (!email || !password) {
-        reject(new Error("Email and password are required"));
-        return;
-      }
-      const token = "mock-jwt-token";
-      const refreshToken = "mock-refresh-token";
-      try {
-        localStorage.setItem(STORAGE_KEYS.AUTH_TOKEN, token);
-        localStorage.setItem(STORAGE_KEYS.REFRESH_TOKEN, refreshToken);
-        localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(MOCK_USER));
-      } catch {
-        // localStorage unavailable (e.g. private browsing) — caller can decide how to handle
-      }
-      resolve({ user: MOCK_USER, token, refreshToken });
-    }, MOCK_LATENCY);
+  const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api"}/auth/login`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body: formData.toString(),
   });
+
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.detail || "Login failed");
+  }
+
+  const data = await response.json();
+
+  try {
+    localStorage.setItem(STORAGE_KEYS.AUTH_TOKEN, data.access_token);
+    localStorage.setItem(STORAGE_KEYS.REFRESH_TOKEN, data.access_token);
+    localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify({
+      id: "user",
+      name: data.name,
+      email: "user@verivision.ai",
+      role: data.role,
+    }));
+  } catch {
+    // localStorage unavailable
+  }
+
+  return {
+    user: {
+      id: "user",
+      name: data.name,
+      email: "user@verivision.ai",
+      role: data.role,
+    },
+    token: data.access_token,
+    refreshToken: data.access_token,
+  };
 }
 
-export function logout() {
-  return new Promise((resolve) => {
-    try {
-      localStorage.removeItem(STORAGE_KEYS.AUTH_TOKEN);
-      localStorage.removeItem(STORAGE_KEYS.REFRESH_TOKEN);
-      localStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
-    } catch {
-      /* no-op */
-    }
-    setTimeout(resolve, MOCK_LATENCY / 2);
-  });
+export async function logout() {
+  try {
+    localStorage.removeItem(STORAGE_KEYS.AUTH_TOKEN);
+    localStorage.removeItem(STORAGE_KEYS.REFRESH_TOKEN);
+    localStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
+  } catch {
+    /* no-op */
+  }
 }
 
-export function getCurrentUser() {
-  return new Promise((resolve) => {
+export async function getCurrentUser() {
+  try {
+    const token = localStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
+    if (!token) return null;
+
+    const data = await api.get("/auth/me");
+    return {
+      id: String(data.id),
+      name: data.name,
+      email: data.email,
+      role: data.role,
+    };
+  } catch {
+    // Token might be expired, try to restore from localStorage
     let stored = null;
     try {
       const raw = localStorage.getItem(STORAGE_KEYS.CURRENT_USER);
@@ -65,8 +81,8 @@ export function getCurrentUser() {
     } catch {
       stored = null;
     }
-    setTimeout(() => resolve(stored), 200);
-  });
+    return stored;
+  }
 }
 
 export function isAuthenticated() {

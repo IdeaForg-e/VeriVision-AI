@@ -6,7 +6,7 @@ from fastapi.staticfiles import StaticFiles
 
 from app.config import settings
 from app.database import engine, Base
-from app.routers import auth, products, inspections, reviews, reports
+from app.routers import auth, products, inspections, reviews, reports, triage
 
 # Setup basic logging configuration
 logging.basicConfig(
@@ -43,11 +43,17 @@ app.include_router(products.router, prefix="/api")
 app.include_router(inspections.router, prefix="/api")
 app.include_router(reviews.router, prefix="/api")
 app.include_router(reports.router, prefix="/api")
+app.include_router(triage.router, prefix="/api")
 
 # Mount 'data' directory static files so frontend can fetch and show raw and heatmap images
 data_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data")
 if os.path.exists(data_dir):
     app.mount("/data", StaticFiles(directory=data_dir), name="data")
+
+# Mount 'dataset' directory so frontend can access golden/defect images for review pages
+dataset_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "dataset")
+if os.path.exists(dataset_dir):
+    app.mount("/dataset", StaticFiles(directory=dataset_dir), name="dataset")
 
 @app.get("/")
 def read_root():

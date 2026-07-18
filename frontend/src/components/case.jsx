@@ -1,8 +1,8 @@
 // Consolidated components for case
-import { REVIEW_DECISION } from "../../utils/constants.js";
-import { formatDateTime } from "../../utils/formatDate.js";
-import { formatFraudScore } from "../../utils/formatScore.js";
-import { formatScore } from "../../utils/formatScore.js";
+import { REVIEW_DECISION } from "../utils/constants.js";
+import { formatDateTime } from "../utils/formatDate.js";
+import { formatFraudScore } from "../utils/formatScore.js";
+import { formatScore } from "../utils/formatScore.js";
 import { useState } from "react";
 
 // DetectorMetrics.jsx — Displays per-detector scores from the AI pipeline
@@ -82,15 +82,15 @@ export function DetectorMetrics({ metrics = [] }) {
 // EvidenceTimeline.jsx — Chronological log of events for a case (status changes, comments, decisions)
 
 const EVENT_CONFIG = {
-  created:          { icon: "add_circle",       color: "text-primary",        bg: "bg-primary/10" },
-  retake_requested: { icon: "history",           color: "text-amber-600",      bg: "bg-amber-50" },
-  resubmitted:      { icon: "publish",           color: "text-blue-600",       bg: "bg-blue-50" },
-  reviewed:         { icon: "rate_review",       color: "text-primary",        bg: "bg-primary/10" },
-  approved:         { icon: "check_circle",      color: "text-green-600",      bg: "bg-green-50" },
-  rejected:         { icon: "cancel",            color: "text-red-600",        bg: "bg-red-50" },
-  needs_evidence:   { icon: "radio_button_checked", color: "text-amber-600",   bg: "bg-amber-50" },
-  final_decision:   { icon: "fact_check",        color: "text-green-700",      bg: "bg-green-50" },
-  comment:          { icon: "chat",              color: "text-on-surface-variant", bg: "bg-surface-container" },
+  created: { icon: "add_circle", color: "text-primary", bg: "bg-primary/10" },
+  retake_requested: { icon: "history", color: "text-amber-600", bg: "bg-amber-50" },
+  resubmitted: { icon: "publish", color: "text-blue-600", bg: "bg-blue-50" },
+  reviewed: { icon: "rate_review", color: "text-primary", bg: "bg-primary/10" },
+  approved: { icon: "check_circle", color: "text-green-600", bg: "bg-green-50" },
+  rejected: { icon: "cancel", color: "text-red-600", bg: "bg-red-50" },
+  needs_evidence: { icon: "radio_button_checked", color: "text-amber-600", bg: "bg-amber-50" },
+  final_decision: { icon: "fact_check", color: "text-green-700", bg: "bg-green-50" },
+  comment: { icon: "chat", color: "text-on-surface-variant", bg: "bg-surface-container" },
 };
 
 function getConfig(type) {
@@ -434,13 +434,13 @@ export function ImageComparison({
  */
 export function MetadataCard({ caseData = {}, extra = [] }) {
   const rows = [
-    { label: "Case ID",     value: caseData.id },
-    { label: "Part Code",   value: caseData.partCode },
-    { label: "Commodity",   value: caseData.commodity },
-    { label: "Status",      value: caseData.status?.replace(/_/g, " ") },
-    { label: "Image Hash",  value: caseData.imageHash },
-    { label: "Neural Model",value: caseData.neuralModel },
-    { label: "Updated",     value: formatDateTime(caseData.updatedAt) },
+    { label: "Case ID", value: caseData.id },
+    { label: "Part Code", value: caseData.partCode },
+    { label: "Commodity", value: caseData.commodity },
+    { label: "Status", value: caseData.status?.replace(/_/g, " ") },
+    { label: "Image Hash", value: caseData.imageHash },
+    { label: "Neural Model", value: caseData.neuralModel },
+    { label: "Updated", value: formatDateTime(caseData.updatedAt) },
     ...extra,
   ].filter((r) => r.value !== undefined && r.value !== null);
 

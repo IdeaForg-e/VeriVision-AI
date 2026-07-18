@@ -1,66 +1,39 @@
 /**
- * Case service — shared by Daily Triage, Case Detail, and Human Review
- * (all three read/write "case" objects, just at different levels of detail).
- *
- * TODO(backend):
- *   GET   /cases                 -> list (used by Daily Triage queue)
- *   GET   /cases/:id             -> full detail (used by Case Detail + Human Review)
- *   PATCH /cases/:id/status      -> { status }
+ * Case service — connects to backend /api/triage/cases endpoints.
  */
+import { api } from "./api.js";
 
-const MOCK_LATENCY = 500;
-
-const MOCK_CASES = [
-  {
-    id: "F-2026-02",
-    partCode: "BRK-442",
-    commodity: "Brake Assembly",
-    confidencePct: 42,
-    fraudScore: 58,
-    status: "needs_evidence",
-    updatedAt: "2026-07-17T10:15:00Z",
-  },
-  {
-    id: "F-2026-01",
-    partCode: "IC-118",
-    commodity: "Microchips / IC",
-    confidencePct: 91,
-    fraudScore: 22,
-    status: "final_decision",
-    updatedAt: "2026-07-16T08:40:00Z",
-  },
-  {
-    id: "F-2026-03",
-    partCode: "SNS-077",
-    commodity: "Sensor Housing",
-    confidencePct: 30,
-    fraudScore: 81,
-    status: "retake_requested",
-    updatedAt: "2026-07-17T13:02:00Z",
-  },
-];
-
-export function getCases() {
-  return new Promise((resolve) => {
-    setTimeout(() => resolve(MOCK_CASES), MOCK_LATENCY);
-  });
+export async function getCases() {
+  try {
+    const data = await api.get("/triage/cases");
+    return data;
+  } catch {
+    // Return empty array on error
+    return [];
+  }
 }
 
-export function getCaseById(caseId) {
-  return new Promise((resolve, reject) => {
-    setTimeout(() => {
-      const found = MOCK_CASES.find((c) => c.id === caseId);
-      if (!found) {
-        reject(new Error(`Case ${caseId} not found`));
-        return;
-      }
-      resolve(found);
-    }, MOCK_LATENCY);
-  });
+export async function getCaseById(caseId) {
+  const data = await api.get(`/triage/cases/${caseId}/detail`);
+  return {
+    id: data.metadata.id,
+    partCode: data.metadata.partCode,
+    commodity: data.metadata.commodity,
+    confidencePct: data.metadata.confidencePct,
+    fraudScore: data.metadata.fraudScore,
+    status: data.metadata.status,
+    updatedAt: data.metadata.updatedAt,
+    imageHash: data.metadata.imageHash,
+    neuralModel: data.metadata.neuralModel,
+    title: `Case detail for ${data.metadata.partCode}`,
+    ocrResults: data.ocrResults,
+    metrics: data.metrics,
+    timeline: data.timeline,
+    recommendation: data.recommendation,
+  };
 }
 
-export function updateCaseStatus(caseId, status) {
-  return new Promise((resolve) => {
-    setTimeout(() => resolve({ caseId, status, updatedAt: new Date().toISOString() }), MOCK_LATENCY / 2);
-  });
+export async function updateCaseStatus(caseId, status) {
+  const data = await api.post(`/triage/cases/${caseId}/status`, { status });
+  return data;
 }

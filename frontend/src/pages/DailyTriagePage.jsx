@@ -1,86 +1,81 @@
-import { useState } from "react";
-
+import { useState, useEffect } from "react";
 import { Layout } from "../components/layout.jsx";
 import { StatsCards, QueueFilters, QueueTable, PipelineStatus } from "../components/triage.jsx";
+import { getTriageQueue, getTriageStats, getPipelineStatus } from "../services/triageService.js";
 
 export default function DailyTriagePage() {
   // Search & Filter
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
 
-  // Mock Inspection Cases
-  const [cases] = useState([
-    {
-      id: 1,
-      caseId: "QC-1001",
-      createdAt: "09:30 AM",
-      partNumber: "PN-4582",
-      batch: "Batch A",
-      commodity: "Gear",
-      riskScore: 85,
-      confidence: 96,
-      reason: "OCR Mismatch",
-      status: "QUARANTINE",
-    },
-    {
-      id: 2,
-      caseId: "QC-1002",
-      createdAt: "09:45 AM",
-      partNumber: "PN-5621",
-      batch: "Batch B",
-      commodity: "Bearing",
-      riskScore: 48,
-      confidence: 91,
-      reason: "Missing Sticker",
-      status: "PENDING QA",
-    },
-    {
-      id: 3,
-      caseId: "QC-1003",
-      createdAt: "10:05 AM",
-      partNumber: "PN-7630",
-      batch: "Batch C",
-      commodity: "Valve",
-      riskScore: 15,
-      confidence: 99,
-      reason: "Passed Inspection",
-      status: "AUTO-APPROVED",
-    },
-  ]);
+  // Real data from backend
+  const [cases, setCases] = useState([]);
+  const [stats, setStats] = useState({ totalToday: 0, pendingReview: 0, autoApproved: 0 });
+  const [alerts, setAlerts] = useState([]);
+  const [activities, setActivities] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  // Mock Alerts
-  const alerts = [
-    {
-      id: 1,
-      title: "High Fraud Risk",
-      message: "QC-1001 requires manual review",
-      time: "2 min ago",
-    },
-    {
-      id: 2,
-      title: "OCR Failure",
-      message: "Image quality below threshold",
-      time: "10 min ago",
-    },
-  ];
+  const fetchData = async () => {
+    setLoading(true);
+    try {
+      const [queueResult, statsData, pipelineData] = await Promise.all([
+        getTriageQueue({ page: 1, pageSize: 50, filters: { status: statusFilter, search } }),
+        getTriageStats(),
+        getPipelineStatus(),
+      ]);
 
-  // Mock Activity
-  const activities = [
-    {
-      id: 1,
-      title: "Inspection Completed",
-      description: "QC-1003 approved",
-      status: "SUCCESS",
-      time: "1 min ago",
-    },
-    {
-      id: 2,
-      title: "Waiting for QA",
-      description: "QC-1002 pending review",
-      status: "PENDING",
-      time: "5 min ago",
-    },
-  ];
+      setCases(queueResult.items || []);
+
+      // Derive alerts from cases with high risk
+      const highRiskCases = (queueResult.items || []).filter((c) => c.riskScore >= 75);
+      setAlerts(
+        highRiskCases.slice(0, 5).map((c, i) => ({
+          id: i + 1,
+          title: "High Fraud Risk",
+          message: `${c.caseId} requires manual review`,
+          time: "Recent",
+        }))
+      );
+
+      // Derive activities
+      const recentCases = (queueResult.items || []).slice(0, 5);
+      setActivities(
+        recentCases.map((c, i) => ({
+          id: i + 1,
+          title: c.status === "AUTO-APPROVED" ? "Inspection Completed" : "Flagged for Review",
+          description: `${c.caseId} ${c.status === "AUTO-APPROVED" ? "approved" : "pending review"}`,
+          status: c.status === "AUTO-APPROVED" ? "SUCCESS" : "PENDING",
+          time: c.createdAt || "Recent",
+        }))
+      );
+
+      setStats(statsData);
+    } catch (err) {
+      console.error("Failed to fetch triage data:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const handleRefresh = () => {
+    setSearch("");
+    setStatusFilter("ALL");
+    fetchData();
+  };
+
+  if (loading && cases.length === 0) {
+    return (
+      <Layout title="Daily Triage Dashboard" subtitle="Monitor inspection cases and AI pipeline">
+        <div className="flex items-center justify-center h-64 text-on-surface-variant">
+          Loading triage data...
+        </div>
+      </Layout>
+    );
+  }
 
   return (
     <Layout
@@ -88,7 +83,7 @@ export default function DailyTriagePage() {
       subtitle="Monitor inspection cases and AI pipeline"
     >
       {/* Statistics */}
-      <StatsCards cases={cases} />
+      <StatsCards cases={cases} stats={stats} />
 
       {/* Filters */}
       <div className="mt-6">
@@ -97,10 +92,7 @@ export default function DailyTriagePage() {
           setSearch={setSearch}
           statusFilter={statusFilter}
           setStatusFilter={setStatusFilter}
-          onRefresh={() => {
-            setSearch("");
-            setStatusFilter("ALL");
-          }}
+          onRefresh={handleRefresh}
         />
       </div>
 

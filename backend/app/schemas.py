@@ -133,3 +133,82 @@ class ReportResponse(BaseModel):
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+# --- Triage / Case Queue Schemas ---
+class CaseQueueItem(BaseModel):
+    id: str
+    caseId: str
+    createdAt: str
+    partNumber: str
+    batch: str
+    commodity: str
+    riskScore: int
+    confidence: int
+    reason: str
+    status: str
+
+class TriageStats(BaseModel):
+    totalToday: int
+    pendingReview: int
+    autoApproved: int
+    avgResolutionMinutes: float
+
+class PipelineStatusResponse(BaseModel):
+    stage: str
+    health: str
+    lastRunAt: str
+
+class CaseStatusUpdate(BaseModel):
+    status: str
+
+
+# --- Pipeline Config Schemas ---
+class ThresholdConfig(BaseModel):
+    ssim: float = 0.85
+    keypointDeltaPct: int = 15
+    ocrFuzzyPct: int = 100
+
+class RoutingRule(BaseModel):
+    id: str
+    name: str
+    description: str
+
+class PrivacyConfig(BaseModel):
+    storeImageHashOnly: bool = True
+    redactPersonalMarkings: bool = True
+    verdictChangeAuditLog: bool = True
+
+class PipelineConfig(BaseModel):
+    thresholds: ThresholdConfig
+    routingRules: List[RoutingRule]
+    privacy: PrivacyConfig
+
+class AdjustmentHistoryItem(BaseModel):
+    id: str
+    changedAt: str
+    summary: str
+    user: str
+
+class ROIRegion(BaseModel):
+    x: float
+    y: float
+    w: float
+    h: float
+
+class ROIUpdate(BaseModel):
+    region: ROIRegion
+
+class ReviewDetailResponse(BaseModel):
+    id: str
+    partCode: str
+    title: str
+    confidencePct: int
+    imageHash: str
+    goldenImageUrl: str
+    uploadedImageUrl: str
+    aiRegion: Dict[str, float]
+    neuralModel: str
+    targetResolutionMinutes: int
+    elapsedMinutes: float
+    status: str

@@ -10,27 +10,6 @@ import { getCaseById } from "../services/caseService.js";
 import { fetchCaseForReview } from "../services/reviewService.js";
 import { ROUTES, REVIEW_DECISION } from "../utils/constants.js";
 
-// ── Mock supplementary data (would come from backend in production) ──────────
-const MOCK_OCR = [
-  { field: "Part Number", extracted: "BRK-442", expected: "BRK-442", match: true },
-  { field: "Batch Code",  extracted: "BTCH-9A",  expected: "BTCH-9B",  match: false },
-  { field: "Serial No.",  extracted: "SN-0041",  expected: null,        match: null },
-];
-
-const MOCK_METRICS = [
-  { name: "SSIM Score",        score: 0.62, unit: "",  icon: "image_search",  description: "Structural similarity to OEM golden image" },
-  { name: "Keypoint Delta",    score: 0.28, unit: "",  icon: "hub",           description: "ORB/SIFT keypoint match delta (lower = closer)" },
-  { name: "OCR Fuzzy Match",   score: 87,   unit: "%", icon: "text_fields",   description: "Character-level fuzzy match with expected label" },
-  { name: "AI Confidence",     score: 42,   unit: "%", icon: "psychology",    description: "Overall detector confidence (< 50% → human review)" },
-];
-
-const MOCK_TIMELINE = [
-  { id: "e1", type: "created",          label: "Case Opened",             user: "System",    timestamp: "2026-07-17T08:00:00Z", description: "Automatically created by the Perception Engine." },
-  { id: "e2", type: "needs_evidence",   label: "Needs Evidence",          user: "FraudSense v4.2", timestamp: "2026-07-17T08:01:00Z", description: "AI confidence below auto-decide threshold (42%)." },
-  { id: "e3", type: "retake_requested", label: "Retake Photo Requested",  user: "Chaitanya", timestamp: "2026-07-17T09:30:00Z", description: "Batch code label partially obscured." },
-  { id: "e4", type: "resubmitted",      label: "Photo Resubmitted",       user: "Supplier",  timestamp: "2026-07-17T10:15:00Z", description: "New image uploaded by supplier portal." },
-];
-
 export default function CaseDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -80,6 +59,21 @@ export default function CaseDetailPage() {
 
   const merged = { ...caseData, ...reviewData };
 
+  // Use OCR results from backend if available, otherwise empty
+  const ocrResults = caseData?.ocrResults || [];
+
+  // Use metrics from backend if available, otherwise empty
+  const metrics = caseData?.metrics || [];
+
+  // Use timeline from backend if available, otherwise empty
+  const timeline = caseData?.timeline || [];
+
+  // Use recommendation from backend if available
+  const recommendation = caseData?.recommendation || {};
+  const recDecision = recommendation.decision === "Accept" ? REVIEW_DECISION.APPROVED
+    : recommendation.decision === "Quarantine & Escalate" ? REVIEW_DECISION.REJECTED
+      : REVIEW_DECISION.NEEDS_MORE_EVIDENCE;
+
   return (
     <Layout>
       {/* Page Header */}
@@ -114,10 +108,10 @@ export default function CaseDetailPage() {
       {/* AI Recommendation */}
       <div className="mb-6">
         <RecommendationCard
-          recommendation={REVIEW_DECISION.NEEDS_MORE_EVIDENCE}
-          confidence={42}
-          reasoning="AI confidence is below the auto-decide threshold (50%). Batch code mismatch detected by OCR. Manual review required before a final decision can be issued."
-          flags={["OCR Mismatch", "Low SSIM (0.62)", "Batch Code Discrepancy"]}
+          recommendation={recDecision}
+          confidence={recommendation.confidence || 42}
+          reasoning={recommendation.reasoning || "AI confidence is below the auto-decide threshold. Manual review required."}
+          flags={recommendation.flags || []}
         />
       </div>
 
@@ -135,18 +129,18 @@ export default function CaseDetailPage() {
             region={merged.aiRegion}
             label="AI-detected region of interest — drag to adjust in Human Review"
           />
-          <OCRResults results={MOCK_OCR} />
+          <OCRResults results={ocrResults} />
         </div>
 
         {/* Right column */}
         <div className="lg:col-span-4 flex flex-col gap-6">
           <MetadataCard caseData={merged} />
-          <DetectorMetrics metrics={MOCK_METRICS} />
+          <DetectorMetrics metrics={metrics} />
         </div>
       </div>
 
       {/* Timeline */}
-      <EvidenceTimeline events={MOCK_TIMELINE} />
+      <EvidenceTimeline events={timeline} />
 
       {/* CTA: Go to Human Review */}
       <div className="mt-8 flex justify-end">

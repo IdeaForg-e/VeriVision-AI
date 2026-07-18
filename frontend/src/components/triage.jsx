@@ -1,18 +1,9 @@
 // Consolidated components for triage
-import Pagination from "../common/Pagination";
-import SearchBar from "../common/SearchBar";
-import {
-import { ROUTES } from "../../utils/constants.js";
-import { Search, Filter, RefreshCw, Download } from "lucide-react";
+import { Pagination, SearchBar } from "./common.jsx";
+import { ROUTES } from "../utils/constants.js";
+import { Search, Filter, RefreshCw, Download, AlertTriangle, ShieldAlert, CheckCircle2, Clock3, Activity, ChevronRight, ClipboardCheck, BrainCircuit, TrendingUp } from "lucide-react";
 import { useMemo, useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-
-  AlertTriangle,
-  ShieldAlert,
-  CheckCircle2,
-  Clock3,
-  Activity,
-} from "lucide-react";
 
 export function PipelineStatus({
   alerts = [],
@@ -237,14 +228,7 @@ export function QueueFilters({
     </div>
   );
 }
-
 // ==========================================
-
-  ChevronRight,
-  AlertTriangle,
-  CheckCircle2,
-  Clock3,
-} from "lucide-react";
 
 export function QueueRow({ item }) {
   const navigate = useNavigate();
@@ -601,13 +585,6 @@ export function QueueTable({
 
 // ==========================================
 
-  ClipboardCheck,
-  Clock3,
-  ShieldAlert,
-  BrainCircuit,
-  TrendingUp,
-} from "lucide-react";
-
 /**
  * Props:
  *  cases {Array} — the raw cases array from DailyTriagePage state.
@@ -701,9 +678,8 @@ export function StatsCards({ cases = [] }) {
 
             {card.footer && (
               <div
-                className={`flex items-center gap-2 mt-4 text-xs uppercase tracking-wide ${
-                  card.trend ? "text-red-500" : "text-gray-500"
-                }`}
+                className={`flex items-center gap-2 mt-4 text-xs uppercase tracking-wide ${card.trend ? "text-red-500" : "text-gray-500"
+                  }`}
               >
                 {card.trend && <TrendingUp size={14} />}
 

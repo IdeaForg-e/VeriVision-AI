@@ -1,5 +1,5 @@
 // Consolidated components for review
-import { confidenceTone, toneClasses } from "../../utils/statusColor.js";
+import { confidenceTone, toneClasses } from "../utils/statusColor.js";
 import { useCallback, useRef, useState } from "react";
 
 
@@ -56,16 +56,14 @@ export function CaseStatusTracker({ status }) {
           return (
             <div
               key={step.key}
-              className={`flex flex-col items-center gap-3 relative flex-1 ${
-                !isActive && !isDone ? "opacity-50" : ""
-              }`}
+              className={`flex flex-col items-center gap-3 relative flex-1 ${!isActive && !isDone ? "opacity-50" : ""
+                }`}
             >
               <div
-                className={`w-10 h-10 rounded-full flex items-center justify-center z-10 border ${
-                  isActive || isDone
+                className={`w-10 h-10 rounded-full flex items-center justify-center z-10 border ${isActive || isDone
                     ? "bg-primary text-white shadow-md border-transparent"
                     : "bg-surface-container text-on-surface-variant border-outline-variant"
-                }`}
+                  }`}
               >
                 <span className="material-symbols-outlined">{step.icon}</span>
               </div>
@@ -309,9 +307,8 @@ export function ROIEditor({ region, onChange, onCommit, label = "AI_PREDICTION_R
       onTouchEnd={endDrag}
     >
       <div
-        className={`absolute border-2 border-dashed border-primary bg-primary/10 shadow-lg z-10 cursor-move ${
-          active ? "ring-2 ring-primary" : ""
-        }`}
+        className={`absolute border-2 border-dashed border-primary bg-primary/10 shadow-lg z-10 cursor-move ${active ? "ring-2 ring-primary" : ""
+          }`}
         style={{
           left: `${region.x}%`,
           top: `${region.y}%`,

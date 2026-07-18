@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState } from "react";
-import { fetchAdjustmentHistory, fetchPipelineConfig, savePipelineConfig } from "../services/feedbackService.js";
+import { useState, useCallback, useEffect } from "react";
+import { fetchPipelineConfig, savePipelineConfig, fetchAdjustmentHistory } from "../services/feedbackService.js";
 
 export function useFeedbackConfig() {
   const [config, setConfig] = useState(null);
@@ -8,41 +8,67 @@ export function useFeedbackConfig() {
   const [saveState, setSaveState] = useState("idle"); // idle | saving | saved | error
 
   useEffect(() => {
-    let cancelled = false;
-    Promise.all([fetchPipelineConfig(), fetchAdjustmentHistory()]).then(([cfg, hist]) => {
-      if (cancelled) return;
-      setConfig(cfg);
-      setHistory(hist);
-      setLoading(false);
-    });
-    return () => {
-      cancelled = true;
-    };
+    setLoading(true);
+    Promise.all([fetchPipelineConfig(), fetchAdjustmentHistory()])
+      .then(([cfg, hist]) => {
+        setConfig(cfg);
+        setHistory(hist);
+      })
+      .catch((err) => console.error("Failed to load pipeline config:", err))
+      .finally(() => setLoading(false));
   }, []);
 
   const updateThreshold = useCallback((key, value) => {
-    setConfig((prev) => ({ ...prev, thresholds: { ...prev.thresholds, [key]: value } }));
+    setConfig((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        thresholds: { ...prev.thresholds, [key]: value },
+      };
+    });
   }, []);
 
   const togglePrivacy = useCallback((key) => {
-    setConfig((prev) => ({ ...prev, privacy: { ...prev.privacy, [key]: !prev.privacy[key] } }));
+    setConfig((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        privacy: { ...prev.privacy, [key]: !prev.privacy[key] },
+      };
+    });
   }, []);
 
   const addRoutingRule = useCallback((rule) => {
-    setConfig((prev) => ({ ...prev, routingRules: [...prev.routingRules, rule] }));
+    setConfig((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        routingRules: [...(prev.routingRules || []), rule],
+      };
+    });
   }, []);
 
   const save = useCallback(async () => {
+    if (!config) return;
     setSaveState("saving");
     try {
       await savePipelineConfig(config);
       setSaveState("saved");
       setTimeout(() => setSaveState("idle"), 2000);
-    } catch {
+    } catch (err) {
       setSaveState("error");
-      setTimeout(() => setSaveState("idle"), 2000);
+      setTimeout(() => setSaveState("idle"), 3000);
     }
   }, [config]);
 
-  return { config, history, loading, saveState, updateThreshold, togglePrivacy, addRoutingRule, save };
+  return {
+    config,
+    history,
+    loading,
+    saveState,
+    updateThreshold,
+    togglePrivacy,
+    addRoutingRule,
+    save,
+  };
 }

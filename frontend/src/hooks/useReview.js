@@ -1,47 +1,44 @@
-import { useCallback, useEffect, useState } from "react";
-import { fetchCaseForReview, submitReviewDecision, updateROIRegion } from "../services/reviewService.js";
+import { useState, useCallback, useEffect } from "react";
+import { fetchCaseForReview, updateROIRegion, submitReviewDecision } from "../services/reviewService.js";
 
 export function useReview(caseId) {
   const [caseData, setCaseData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [notes, setNotes] = useState("");
-  const [region, setRegion] = useState(null);
-  const [decisionState, setDecisionState] = useState({ pending: null, lastResult: null, error: null });
+  const [region, setRegion] = useState({ x: 25, y: 25, w: 25, h: 25 });
+  const [decisionState, setDecisionState] = useState({
+    pending: null,
+    lastResult: null,
+    error: null,
+  });
 
   useEffect(() => {
-    let cancelled = false;
+    if (!caseId) return;
     setLoading(true);
-    fetchCaseForReview(caseId).then((data) => {
-      if (cancelled) return;
-      setCaseData(data);
-      setRegion(data.aiRegion);
-      setLoading(false);
-    });
-    return () => {
-      cancelled = true;
-    };
+    fetchCaseForReview(caseId)
+      .then((data) => {
+        setCaseData(data);
+        if (data.aiRegion) setRegion(data.aiRegion);
+      })
+      .catch((err) => console.error("Failed to load case for review:", err))
+      .finally(() => setLoading(false));
   }, [caseId]);
 
-  const handleRegionChange = useCallback(
-    (nextRegion) => {
-      setRegion(nextRegion);
-      if (caseData) updateROIRegion(caseData.id, nextRegion);
-    },
-    [caseData]
-  );
+  const handleRegionChange = useCallback((newRegion) => {
+    setRegion(newRegion);
+  }, []);
 
   const submitDecision = useCallback(
     async (decision) => {
-      if (!caseData) return;
       setDecisionState({ pending: decision, lastResult: null, error: null });
       try {
-        const result = await submitReviewDecision(caseData.id, decision, notes);
+        const result = await submitReviewDecision(caseId, decision, notes);
         setDecisionState({ pending: null, lastResult: result, error: null });
       } catch (err) {
         setDecisionState({ pending: null, lastResult: null, error: err.message });
       }
     },
-    [caseData, notes]
+    [caseId, notes]
   );
 
   return {
