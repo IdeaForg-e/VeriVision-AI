@@ -588,18 +588,21 @@ export function QueueTable({
 /**
  * Props:
  *  cases {Array} — the raw cases array from DailyTriagePage state.
- *                  We derive the stats from it so the component is self-contained
- *                  and doesn't require the parent to compute them separately.
+ *  stats {Object} — optional aggregate values returned by the backend.
  *
- * Previously this component expected a `stats` object prop but was called with
- * a `cases` array, causing all values to render as 0/undefined.
+ * The dashboard now prefers the backend-provided stats object, but still falls
+ * back to deriving values from the cases array when needed.
  */
-export function StatsCards({ cases = [] }) {
-  // Derive stats from the cases array
-  const totalInspected = cases.length;
-  const pendingQA = cases.filter((c) => c.status === "PENDING QA").length;
-  const quarantined = cases.filter((c) => c.status === "QUARANTINE").length;
-  const autoApproved = cases.filter((c) => c.status === "AUTO-APPROVED").length;
+export function StatsCards({ cases = [], stats = null }) {
+  const derivedTotal = cases.length;
+  const derivedPending = cases.filter((c) => c.status === "PENDING QA").length;
+  const derivedQuarantined = cases.filter((c) => c.status === "QUARANTINE").length;
+  const derivedAutoApproved = cases.filter((c) => c.status === "AUTO-APPROVED").length;
+
+  const totalInspected = stats?.totalToday ?? derivedTotal;
+  const pendingQA = stats?.pendingReview ?? derivedPending;
+  const quarantined = derivedQuarantined;
+  const autoApproved = stats?.autoApproved ?? derivedAutoApproved;
   const quarantineRate = totalInspected > 0 ? Math.round((quarantined / totalInspected) * 100) : 0;
   const autopilotIndex = totalInspected > 0 ? Math.round((autoApproved / totalInspected) * 100) : 0;
 

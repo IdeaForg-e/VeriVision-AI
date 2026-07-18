@@ -49,7 +49,7 @@ export default function DailyTriagePage() {
         }))
       );
 
-      setStats(statsData);
+      setStats(statsData || { totalToday: 0, pendingReview: 0, autoApproved: 0, avgResolutionMinutes: 0 });
     } catch (err) {
       console.error("Failed to fetch triage data:", err);
     } finally {

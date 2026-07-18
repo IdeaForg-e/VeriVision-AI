@@ -44,7 +44,7 @@ export default function CaseDetailPage() {
       <Layout>
         <div className="flex flex-col items-center justify-center py-24 gap-4 text-center">
           <span className="material-symbols-outlined text-5xl text-error">error_outline</span>
-          <p className="font-headline-sm text-on-surface">Case not found</p>
+          <p className="font-headline-sm text-on-surface">Error Loading Case</p>
           <p className="text-body-md text-on-surface-variant max-w-sm">{error}</p>
           <button
             onClick={() => navigate(ROUTES.TRIAGE)}

@@ -104,6 +104,88 @@ def seed():
             db.add_all(references)
             db.commit()
 
+        # 4. Create Mock Inspections for Dashboard Data
+        print("Creating mock inspection cases...")
+        from datetime import datetime, timedelta
+        
+        now = datetime.utcnow()
+        
+        # Case 1: Clean
+        i1 = models.Inspection(
+            case_id="F-2026-02",
+            product_id=products["XPS-MB-409"].id,
+            user_id=users[1].id,
+            captured_image_path=mb_golden_dest if os.path.exists(ref_motherboard_src) else "/dataset/golden_motherboard_full_top_down.png",
+            capture_site="Line-1",
+            capture_angle="top",
+            status="completed",
+            created_at=now - timedelta(minutes=45)
+        )
+        db.add(i1)
+        db.commit()
+        db.refresh(i1)
+        
+        r1 = models.InspectionResult(
+            inspection_id=i1.id,
+            ssim_score=0.98,
+            keypoint_match_rate=0.95,
+            ocr_detected_text="XPS-REV-409",
+            ocr_expected_text="XPS-REV-409",
+            fraud_score=10,
+            verdict="clean",
+            confidence=0.92,
+            recommended_action="Accept",
+            explanation="Parts verified correctly.",
+            heatmap_path=None
+        )
+        db.add(r1)
+
+        # Case 2: Tampered / Quarantine
+        i2 = models.Inspection(
+            case_id="C-2026-03",
+            product_id=products["XPS-LABEL-03"].id,
+            user_id=users[1].id,
+            captured_image_path="/dataset/defect_burn_marks.png",
+            capture_site="Line-2",
+            capture_angle="top",
+            status="completed",
+            created_at=now - timedelta(minutes=10)
+        )
+        db.add(i2)
+        db.commit()
+        db.refresh(i2)
+        
+        r2 = models.InspectionResult(
+            inspection_id=i2.id,
+            ssim_score=0.62,
+            keypoint_match_rate=0.55,
+            ocr_detected_text="91165LUSODDD",
+            ocr_expected_text="91165LUS0DDD",
+            fraud_score=85,
+            verdict="tampered",
+            confidence=0.90,
+            recommended_action="Quarantine & Escalate",
+            explanation="Defects and character mismatch detected.",
+            heatmap_path=None
+        )
+        db.add(r2)
+
+        # Case 3: Pending Review
+        i3 = models.Inspection(
+            case_id="P-2026-04",
+            product_id=products["XPS-MB-409"].id,
+            user_id=users[1].id,
+            captured_image_path="/dataset/golden_motherboard_full_top_down.png",
+            capture_site="Line-1",
+            capture_angle="top",
+            status="pending",
+            created_at=now - timedelta(minutes=2)
+        )
+        db.add(i3)
+        
+        db.commit()
+
+
         print("Database Seeding Completed Successfully! [SUCCESS]")
         print("\nDefault Logins:")
         print("- Admin: admin@verivision.com / admin123")

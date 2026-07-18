@@ -19,7 +19,7 @@ export default function AppRoutes() {
       <Route path="/login" element={<LoginPage />} />
       <Route path="/triage" element={<WorkspaceRoute><DailyTriagePage /></WorkspaceRoute>} />
       <Route path="/case/:id" element={<WorkspaceRoute><CaseDetailPage /></WorkspaceRoute>} />
-      <Route path="/case" element={<WorkspaceRoute><Navigate to="/triage" replace /></WorkspaceRoute>} />
+      <Route path="/case" element={<WorkspaceRoute><CaseDetailPage /></WorkspaceRoute>} />
       <Route path="/review" element={<WorkspaceRoute><HumanReviewPage /></WorkspaceRoute>} />
       <Route path="/feedback" element={<WorkspaceRoute><FeedbackPanelPage /></WorkspaceRoute>} />
       <Route path="*" element={<NotFoundPage />} />
