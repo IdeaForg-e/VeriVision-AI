@@ -125,7 +125,7 @@ def make_decision(ensemble_results: dict) -> dict:
     
     # Scale up for visibility
     fraud_score = int(min(max(weighted_score * 1.5, 0.0), 100.0))
-    logger.info(f"Local calculated losses - SSIM: {ssim_loss:.3f}, OCR: {ocr_loss:.3f}, Keypoints: {kp_loss:.3f}, Template: {temp_loss:.1f}, Color: {color_loss:.3f}. Weighted Score: {weighted_score:.2f} -> Fraud Score: {fraud_score}")
+    logger.info(f"Local calculated losses - SSIM: {ssim_loss:.3f}, OCR: {ocr_loss:.3f}, Keypoints: {kp_loss:.3f}, Template: {template_loss:.1f}, Color: {color_loss:.3f}. Weighted Score: {weighted_score:.2f} -> Fraud Score: {fraud_score}")
 
     verdict = "clean"
     recommended_action = "Accept"
