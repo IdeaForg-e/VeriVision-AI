@@ -2,35 +2,96 @@
 @tailwind components;
 @tailwind utilities;
 
-/* ── Base ──────────────────────────────────────────────────────────────────── */
+/* ── Base Theme Overrides ─────────────────────────────────────────────────── */
 @layer base {
   html {
     font-family: "Inter", system-ui, sans-serif;
     -webkit-font-smoothing: antialiased;
+    scroll-behavior: smooth;
+    background-color: #070a13;
   }
 
   body {
-    @apply bg-background text-on-surface;
+    background-color: #070a13;
+    background-image: 
+      radial-gradient(at 0% 0%, rgba(34, 211, 238, 0.03) 0px, transparent 50%),
+      radial-gradient(at 100% 0%, rgba(139, 92, 246, 0.03) 0px, transparent 50%),
+      radial-gradient(at 50% 100%, rgba(16, 185, 129, 0.02) 0px, transparent 50%);
+    background-attachment: fixed;
+    color: #e2e8f0;
+  }
+
+  /* Custom thin premium scrollbar */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: #090d16;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #1e293b;
+    border-radius: 9999px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #06b6d4;
   }
 }
 
-/* ── Custom utility classes for design tokens ──────────────────────────────── */
+/* ── Premium Cyber Utility Classes ────────────────────────────────────────── */
 @layer utilities {
-  /* Typography helpers referenced in JSX as className="font-tech-code …" */
   .font-tech-code {
     font-family: "JetBrains Mono", monospace;
     font-weight: 700;
+    letter-spacing: -0.02em;
   }
 
-  .font-headline-lg { font-size: 1.5rem;    line-height: 2rem;    font-weight: 700; }
-  .font-headline-md { font-size: 1.25rem;   line-height: 1.75rem; font-weight: 700; }
+  /* Glassmorphic Cyber Card */
+  .cyber-card {
+    background: rgba(15, 23, 42, 0.55);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(30, 41, 59, 0.7);
+    border-radius: 12px;
+    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.35);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .cyber-card:hover {
+    border-color: rgba(6, 182, 212, 0.35);
+    box-shadow: 0 0 25px rgba(6, 182, 212, 0.08);
+    transform: translateY(-2px);
+  }
+
+  /* Cyber Glow Highlights */
+  .cyber-glow-cyan {
+    box-shadow: 0 0 20px rgba(6, 182, 212, 0.15);
+  }
+  .cyber-glow-purple {
+    box-shadow: 0 0 20px rgba(168, 85, 247, 0.15);
+  }
+
+  /* Cyber inputs */
+  .cyber-input {
+    background: rgba(9, 13, 22, 0.6) !important;
+    border: 1px solid rgba(30, 41, 59, 0.8) !important;
+    color: #f8fafc !important;
+    outline: none !important;
+    transition: all 0.2s ease-in-out !important;
+  }
+  .cyber-input:focus {
+    border-color: #06b6d4 !important;
+    box-shadow: 0 0 10px rgba(6, 182, 212, 0.2) !important;
+  }
+
+  /* Typography helpers */
+  .font-headline-lg { font-size: 1.5rem;    line-height: 2rem;    font-weight: 800; letter-spacing: -0.025em; }
+  .font-headline-md { font-size: 1.25rem;   line-height: 1.75rem; font-weight: 700; letter-spacing: -0.02em; }
   .font-headline-sm { font-size: 1rem;      line-height: 1.5rem;  font-weight: 700; }
   .font-body-lg     { font-size: 1rem;      line-height: 1.5rem; }
   .font-body-md     { font-size: 0.875rem;  line-height: 1.25rem; }
   .font-body-sm     { font-size: 0.75rem;   line-height: 1rem; }
-  .font-label-caps  { font-size: 0.6875rem; line-height: 1rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; }
+  .font-label-caps  { font-size: 0.6875rem; line-height: 1rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; }
 
-  /* Gap / padding design tokens not inferrable from Tailwind config alone */
   .gap-gutter       { gap: 24px; }
   .p-card-padding   { padding: 24px; }
   .space-y-stack-gap > * + * { margin-top: 16px; }
@@ -39,26 +100,167 @@
 /* ── Range input styling ───────────────────────────────────────────────────── */
 input[type="range"] {
   -webkit-appearance: none;
-  height: 6px;
+  height: 4px;
   border-radius: 9999px;
-  background: #d3e4fe;
+  background: #1e293b;
 }
 input[type="range"]::-webkit-slider-thumb {
   -webkit-appearance: none;
-  width: 18px;
-  height: 18px;
+  width: 16px;
+  height: 16px;
   border-radius: 9999px;
-  background: #004ac6;
+  background: #06b6d4;
   cursor: pointer;
-  border: 3px solid white;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+  border: 2px solid #ffffff;
+  box-shadow: 0 0 10px rgba(6, 182, 212, 0.6);
+  transition: all 0.1s ease;
+}
+input[type="range"]::-webkit-slider-thumb:hover {
+  transform: scale(1.2);
 }
 input[type="range"]::-moz-range-thumb {
-  width: 18px;
-  height: 18px;
+  width: 16px;
+  height: 16px;
   border-radius: 9999px;
-  background: #004ac6;
+  background: #06b6d4;
   cursor: pointer;
-  border: 3px solid white;
+  border: 2px solid #ffffff;
+  box-shadow: 0 0 10px rgba(6, 182, 212, 0.6);
 }
 
+/* ── Light Theme Overrides ────────────────────────────────────────────────── */
+body.light-theme {
+  background-color: #f3f4f6 !important;
+  background-image: none !important;
+  color: #1f2937 !important;
+}
+
+body.light-theme .cyber-card {
+  background: rgba(255, 255, 255, 0.95) !important;
+  border-color: #e5e7eb !important;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05) !important;
+}
+body.light-theme .cyber-card:hover {
+  border-color: rgba(6, 182, 212, 0.5) !important;
+  box-shadow: 0 0 20px rgba(6, 182, 212, 0.1) !important;
+}
+
+body.light-theme header {
+  background-color: rgba(255, 255, 255, 0.9) !important;
+  border-bottom-color: #e5e7eb !important;
+}
+
+body.light-theme header a, body.light-theme header p {
+  color: #111827 !important;
+}
+
+body.light-theme header nav a.active {
+  background-color: rgba(6, 182, 212, 0.08) !important;
+  border-color: rgba(6, 182, 212, 0.25) !important;
+  color: #0891b2 !important;
+}
+
+body.light-theme header nav a:not(.active) {
+  color: #4b5563 !important;
+}
+body.light-theme header nav a:not(.active):hover {
+  background-color: #f3f4f6 !important;
+  color: #111827 !important;
+}
+
+body.light-theme .cyber-input, 
+body.light-theme select, 
+body.light-theme textarea {
+  background-color: #ffffff !important;
+  border-color: #d1d5db !important;
+  color: #111827 !important;
+}
+body.light-theme .cyber-input:focus {
+  border-color: #06b6d4 !important;
+  box-shadow: 0 0 8px rgba(6, 182, 212, 0.15) !important;
+}
+
+body.light-theme h1, 
+body.light-theme h2, 
+body.light-theme h3, 
+body.light-theme h4 {
+  color: #111827 !important;
+}
+
+body.light-theme .text-slate-100 { color: #111827 !important; }
+body.light-theme .text-slate-200 { color: #1f2937 !important; }
+body.light-theme .text-slate-300 { color: #374151 !important; }
+body.light-theme .text-slate-400 { color: #4b5563 !important; }
+body.light-theme .text-slate-450 { color: #6b7280 !important; }
+body.light-theme .text-slate-500 { color: #6b7280 !important; }
+body.light-theme .text-white { color: #111827 !important; }
+
+body.light-theme .bg-\[\#0d1527\]\/50 {
+  background-color: #f9fafb !important;
+  border-bottom-color: #e5e7eb !important;
+}
+
+body.light-theme .bg-\[\#0a0f1d\] {
+  background-color: #f3f4f6 !important;
+  border-bottom-color: #e5e7eb !important;
+}
+
+body.light-theme .border-slate-800,
+body.light-theme .border-slate-850 {
+  border-color: #e5e7eb !important;
+}
+
+body.light-theme input[type="range"] {
+  background: #e5e7eb !important;
+}
+
+body.light-theme .bg-slate-900 {
+  background-color: #f9fafb !important;
+  border-color: #e5e7eb !important;
+}
+body.light-theme .bg-slate-950 {
+  background-color: #f3f4f6 !important;
+  border-color: #e5e7eb !important;
+}
+
+body.light-theme .text-cyan-400 {
+  color: #0891b2 !important;
+}
+body.light-theme .bg-cyan-500\/10 {
+  background-color: rgba(6, 182, 212, 0.08) !important;
+  border-color: rgba(6, 182, 212, 0.2) !important;
+}
+body.light-theme .border-cyan-500\/20 {
+  border-color: rgba(6, 182, 212, 0.2) !important;
+}
+
+body.light-theme .bg-\[\#090d16\] {
+  background-color: #ffffff !important;
+}
+
+body.light-theme .bg-\[\#070a13\] {
+  background-color: #f3f4f6 !important;
+}
+
+body.light-theme td {
+  color: #374151 !important;
+}
+body.light-theme tr:hover {
+  background-color: rgba(6, 182, 212, 0.04) !important;
+}
+body.light-theme tr {
+  border-bottom-color: #e5e7eb !important;
+}
+
+body.light-theme table thead {
+  background-color: #f9fafb !important;
+  border-bottom-color: #e5e7eb !important;
+}
+
+body.light-theme .font-tech-code {
+  color: #0891b2 !important;
+}
+
+body.light-theme label {
+  color: #374151 !important;
+}

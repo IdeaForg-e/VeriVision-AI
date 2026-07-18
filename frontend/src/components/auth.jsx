@@ -31,9 +31,12 @@ const ROLE_PRESETS = {
 
 function GoogleGlyph() {
   return (
-    <span className="grid h-5 w-5 place-items-center rounded-full border border-slate-200 bg-white text-[12px] font-black text-blue-700">
-      G
-    </span>
+    <svg className="h-5 w-5 shrink-0" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+      <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+      <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+      <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" fill="#FBBC05"/>
+      <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+    </svg>
   );
 }
 
@@ -57,41 +60,21 @@ export function LoginForm() {
   const [error, setError] = useState(null);
   const [message, setMessage] = useState(null);
 
-  const from = location.state?.from?.pathname ?? ROUTES.TRIAGE;
   const isSignup = mode === "signup";
 
-  useEffect(() => {
-    if (isSignup) return;
-    setEmail(preset.email);
-    setPassword(preset.password);
-  }, [isSignup, preset.email, preset.password]);
-
-  const roleOptions = useMemo(() => [
-    { key: "admin", label: "Admin", icon: ShieldCheck },
-    { key: "user", label: "User", icon: Fingerprint },
-  ], []);
-
-  const switchMode = (nextMode) => {
+  const switchMode = (newMode) => {
     setError(null);
     setMessage(null);
-    setMode(nextMode);
-    const next = new URLSearchParams(searchParams);
-    if (nextMode === "signup") {
-      next.set("mode", "signup");
-      setEmail("");
-      setPassword("");
-    } else {
-      next.delete("mode");
-      setEmail(preset.email);
-      setPassword(preset.password);
-    }
-    setSearchParams(next, { replace: true });
+    setMode(newMode);
+    setSearchParams({ role, mode: newMode });
   };
 
-  const switchRole = (nextRole) => {
-    const next = new URLSearchParams(searchParams);
-    next.set("role", nextRole);
-    setSearchParams(next, { replace: true });
+  const switchRole = (newRole) => {
+    setError(null);
+    setMessage(null);
+    setSearchParams({ role: newRole, mode });
+    setEmail(ROLE_PRESETS[newRole].email);
+    setPassword(ROLE_PRESETS[newRole].password);
   };
 
   const handleSubmit = async (event) => {
@@ -103,19 +86,14 @@ export function LoginForm() {
     try {
       if (isSignup) {
         await register({ name, email, password, role: "user" });
-        setMessage("Account created. Sign in with your new credentials.");
-        setMode("login");
-        const next = new URLSearchParams(searchParams);
-        next.delete("mode");
-        next.set("role", "user");
-        setSearchParams(next, { replace: true });
-        return;
+        setMessage("Account created! Please sign in using your credentials.");
+        switchMode("login");
+      } else {
+        await login(email, password);
+        navigate(role === "admin" ? ROUTES.TRIAGE : ROUTES.HUMAN_REVIEW);
       }
-
-      await login(email, password);
-      navigate(from, { replace: true });
     } catch (err) {
-      setError(err.message ?? "Authentication failed. Please try again.");
+      setError(err.message || "Authentication failed. Please verify credentials.");
     } finally {
       setLoading(false);
     }
@@ -141,88 +119,106 @@ export function LoginForm() {
       callback: async (response) => {
         try {
           await loginWithGoogle(response.credential);
-          navigate(from, { replace: true });
+          navigate(ROUTES.TRIAGE);
         } catch (err) {
-          setError(err.message ?? "Google sign-in failed.");
+          setError(err.message || "Google Authentication failed.");
         } finally {
           setGoogleLoading(false);
         }
       },
     });
-    window.google.accounts.id.prompt((notification) => {
-      if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
-        setGoogleLoading(false);
-      }
-    });
+    window.google.accounts.id.prompt();
   };
 
+  const roleOptions = useMemo(() => [
+    { key: "admin", label: "Admin", icon: ShieldCheck },
+    { key: "user", label: "User", icon: Fingerprint },
+  ], []);
+
   return (
-    <div className="grid min-h-screen grid-cols-1 bg-[#f6f8fc] lg:grid-cols-[0.95fr_1.05fr]">
-      <aside className="hidden border-r border-slate-200 bg-slate-950 px-10 py-10 text-white lg:flex lg:flex-col">
-        <Link to={ROUTES.LANDING} className="flex items-center gap-3">
-          <div className="grid h-11 w-11 place-items-center rounded-lg bg-white text-slate-950">
-            <Fingerprint size={23} />
+    <div className="grid h-screen max-h-screen overflow-hidden grid-cols-1 bg-[#070a13] lg:grid-cols-[0.9fr_1.1fr]">
+      <aside className="hidden border-r border-slate-850 bg-[#090d16] px-12 py-10 text-white lg:flex lg:flex-col justify-between overflow-hidden">
+        <Link to={ROUTES.LANDING} className="flex items-center gap-3 self-start">
+          <div className="grid h-11 w-11 place-items-center rounded-xl bg-gradient-to-tr from-cyan-500 to-purple-600 text-white shadow-[0_0_12px_rgba(6,182,212,0.3)]">
+            <Fingerprint size={22} />
           </div>
           <div>
-            <p className="text-sm font-extrabold tracking-[0.2em]">VERIVISION-AI</p>
-            <p className="text-xs text-slate-400">Inspection command center</p>
+            <p className="text-xs font-extrabold tracking-[0.25em]">VERIVISION-AI</p>
+            <p className="text-[9px] text-slate-400 uppercase tracking-widest font-semibold">Inspection command center</p>
           </div>
         </Link>
 
-        <div className="mt-auto max-w-xl">
-          <p className="text-xs font-bold uppercase tracking-[0.22em] text-blue-300">Secure visual verification</p>
-          <h1 className="mt-4 text-5xl font-extrabold leading-tight tracking-normal">
-            Review parts with evidence, not guesswork.
+        <div className="max-w-lg my-auto space-y-5">
+          <p className="text-xs font-bold uppercase tracking-[0.25em] text-cyan-400 font-tech-code">Secure visual verification</p>
+          <h1 className="text-4xl font-black leading-[1.15] tracking-tight">
+            Review parts with evidence, <br />not guesswork.
           </h1>
-          <p className="mt-5 text-base leading-8 text-slate-300">
+          <p className="text-sm leading-relaxed text-slate-350">
             Sign in to compare golden references, inspect anomaly overlays, and close every case with a clean audit trail.
           </p>
 
-          <div className="mt-8 grid grid-cols-3 gap-3">
-            {["SSIM", "OCR", "ROI"].map((item) => (
-              <div key={item} className="rounded-lg border border-white/10 bg-white/5 p-4">
-                <p className="text-xl font-extrabold">{item}</p>
-                <p className="mt-1 text-xs text-slate-400">Detector layer</p>
+          <div className="pt-2 grid grid-cols-3 gap-3">
+            {["SSIM", "ROI", "OCR"].map((item) => (
+              <div key={item} className="rounded-xl border border-cyan-500/15 bg-cyan-950/10 p-4 hover:border-cyan-500/30 hover:bg-cyan-950/15 transition-all">
+                <p className="text-xl font-black text-cyan-400">{item}</p>
+                <p className="mt-0.5 text-[9px] text-slate-450 uppercase tracking-wider font-semibold">Detector</p>
               </div>
             ))}
           </div>
         </div>
+
+        <div className="text-[10px] text-slate-500">
+          © 2026 VERIVISION-AI. Compliance inspection portal.
+        </div>
       </aside>
 
-      <section className="flex items-center justify-center px-5 py-8 sm:px-8">
-        <div className="w-full max-w-[500px]">
-          <div className="mb-8 flex items-center justify-between lg:hidden">
+      <section className="flex h-full items-center justify-center px-6 py-6 bg-[#070a13] overflow-hidden">
+        <div className="w-full max-w-[440px]">
+          <div className="mb-6 flex items-center justify-between lg:hidden">
             <Link to={ROUTES.LANDING} className="flex items-center gap-3">
-              <div className="grid h-10 w-10 place-items-center rounded-lg bg-slate-950 text-white">
-                <Fingerprint size={21} />
+              <div className="grid h-10 w-10 place-items-center rounded-xl bg-gradient-to-tr from-cyan-500 to-purple-600 text-white">
+                <Fingerprint size={20} />
               </div>
               <div>
-                <p className="text-sm font-extrabold tracking-[0.18em] text-slate-950">VERIVISION-AI</p>
-                <p className="text-xs text-slate-500">Inspection workspace</p>
+                <p className="text-xs font-extrabold tracking-[0.2em] text-white">VERIVISION-AI</p>
+                <p className="text-[9px] text-slate-400 uppercase tracking-widest">Inspection workspace</p>
               </div>
             </Link>
           </div>
 
-          <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-xl shadow-slate-900/8 sm:p-7">
+          <div className="cyber-card p-6 sm:p-8 border-slate-800 bg-[#0f172a]/55 shadow-2xl">
             <div className="flex items-start justify-between gap-4">
-              <div>
-                <p className="text-xs font-bold uppercase tracking-[0.18em] text-blue-700">
+              <div className="space-y-0.5">
+                <p className="text-[9px] font-bold uppercase tracking-[0.2em] text-cyan-400 font-tech-code">
                   {isSignup ? "Create access" : preset.label}
                 </p>
-                <h2 className="mt-2 text-2xl font-extrabold text-slate-950">
-                  {isSignup ? "Create your VERIVISION-AI account" : "Sign in to VERIVISION-AI"}
+                <h2 className="text-xl font-black text-white tracking-tight">
+                  {isSignup ? "Create account" : "Welcome Back"}
                 </h2>
-                <p className="mt-2 text-sm leading-6 text-slate-600">
-                  {isSignup ? "New operators can create a standard user account." : preset.helper}
+                <p className="text-[11px] leading-relaxed text-slate-400">
+                  {isSignup ? "Create an operator account." : preset.helper}
                 </p>
               </div>
-              <div className="grid h-11 w-11 place-items-center rounded-lg bg-blue-50 text-blue-700">
-                {isSignup ? <UserPlus size={22} /> : <KeyRound size={22} />}
+              <div className="grid h-10 w-10 flex-shrink-0 place-items-center rounded-xl bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 shadow-inner">
+                {isSignup ? <UserPlus size={18} /> : <KeyRound size={18} />}
               </div>
             </div>
 
+            <div className="mt-4 p-2.5 rounded-lg bg-cyan-500/10 border border-cyan-500/20 flex justify-between items-center text-[11px]">
+              <span className="text-slate-300">
+                {isSignup ? "Already have access?" : "New to the workspace?"}
+              </span>
+              <button
+                type="button"
+                onClick={() => switchMode(isSignup ? "login" : "signup")}
+                className="font-bold text-cyan-400 hover:text-cyan-300 transition uppercase tracking-wider text-[10px]"
+              >
+                {isSignup ? "Sign In" : "Create Account"}
+              </button>
+            </div>
+
             {!isSignup && (
-              <div className="mt-6 grid grid-cols-2 gap-2 rounded-lg bg-slate-100 p-1">
+              <div className="mt-4 grid grid-cols-2 gap-1.5 rounded-xl bg-slate-900/80 border border-slate-850 p-1">
                 {roleOptions.map((item) => {
                   const Icon = item.icon;
                   const selected = role === item.key;
@@ -231,11 +227,11 @@ export function LoginForm() {
                       key={item.key}
                       type="button"
                       onClick={() => switchRole(item.key)}
-                      className={`flex items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-bold transition ${
-                        selected ? "bg-white text-slate-950 shadow-sm" : "text-slate-500 hover:text-slate-800"
+                      className={`flex items-center justify-center gap-1.5 rounded-lg px-2 py-1.5 text-[11px] font-bold transition border border-transparent ${
+                        selected ? "bg-cyan-500/15 text-cyan-400 border-cyan-500/25 shadow-sm" : "text-slate-455 hover:text-slate-200"
                       }`}
                     >
-                      <Icon size={16} />
+                      <Icon size={12} />
                       {item.label}
                     </button>
                   );
@@ -244,51 +240,51 @@ export function LoginForm() {
             )}
 
             {error && (
-              <div className="mt-5 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+              <div className="mt-4 rounded-lg border border-red-500/20 bg-red-950/30 px-3 py-2 text-[11px] font-medium text-red-400 leading-relaxed">
                 {error}
               </div>
             )}
             {message && (
-              <div className="mt-5 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700">
+              <div className="mt-4 rounded-lg border border-emerald-500/20 bg-emerald-950/30 px-3 py-2 text-[11px] font-medium text-emerald-400 leading-relaxed">
                 {message}
               </div>
             )}
 
-            <form onSubmit={handleSubmit} className="mt-6 space-y-4">
+            <form onSubmit={handleSubmit} className="mt-4 space-y-4">
               {isSignup && (
                 <label className="block">
-                  <span className="mb-2 block text-sm font-bold text-slate-700">Full name</span>
+                  <span className="mb-1 block text-[10px] font-bold text-slate-300 uppercase tracking-wider">Full name</span>
                   <input
                     value={name}
                     onChange={(event) => setName(event.target.value)}
                     required
                     autoComplete="name"
-                    className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm outline-none transition focus:border-blue-600 focus:ring-4 focus:ring-blue-100"
+                    className="w-full rounded-lg px-3 py-2 text-xs cyber-input"
                     placeholder="Anil Kumar"
                   />
                 </label>
               )}
 
               <label className="block">
-                <span className="mb-2 block text-sm font-bold text-slate-700">Email</span>
+                <span className="mb-1 block text-[10px] font-bold text-slate-300 uppercase tracking-wider">Email</span>
                 <div className="relative">
-                  <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                  <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" size={14} />
                   <input
                     value={email}
                     onChange={(event) => setEmail(event.target.value)}
                     required
                     type="email"
                     autoComplete="email"
-                    className="w-full rounded-lg border border-slate-300 bg-white py-3 pl-11 pr-4 text-sm outline-none transition focus:border-blue-600 focus:ring-4 focus:ring-blue-100"
+                    className="w-full py-2 pl-10 pr-3 text-xs rounded-lg cyber-input"
                     placeholder="you@company.com"
                   />
                 </div>
               </label>
 
               <label className="block">
-                <span className="mb-2 block text-sm font-bold text-slate-700">Password</span>
+                <span className="mb-1 block text-[10px] font-bold text-slate-300 uppercase tracking-wider">Password</span>
                 <div className="relative">
-                  <LockKeyhole className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                  <LockKeyhole className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" size={14} />
                   <input
                     value={password}
                     onChange={(event) => setPassword(event.target.value)}
@@ -296,16 +292,16 @@ export function LoginForm() {
                     minLength={isSignup ? 6 : undefined}
                     type={showPassword ? "text" : "password"}
                     autoComplete={isSignup ? "new-password" : "current-password"}
-                    className="w-full rounded-lg border border-slate-300 bg-white py-3 pl-11 pr-12 text-sm outline-none transition focus:border-blue-600 focus:ring-4 focus:ring-blue-100"
+                    className="w-full py-2 pl-10 pr-10 text-xs rounded-lg cyber-input"
                     placeholder="Enter password"
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword((value) => !value)}
-                    className="absolute right-3 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-md text-slate-500 transition hover:bg-slate-100 hover:text-slate-800"
+                    className="absolute right-2 top-1/2 grid h-7 w-7 -translate-y-1/2 place-items-center rounded-md text-slate-400 transition hover:bg-slate-800 hover:text-slate-200"
                     aria-label={showPassword ? "Hide password" : "Show password"}
                   >
-                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                    {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
                   </button>
                 </div>
               </label>
@@ -313,38 +309,31 @@ export function LoginForm() {
               <button
                 type="submit"
                 disabled={loading}
-                className="flex w-full items-center justify-center gap-2 rounded-lg bg-slate-950 px-4 py-3 text-sm font-bold text-white shadow-lg shadow-slate-950/10 transition hover:bg-slate-800 disabled:cursor-wait disabled:opacity-60"
+                className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 px-4 py-2.5 text-xs font-bold text-white shadow-[0_0_12px_rgba(6,182,212,0.12)] hover:shadow-[0_0_18px_rgba(6,182,212,0.25)] transition duration-200 disabled:cursor-wait disabled:opacity-60"
               >
                 {loading ? "Working..." : isSignup ? "Create account" : "Enter workspace"}
-                {!loading && <ArrowRight size={17} />}
+                {!loading && <ArrowRight size={14} />}
               </button>
             </form>
 
-            <div className="my-6 flex items-center gap-3">
-              <div className="h-px flex-1 bg-slate-200" />
-              <span className="text-xs font-bold uppercase tracking-wider text-slate-400">or</span>
-              <div className="h-px flex-1 bg-slate-200" />
+            <div className="my-4 flex items-center gap-3">
+              <div className="h-px flex-1 bg-slate-850" />
+              <span className="text-[9px] font-bold uppercase tracking-wider text-slate-550">or</span>
+              <div className="h-px flex-1 bg-slate-850" />
             </div>
 
             <button
               type="button"
               onClick={handleGoogleLogin}
               disabled={googleLoading}
-              className="flex w-full items-center justify-center gap-3 rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50 disabled:cursor-wait disabled:opacity-60"
+              className="flex w-full items-center justify-center gap-2.5 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-xs font-bold text-slate-900 shadow-sm transition hover:bg-slate-50 disabled:cursor-wait disabled:opacity-60"
             >
               <GoogleGlyph />
-              {googleLoading ? "Opening Google..." : "Continue with Google"}
+              {googleLoading ? "Opening..." : "Continue with Google"}
             </button>
 
-            <div className="mt-6 flex flex-col items-center justify-between gap-3 border-t border-slate-200 pt-5 text-sm text-slate-600 sm:flex-row">
-              <button
-                type="button"
-                onClick={() => switchMode(isSignup ? "login" : "signup")}
-                className="font-semibold text-blue-700 hover:text-blue-900"
-              >
-                {isSignup ? "Already have access? Sign in" : "New user? Create account"}
-              </button>
-              <Link to={ROUTES.LANDING} className="font-semibold text-slate-500 hover:text-slate-900">
+            <div className="mt-5 flex justify-center border-t border-slate-800 pt-4">
+              <Link to={ROUTES.LANDING} className="text-[11px] font-semibold text-slate-450 hover:text-slate-200 transition">
                 Back to overview
               </Link>
             </div>

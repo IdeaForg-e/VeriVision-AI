@@ -2,7 +2,6 @@
 import { confidenceTone, toneClasses } from "../utils/statusColor.js";
 import { useCallback, useRef, useState } from "react";
 
-
 const STEPS = [
   { key: "needs_evidence", label: "Needs Evidence", icon: "radio_button_checked" },
   { key: "retake_requested", label: "Retake Requested", icon: "history" },
@@ -15,7 +14,7 @@ export function ConfidenceBadge({ confidencePct }) {
   return (
     <div className={`px-4 py-2 rounded-full border flex items-center gap-2 shadow-sm font-medium ${toneClasses(tone)}`}>
       <span className="material-symbols-outlined text-[20px]">warning</span>
-      <span className="font-label-caps uppercase">
+      <span className="font-label-caps uppercase text-xs">
         Confidence: {confidencePct}% — {confidencePct < 50 ? "below auto-decide threshold" : "review recommended"}
       </span>
     </div>
@@ -26,18 +25,18 @@ export function CaseVelocity({ targetMinutes, elapsedMinutes }) {
   const remaining = Math.max(targetMinutes - elapsedMinutes, 0);
   const pct = Math.min((elapsedMinutes / targetMinutes) * 100, 100);
   return (
-    <div className="bg-white border border-outline-variant rounded-xl p-6 shadow-sm">
+    <div className="cyber-card bg-[#0f172a]/55 border-slate-800 p-6 shadow-lg">
       <div className="flex justify-between items-center mb-2">
-        <span className="font-label-caps text-on-surface-variant uppercase">Case Velocity</span>
-        <span className="font-tech-code text-body-sm text-primary">{remaining.toFixed(1)}m left</span>
+        <span className="font-label-caps text-slate-400 uppercase">Case Velocity</span>
+        <span className="font-tech-code text-body-sm text-cyan-400">{remaining.toFixed(1)}m left</span>
       </div>
-      <div className="w-full h-2 bg-surface-container-highest rounded-full overflow-hidden">
+      <div className="w-full h-2 bg-slate-900 rounded-full overflow-hidden border border-slate-800">
         <div
-          className={`h-full ${pct >= 100 ? "bg-error" : "bg-primary"} transition-all`}
+          className={`h-full ${pct >= 100 ? "bg-red-500" : "bg-cyan-500"} transition-all`}
           style={{ width: `${pct}%` }}
         />
       </div>
-      <p className="text-body-sm text-on-surface-variant italic mt-3">
+      <p className="text-body-sm text-slate-400 italic mt-3">
         Target resolution time: &lt; {targetMinutes} minutes per triage.
       </p>
     </div>
@@ -48,7 +47,7 @@ export function CaseStatusTracker({ status }) {
   const activeIndex = STEPS.findIndex((s) => s.key === status);
 
   return (
-    <div className="mt-8 bg-white border border-outline-variant rounded-xl p-6 shadow-sm">
+    <div className="mt-8 cyber-card bg-[#0f172a]/55 border-slate-800 p-6 shadow-lg">
       <div className="flex flex-col md:flex-row items-center justify-between gap-8 px-4">
         {STEPS.map((step, i) => {
           const isActive = i === activeIndex;
@@ -56,22 +55,21 @@ export function CaseStatusTracker({ status }) {
           return (
             <div
               key={step.key}
-              className={`flex flex-col items-center gap-3 relative flex-1 ${!isActive && !isDone ? "opacity-50" : ""
-                }`}
+              className={`flex flex-col items-center gap-3 relative flex-1 ${!isActive && !isDone ? "opacity-40" : ""}`}
             >
               <div
                 className={`w-10 h-10 rounded-full flex items-center justify-center z-10 border ${isActive || isDone
-                    ? "bg-primary text-white shadow-md border-transparent"
-                    : "bg-surface-container text-on-surface-variant border-outline-variant"
+                    ? "bg-cyan-500 text-slate-950 shadow-[0_0_12px_rgba(6,182,212,0.3)] border-transparent"
+                    : "bg-slate-900 text-slate-400 border-slate-800"
                   }`}
               >
-                <span className="material-symbols-outlined">{step.icon}</span>
+                <span className="material-symbols-outlined text-[20px]">{step.icon}</span>
               </div>
-              <span className={`text-body-sm ${isActive ? "font-bold text-primary" : "font-medium text-on-surface-variant"}`}>
+              <span className={`text-body-sm font-semibold ${isActive ? "text-cyan-400" : "text-slate-400"}`}>
                 {step.label}
               </span>
               {i < STEPS.length - 1 && (
-                <div className="absolute left-1/2 top-5 w-full h-[2px] bg-primary/20 hidden md:block" />
+                <div className="absolute left-1/2 top-5 w-full h-[2px] bg-slate-850 hidden md:block" />
               )}
             </div>
           );
@@ -83,18 +81,17 @@ export function CaseStatusTracker({ status }) {
 
 // ==========================================
 
-
 export function EvidencePanel({ caseData, region, onRegionChange, onRegionCommit }) {
   if (!caseData) return null;
 
   return (
-    <div className="lg:col-span-8 bg-white border border-outline-variant rounded-xl shadow-sm p-card-padding flex flex-col gap-6">
-      <div className="flex items-center justify-between">
-        <h2 className="font-headline-sm text-headline-sm flex items-center gap-2">
-          <span className="material-symbols-outlined text-primary">analytics</span>
+    <div className="lg:col-span-8 cyber-card bg-[#0f172a]/55 border-slate-800 p-card-padding flex flex-col gap-6 shadow-lg">
+      <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+        <h2 className="font-headline-sm text-headline-sm flex items-center gap-2 text-slate-100">
+          <span className="material-symbols-outlined text-cyan-400">analytics</span>
           Evidence Analysis
         </h2>
-        <span className="font-tech-code text-on-surface-variant text-body-sm bg-surface-container-low px-2 py-1 rounded">
+        <span className="font-tech-code text-cyan-400 text-body-sm bg-slate-900 px-2 py-1 rounded border border-slate-800">
           IMAGE_HASH: {caseData.imageHash}
         </span>
       </div>
@@ -102,15 +99,15 @@ export function EvidencePanel({ caseData, region, onRegionChange, onRegionCommit
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Golden Reference */}
         <div className="flex flex-col gap-3">
-          <span className="font-label-caps text-on-surface-variant uppercase">Golden Reference (OEM Standard)</span>
-          <div className="relative aspect-square bg-surface-container-lowest border border-outline-variant rounded-lg overflow-hidden group">
+          <span className="font-label-caps text-slate-400 uppercase">Golden Reference (OEM Standard)</span>
+          <div className="relative aspect-square bg-slate-950 border border-slate-850 rounded-lg overflow-hidden group">
             <img
               className="w-full h-full object-cover grayscale opacity-80"
               alt="Golden reference part"
               src={caseData.goldenImageUrl}
             />
-            <div className="absolute inset-0 bg-primary/5 pointer-events-none" />
-            <div className="absolute bottom-2 left-2 bg-white/90 backdrop-blur px-3 py-1 rounded-full text-[10px] font-bold border border-outline-variant tracking-wider uppercase">
+            <div className="absolute inset-0 bg-cyan-500/5 pointer-events-none" />
+            <div className="absolute bottom-2 left-2 bg-[#090d16]/90 backdrop-blur px-3 py-1 rounded-full text-[10px] font-bold border border-slate-800 text-slate-350 tracking-wider uppercase">
               Source: Master_DB
             </div>
           </div>
@@ -118,10 +115,10 @@ export function EvidencePanel({ caseData, region, onRegionChange, onRegionCommit
 
         {/* Defective / Uploaded */}
         <div className="flex flex-col gap-3">
-          <span className="font-label-caps text-on-surface-variant uppercase">
+          <span className="font-label-caps text-slate-400 uppercase">
             Defective / Uploaded (Review Required)
           </span>
-          <div className="relative aspect-square bg-surface-container-lowest border border-outline-variant rounded-lg overflow-hidden select-none">
+          <div className="relative aspect-square bg-slate-950 border border-slate-850 rounded-lg overflow-hidden select-none">
             <img
               className="w-full h-full object-cover absolute inset-0"
               alt="Uploaded part under review"
@@ -132,11 +129,11 @@ export function EvidencePanel({ caseData, region, onRegionChange, onRegionCommit
         </div>
       </div>
 
-      <div className="bg-surface-container-low p-4 rounded-lg flex gap-3 items-start border-l-4 border-primary">
-        <span className="material-symbols-outlined text-primary mt-0.5">info</span>
-        <p className="text-body-sm text-on-surface-variant leading-relaxed">
+      <div className="bg-[#090d16]/60 p-4 rounded-lg flex gap-3 items-start border-l-4 border-cyan-500 border border-slate-850/50">
+        <span className="material-symbols-outlined text-cyan-400 mt-0.5">info</span>
+        <p className="text-body-sm text-slate-400 leading-relaxed">
           Drag or resize the box if the AI's highlighted region is off. Your correction is saved as a training
-          example for the <span className="font-tech-code text-primary">{caseData.neuralModel}</span> neural model.
+          example for the <span className="font-tech-code text-cyan-400">{caseData.neuralModel}</span> neural model.
         </p>
       </div>
     </div>
@@ -150,19 +147,19 @@ const DECISIONS = [
     key: "approved",
     label: "Approve Case",
     icon: "check_circle",
-    className: "bg-[#10b981] hover:bg-[#059669] text-white",
+    className: "bg-emerald-600 hover:bg-emerald-700 text-white shadow-[0_0_12px_rgba(16,185,129,0.15)]",
   },
   {
     key: "rejected",
     label: "Reject Case",
     icon: "cancel",
-    className: "bg-error hover:bg-[#991b1b] text-white",
+    className: "bg-red-600 hover:bg-red-700 text-white shadow-[0_0_12px_rgba(239,68,68,0.15)]",
   },
   {
     key: "needs_more_evidence",
     label: "Needs More Evidence",
     icon: "hourglass_empty",
-    className: "bg-tertiary-fixed text-on-tertiary-fixed hover:bg-[#e8c8f5] border border-[#d1a8e8]",
+    className: "bg-slate-800 text-slate-350 hover:bg-slate-700 border border-slate-750",
   },
 ];
 
@@ -207,11 +204,11 @@ export function ReviewDecision({ onDecide, pending, lastResult }) {
 export function ReviewerComment({ value, onChange }) {
   return (
     <div className="flex flex-col gap-2">
-      <label className="font-label-caps text-on-surface-variant uppercase">Decision Rationale &amp; Notes</label>
+      <label className="font-label-caps text-slate-400 uppercase">Decision Rationale &amp; Notes</label>
       <textarea
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full h-40 rounded-lg border border-outline-variant focus:ring-2 focus:ring-primary/20 focus:border-primary text-body-md p-4 transition-all resize-none bg-surface-container-lowest"
+        className="w-full h-40 rounded-lg p-4 transition-all resize-none text-body-md cyber-input"
         placeholder="Add your review notes here..."
       />
     </div>
@@ -220,19 +217,6 @@ export function ReviewerComment({ value, onChange }) {
 
 // ==========================================
 
-
-/**
- * Draggable + resizable "AI prediction region" box, rendered over an image.
- * Region is stored/reported in percentages of the container so it stays
- * correct at any image size (the static Stitch export used raw pixels,
- * which breaks on resize — this version is layout-safe).
- *
- * Props:
- *  - region: { x, y, w, h } in % (0-100)
- *  - onChange(region): called continuously while dragging/resizing
- *  - onCommit(region): called once on mouse/touch up (good place to hit the API)
- *  - label: badge text, defaults to "AI_PREDICTION_REGION"
- */
 export function ROIEditor({ region, onChange, onCommit, label = "AI_PREDICTION_REGION" }) {
   const containerRef = useRef(null);
   const dragState = useRef(null);
@@ -307,8 +291,7 @@ export function ROIEditor({ region, onChange, onCommit, label = "AI_PREDICTION_R
       onTouchEnd={endDrag}
     >
       <div
-        className={`absolute border-2 border-dashed border-primary bg-primary/10 shadow-lg z-10 cursor-move ${active ? "ring-2 ring-primary" : ""
-          }`}
+        className={`absolute border-2 border-dashed border-cyan-400 bg-cyan-400/10 shadow-lg z-10 cursor-move ${active ? "ring-2 ring-cyan-400" : ""}`}
         style={{
           left: `${region.x}%`,
           top: `${region.y}%`,
@@ -318,14 +301,14 @@ export function ROIEditor({ region, onChange, onCommit, label = "AI_PREDICTION_R
         onMouseDown={startDrag}
         onTouchStart={startDrag}
       >
-        <div className="absolute -top-6 left-0 bg-primary text-white text-[10px] px-2 py-0.5 rounded-sm font-bold whitespace-nowrap">
+        <div className="absolute -top-6 left-0 bg-cyan-500 text-slate-950 text-[10px] px-2 py-0.5 rounded-sm font-bold whitespace-nowrap shadow-md">
           {label}
         </div>
         <div
           data-resizer="true"
           onMouseDown={startResize}
           onTouchStart={startResize}
-          className="absolute -bottom-1.5 -right-1.5 w-4 h-4 bg-primary rounded-full border-2 border-white cursor-se-resize"
+          className="absolute -bottom-1.5 -right-1.5 w-4 h-4 bg-cyan-500 rounded-full border-2 border-slate-950 cursor-se-resize shadow"
         />
       </div>
     </div>

@@ -13,17 +13,17 @@ export function PipelineStatus({
     <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 mt-6">
       {/* Recent Alerts */}
 
-      <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+      <div className="cyber-card bg-[#0f172a]/55 border-slate-800 shadow-lg overflow-hidden">
 
-        <div className="px-5 py-4 border-b bg-gray-50 flex items-center justify-between">
+        <div className="px-5 py-4 border-b bg-[#0d1527]/50 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <ShieldAlert className="text-red-500" size={20} />
-            <h2 className="font-semibold text-gray-800">
+            <h2 className="font-semibold text-slate-200">
               Recent Alerts
             </h2>
           </div>
 
-          <span className="text-xs text-gray-500">
+          <span className="text-xs text-slate-450">
             {alerts.length} Alerts
           </span>
         </div>
@@ -31,14 +31,14 @@ export function PipelineStatus({
         <div className="max-h-80 overflow-y-auto">
 
           {alerts.length === 0 ? (
-            <div className="p-8 text-center text-gray-500">
+            <div className="p-8 text-center text-slate-450">
               No alerts available
             </div>
           ) : (
             alerts.map((alert) => (
               <div
                 key={alert.id}
-                className="px-5 py-4 border-b last:border-0 hover:bg-red-50 transition"
+                className="px-5 py-4 border-b border-slate-850 last:border-0 hover:bg-red-950/25 transition"
               >
                 <div className="flex justify-between items-start">
 
@@ -53,11 +53,11 @@ export function PipelineStatus({
 
                     <div>
 
-                      <p className="font-semibold text-gray-800">
+                      <p className="font-semibold text-slate-200">
                         {alert.title}
                       </p>
 
-                      <p className="text-sm text-gray-500 mt-1">
+                      <p className="text-sm text-slate-450 mt-1">
                         {alert.message}
                       </p>
 
@@ -65,7 +65,7 @@ export function PipelineStatus({
 
                   </div>
 
-                  <span className="text-xs text-gray-400 whitespace-nowrap">
+                  <span className="text-xs text-slate-500 whitespace-nowrap">
                     {alert.time}
                   </span>
 
@@ -79,18 +79,18 @@ export function PipelineStatus({
 
       {/* Recent Activity */}
 
-      <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+      <div className="cyber-card bg-[#0f172a]/55 border-slate-800 shadow-lg overflow-hidden">
 
-        <div className="px-5 py-4 border-b bg-gray-50 flex items-center justify-between">
+        <div className="px-5 py-4 border-b bg-[#0d1527]/50 flex items-center justify-between">
 
           <div className="flex items-center gap-2">
-            <Activity className="text-blue-600" size={20} />
-            <h2 className="font-semibold text-gray-800">
+            <Activity className="text-cyan-400" size={20} />
+            <h2 className="font-semibold text-slate-200">
               Recent Activity
             </h2>
           </div>
 
-          <span className="text-xs text-gray-500">
+          <span className="text-xs text-slate-450">
             Live Feed
           </span>
 
@@ -99,14 +99,14 @@ export function PipelineStatus({
         <div className="max-h-80 overflow-y-auto">
 
           {activities.length === 0 ? (
-            <div className="p-8 text-center text-gray-500">
+            <div className="p-8 text-center text-slate-450">
               No recent activity
             </div>
           ) : (
             activities.map((activity) => (
               <div
                 key={activity.id}
-                className="px-5 py-4 border-b last:border-0 hover:bg-gray-50 transition"
+                className="px-5 py-4 border-b border-slate-850 last:border-0 hover:bg-[#0d1527]/50 transition"
               >
                 <div className="flex justify-between">
 
@@ -128,11 +128,11 @@ export function PipelineStatus({
 
                     <div>
 
-                      <p className="font-semibold text-gray-800">
+                      <p className="font-semibold text-slate-200">
                         {activity.title}
                       </p>
 
-                      <p className="text-sm text-gray-500 mt-1">
+                      <p className="text-sm text-slate-450 mt-1">
                         {activity.description}
                       </p>
 
@@ -140,7 +140,7 @@ export function PipelineStatus({
 
                   </div>
 
-                  <span className="text-xs text-gray-400 whitespace-nowrap">
+                  <span className="text-xs text-slate-500 whitespace-nowrap">
                     {activity.time}
                   </span>
 
@@ -166,13 +166,12 @@ export function QueueFilters({
   onRefresh,
 }) {
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
+    <div className="cyber-card bg-[#0f172a]/55 border-slate-800 rounded-xl p-4 shadow-sm">
 
       <div className="flex flex-col lg:flex-row gap-4 justify-between">
 
         {/* Search */}
         <div className="relative flex-1">
-          {/* SearchBar already renders its own search icon internally — no need to double-render */}
           <SearchBar
             value={search}
             onChange={setSearch}
@@ -188,13 +187,13 @@ export function QueueFilters({
 
             <Filter
               size={16}
-              className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none"
             />
 
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="border rounded-lg py-2 pl-9 pr-8 bg-white focus:ring-2 focus:ring-blue-500 h-full"
+              className="rounded-lg py-2 pl-9 pr-8 h-full cyber-input text-slate-350"
             >
               <option value="ALL">All Status</option>
               <option value="QUARANTINE">Quarantine</option>
@@ -208,14 +207,14 @@ export function QueueFilters({
           {/* Single Refresh button (was duplicated before) */}
           <button
             onClick={onRefresh}
-            className="flex items-center gap-2 bg-gray-100 hover:bg-gray-200 px-4 py-2 rounded-lg transition-colors"
+            className="flex items-center gap-2 border border-slate-800 bg-slate-900 text-slate-300 hover:bg-slate-800 hover:text-white px-4 py-2 rounded-lg transition-colors"
           >
             <RefreshCw size={16} />
             Refresh
           </button>
 
           <button
-            className="flex items-center gap-2 bg-blue-600 text-white hover:bg-blue-700 px-4 py-2 rounded-lg transition-colors"
+            className="flex items-center gap-2 bg-gradient-to-r from-cyan-500 to-blue-600 text-white hover:bg-blue-700 px-4 py-2 rounded-lg transition-colors"
           >
             <Download size={16} />
             Export
@@ -236,19 +235,19 @@ export function QueueRow({ item }) {
   const getStatusStyle = (status) => {
     switch (status) {
       case "QUARANTINE":
-        return "bg-red-100 text-red-700 border border-red-200";
+        return "bg-red-500/10 text-red-400 border border-red-500/20";
 
       case "PENDING QA":
-        return "bg-yellow-100 text-yellow-700 border border-yellow-200";
+        return "bg-amber-500/10 text-amber-400 border border-amber-500/20";
 
       case "AUTO-APPROVED":
-        return "bg-green-100 text-green-700 border border-green-200";
+        return "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20";
 
       case "RETAKE REQUESTED":
-        return "bg-blue-100 text-blue-700 border border-blue-200";
+        return "bg-cyan-500/10 text-cyan-400 border border-cyan-500/20";
 
       default:
-        return "bg-gray-100 text-gray-700";
+        return "bg-slate-800 text-slate-400 border border-slate-750";
     }
   };
 
@@ -278,7 +277,7 @@ export function QueueRow({ item }) {
   return (
     <tr
       onClick={handleClick}
-      className="group cursor-pointer border-b last:border-b-0 hover:bg-blue-50 transition-all duration-200"
+      className="group cursor-pointer border-b last:border-b-0 hover:bg-cyan-500/10 transition-all duration-200"
     >
       {/* Case ID */}
 
@@ -286,11 +285,11 @@ export function QueueRow({ item }) {
 
         <div>
 
-          <p className="font-semibold text-gray-800">
+          <p className="font-semibold text-slate-200">
             {item.caseId}
           </p>
 
-          <p className="text-xs text-gray-400">
+          <p className="text-xs text-slate-500">
             {item.createdAt}
           </p>
 
@@ -304,11 +303,11 @@ export function QueueRow({ item }) {
 
         <div>
 
-          <p className="font-medium text-gray-700">
+          <p className="font-medium text-slate-300">
             {item.partNumber}
           </p>
 
-          <p className="text-xs text-gray-400">
+          <p className="text-xs text-slate-500">
             {item.batch}
           </p>
 
@@ -336,7 +335,7 @@ export function QueueRow({ item }) {
 
             </span>
 
-            <span className="text-gray-400">
+            <span className="text-slate-500">
 
               Risk
 
@@ -365,7 +364,7 @@ export function QueueRow({ item }) {
 
       <td className="px-4 py-4">
 
-        <span className="font-semibold text-blue-600">
+        <span className="font-semibold text-cyan-400">
 
           {item.confidence}%
 
@@ -377,7 +376,7 @@ export function QueueRow({ item }) {
 
       <td className="px-4 py-4">
 
-        <p className="text-sm text-gray-600">
+        <p className="text-sm text-slate-400">
 
           {item.reason}
 
@@ -407,7 +406,7 @@ export function QueueRow({ item }) {
       <td className="px-4 py-4">
 
         <ChevronRight
-          className="text-gray-400 group-hover:text-blue-600 transition"
+          className="text-slate-500 group-hover:text-cyan-400 transition"
           size={18}
         />
 
@@ -455,27 +454,27 @@ export function QueueTable({
   );
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+    <div className="cyber-card bg-[#0f172a]/55 border-slate-800 shadow-lg overflow-hidden">
 
       {/* Header */}
 
-      <div className="flex justify-between items-center px-6 py-5 border-b bg-gray-50">
+      <div className="flex justify-between items-center px-6 py-5 border-b border-slate-800 bg-[#0d1527]/50">
 
         <div>
 
-          <h2 className="text-lg font-bold text-gray-800">
+          <h2 className="text-lg font-bold text-slate-200">
             Inspection Queue
           </h2>
 
-          <p className="text-sm text-gray-500">
+          <p className="text-sm text-slate-450">
             Live inspection cases awaiting processing
           </p>
 
         </div>
 
-        <div className="bg-blue-100 text-blue-700 px-4 py-2 rounded-full font-semibold">
+        <div className="bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 px-4 py-1.5 rounded-full text-xs font-semibold font-tech-code tracking-wide">
 
-          {filteredCases.length} Active
+          {filteredCases.length} ACTIVE
 
         </div>
 
@@ -487,9 +486,9 @@ export function QueueTable({
 
         <table className="min-w-full">
 
-          <thead className="bg-gray-100">
+          <thead className="bg-[#0a0f1d] border-b border-slate-800">
 
-            <tr className="text-gray-700">
+            <tr className="text-slate-400 text-xs font-semibold tracking-wider uppercase border-b border-slate-800">
 
               <th className="px-6 py-4 text-left">Case ID</th>
 
@@ -517,7 +516,7 @@ export function QueueTable({
 
                 <td
                   colSpan="7"
-                  className="py-16 text-center text-gray-500"
+                  className="py-16 text-center text-slate-450"
                 >
                   No inspection cases found.
                 </td>
@@ -543,9 +542,9 @@ export function QueueTable({
 
       {/* Footer */}
 
-      <div className="flex justify-between items-center px-6 py-4 border-t bg-gray-50">
+      <div className="flex justify-between items-center px-6 py-4 border-t bg-[#0d1527]/50">
 
-        <span className="text-sm text-gray-500">
+        <span className="text-sm text-slate-450">
 
           Showing {paginatedCases.length} of {filteredCases.length} cases
 
@@ -556,7 +555,7 @@ export function QueueTable({
           <button
             disabled={currentPage === 1}
             onClick={() => setCurrentPage((p) => p - 1)}
-            className="px-4 py-2 border rounded-lg disabled:opacity-40 hover:bg-gray-100"
+            className="px-4 py-2 border rounded-lg disabled:opacity-40 hover:bg-slate-800/50"
           >
             Previous
           </button>
@@ -570,7 +569,7 @@ export function QueueTable({
           <button
             disabled={currentPage === totalPages || totalPages === 0}
             onClick={() => setCurrentPage((p) => p + 1)}
-            className="px-4 py-2 border rounded-lg disabled:opacity-40 hover:bg-gray-100"
+            className="px-4 py-2 border rounded-lg disabled:opacity-40 hover:bg-slate-800/50"
           >
             Next
           </button>
@@ -611,7 +610,7 @@ export function StatsCards({ cases = [], stats = null }) {
       title: "TOTAL INSPECTED",
       value: totalInspected,
       icon: ClipboardCheck,
-      color: "text-blue-600",
+      color: "text-cyan-400",
       progress: Math.min(totalInspected * 2, 100), // illustrative bar
       footer: null,
     },
@@ -650,11 +649,11 @@ export function StatsCards({ cases = [], stats = null }) {
         return (
           <div
             key={index}
-            className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm hover:shadow-md transition-all duration-200"
+            className="cyber-card bg-[#0f172a]/55 border-slate-800 p-5 shadow-sm hover:shadow-md transition-all duration-200"
           >
             <div className="flex justify-between items-start">
               <div>
-                <p className="text-xs font-semibold tracking-widest text-gray-500 uppercase">
+                <p className="text-xs font-semibold tracking-widest text-slate-450 uppercase">
                   {card.title}
                 </p>
 
@@ -668,9 +667,9 @@ export function StatsCards({ cases = [], stats = null }) {
 
             {card.progress !== null && (
               <div className="mt-5">
-                <div className="w-full h-2 bg-gray-200 rounded-full">
+                <div className="w-full h-2 bg-slate-900 border border-slate-800 rounded-full overflow-hidden">
                   <div
-                    className="bg-blue-600 h-2 rounded-full"
+                    className="bg-cyan-500 h-2 rounded-full"
                     style={{
                       width: `${card.progress}%`,
                     }}
@@ -681,7 +680,7 @@ export function StatsCards({ cases = [], stats = null }) {
 
             {card.footer && (
               <div
-                className={`flex items-center gap-2 mt-4 text-xs uppercase tracking-wide ${card.trend ? "text-red-500" : "text-gray-500"
+                className={`flex items-center gap-2 mt-4 text-xs uppercase tracking-wide ${card.trend ? "text-red-500" : "text-slate-450"
                   }`}
               >
                 {card.trend && <TrendingUp size={14} />}

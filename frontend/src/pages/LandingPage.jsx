@@ -10,160 +10,165 @@ import {
   LockKeyhole,
   ScanSearch,
   ShieldCheck,
+  Zap,
+  Cpu,
+  Layers
 } from "lucide-react";
 import { ROUTES } from "../utils/constants.js";
 
-const workflow = [
-  { label: "Ingest", value: "Quality gate", icon: ScanSearch },
-  { label: "Compare", value: "Golden reference", icon: FileSearch },
-  { label: "Decide", value: "Fraud score", icon: Gauge },
-  { label: "Report", value: "Audit-ready", icon: ClipboardCheck },
-];
-
-const metrics = [
-  { label: "Visual detectors", value: "5" },
-  { label: "Review actions", value: "3" },
-  { label: "Pipeline mode", value: "Agentic" },
+const keyFeatures = [
+  {
+    title: "AI Visual Comparison",
+    description: "Compare returns against OEM references using ORB & SSIM descriptors.",
+    icon: Cpu,
+    color: "text-cyan-400"
+  },
+  {
+    title: "Fuzzy OCR Extraction",
+    description: "Parse serial numbers to match official registries.",
+    icon: ScanSearch,
+    color: "text-purple-400"
+  }
 ];
 
 export default function LandingPage() {
   return (
-    <main className="min-h-screen bg-[#f6f8fc] text-slate-950">
-      <header className="mx-auto flex max-w-7xl items-center justify-between px-5 py-5 sm:px-8">
+    <main className="h-screen max-h-screen overflow-hidden flex flex-col bg-[#070a13] text-slate-100 selection:bg-cyan-500 selection:text-slate-950">
+      
+      {/* Compact Header */}
+      <header className="mx-auto w-full max-w-7xl flex items-center justify-between px-5 py-4 sm:px-8 border-b border-slate-900/60 bg-[#070a13]/85 backdrop-blur-md z-50">
         <Link to={ROUTES.LANDING} className="flex items-center gap-3">
-          <div className="grid h-10 w-10 place-items-center rounded-lg bg-slate-950 text-white shadow-sm">
-            <Fingerprint size={22} />
+          <div className="grid h-10 w-10 place-items-center rounded-xl bg-gradient-to-tr from-cyan-500 to-purple-600 text-white shadow-[0_0_12px_rgba(6,182,212,0.3)]">
+            <Fingerprint size={21} />
           </div>
           <div>
-            <p className="text-sm font-extrabold tracking-[0.18em] text-slate-950">VERIVISION-AI</p>
-            <p className="text-xs font-medium text-slate-500">Parts fraud inspection workspace</p>
+            <p className="text-xs font-extrabold tracking-[0.25em] text-white">VERIVISION-AI</p>
+            <p className="text-[9px] font-semibold text-slate-400 uppercase tracking-widest">Vision-Triage System</p>
           </div>
         </Link>
         <Link
           to={`${ROUTES.LOGIN}?role=user`}
-          className="hidden items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-slate-400 hover:bg-slate-50 sm:inline-flex"
+          className="hidden items-center gap-2 rounded-lg border border-cyan-500/30 bg-cyan-950/30 px-4 py-1.5 text-xs font-semibold text-cyan-400 shadow-sm transition hover:bg-cyan-900/50 hover:border-cyan-400/50 sm:inline-flex"
         >
-          Open workspace
-          <ArrowRight size={16} />
+          Enter Console
+          <ArrowRight size={14} />
         </Link>
       </header>
 
-      <section className="mx-auto grid max-w-7xl grid-cols-1 gap-10 px-5 pb-16 pt-8 sm:px-8 lg:grid-cols-[1.02fr_0.98fr] lg:items-center lg:pb-24 lg:pt-14">
-        <div>
-          <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 shadow-sm">
-            <ShieldCheck size={15} className="text-blue-700" />
-            Computer vision + human review for repair supply chains
+      {/* Main Single Screen Grid Layout */}
+      <section className="flex-1 mx-auto w-full max-w-7xl px-5 sm:px-8 grid grid-cols-1 lg:grid-cols-12 gap-8 items-center overflow-hidden max-h-[calc(100vh-120px)] py-4">
+        
+        {/* Left Side Info Panel */}
+        <div className="lg:col-span-5 flex flex-col gap-5 justify-center py-2">
+          
+          <div className="inline-flex self-start items-center gap-2 rounded-full border border-cyan-500/25 bg-cyan-950/20 px-3 py-1.5 text-[11px] font-semibold text-cyan-400 shadow-[0_0_12px_rgba(6,182,212,0.08)]">
+            <Zap size={12} className="animate-pulse" />
+            <span>Dell Hackathon Finale Release</span>
+          </div>
+          
+          <div className="space-y-3">
+            <h1 className="text-4xl sm:text-5xl font-black leading-[1.1] tracking-tight text-white">
+              Real-time AI <br />
+              <span className="bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-500 bg-clip-text text-transparent">
+                Parts Inspection
+              </span>
+            </h1>
+            <p className="text-sm leading-relaxed text-slate-400 max-w-xl">
+              Automate repair supply chain verification. Compare incoming returns against golden OEM templates, compute variations, and instantly isolate tampered parts.
+            </p>
           </div>
 
-          <h1 className="max-w-4xl text-4xl font-extrabold leading-[1.04] tracking-normal text-slate-950 sm:text-5xl lg:text-6xl">
-            VERIVISION-AI
-          </h1>
-          <p className="mt-5 max-w-2xl text-lg leading-8 text-slate-600">
-            A focused inspection console for comparing returned parts against golden references,
-            scoring fraud risk, and producing reviewer-ready evidence.
-          </p>
+          <div className="flex flex-col gap-2.5">
+            {keyFeatures.map((feat) => {
+              const Icon = feat.icon;
+              return (
+                <div key={feat.title} className="cyber-card border-slate-850 bg-[#0f172a]/30 p-3.5 flex items-start gap-3.5">
+                  <div className={`p-2 rounded-lg bg-slate-950/80 border border-slate-850 shrink-0 ${feat.color}`}>
+                    <Icon size={16} />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-slate-100 text-xs">{feat.title}</h3>
+                    <p className="text-[10px] text-slate-400 leading-relaxed mt-0.5">{feat.description}</p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
 
-          <div className="mt-8 grid gap-3 sm:max-w-xl sm:grid-cols-2">
+          <div className="grid grid-cols-2 gap-3 max-w-md">
             <Link
               to={`${ROUTES.LOGIN}?role=admin`}
-              className="group flex min-h-[68px] items-center justify-between rounded-lg bg-slate-950 px-5 py-4 text-white shadow-lg shadow-slate-950/10 transition hover:bg-slate-800"
+              className="group flex h-11 items-center justify-between rounded-lg bg-gradient-to-r from-cyan-500 to-blue-600 text-slate-950 font-extrabold text-xs shadow-[0_0_12px_rgba(6,182,212,0.2)] hover:opacity-95 transition px-4 py-2"
             >
-              <span>
-                <span className="block text-sm font-bold">Login as Admin</span>
-                <span className="mt-1 block text-xs text-slate-300">Full triage and tuning access</span>
-              </span>
-              <ArrowRight size={19} className="transition group-hover:translate-x-0.5" />
+              <span>Admin Console</span>
+              <ArrowRight size={15} className="text-slate-950 transition group-hover:translate-x-0.5" />
             </Link>
             <Link
               to={`${ROUTES.LOGIN}?role=user`}
-              className="group flex min-h-[68px] items-center justify-between rounded-lg border border-slate-300 bg-white px-5 py-4 text-slate-900 shadow-sm transition hover:border-blue-300 hover:bg-blue-50/50"
+              className="group flex h-11 items-center justify-between rounded-lg border border-slate-800 bg-slate-900/60 text-slate-300 hover:bg-slate-800 hover:text-white transition text-xs font-semibold px-4 py-2"
             >
-              <span>
-                <span className="block text-sm font-bold">Login as User</span>
-                <span className="mt-1 block text-xs text-slate-500">Operator review workspace</span>
+              <span>Operator Space</span>
+              <ArrowRight size={15} className="text-cyan-400 transition group-hover:translate-x-0.5" />
+            </Link>
+          </div>
+        </div>
+
+        {/* Right Side Visual Sandbox */}
+        <div className="lg:col-span-7 h-full flex items-center justify-center py-2 max-h-[460px]">
+          <div className="w-full cyber-card border-slate-800 bg-[#0f172a]/65 p-5 shadow-2xl relative flex flex-col justify-between h-full max-h-[440px]">
+            
+            {/* Mockup Header */}
+            <div className="flex items-center justify-between border-b border-slate-850 pb-3">
+              <div className="flex items-center gap-2.5">
+                <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-ping" />
+                <div>
+                  <p className="text-[9px] font-bold uppercase tracking-[0.2em] text-slate-500">AI Telemetry Sandbox</p>
+                  <p className="text-xs font-extrabold text-white">XPS-BOARD-2026</p>
+                </div>
+              </div>
+              <span className="rounded-full bg-red-500/10 border border-red-500/20 px-2.5 py-0.5 text-[10px] font-bold text-red-400 font-tech-code tracking-wider">
+                94% TAMPER
               </span>
-              <ArrowRight size={19} className="text-blue-700 transition group-hover:translate-x-0.5" />
-            </Link>
-          </div>
+            </div>
 
-          <div className="mt-5 flex flex-wrap items-center gap-3 text-sm text-slate-600">
-            <span>New to the workspace?</span>
-            <Link to={`${ROUTES.LOGIN}?mode=signup`} className="font-semibold text-blue-700 hover:text-blue-900">
-              Create an operator account
-            </Link>
+            {/* In-Line Images */}
+            <div className="grid grid-cols-2 gap-3.5 my-3.5 flex-1">
+              <div className="rounded-lg border border-slate-850 bg-slate-950 p-2.5 flex flex-col justify-between">
+                <div className="flex items-center justify-between">
+                  <span className="text-[9px] font-bold uppercase tracking-wider text-slate-450">OEM Reference</span>
+                  <BadgeCheck size={14} className="text-emerald-500 animate-pulse" />
+                </div>
+                <div className="h-[80px] border border-dashed border-slate-850 rounded bg-[#090d16]/70 flex flex-col justify-center items-center text-center p-1">
+                  <span className="text-[9px] text-slate-500">SSIM Match: 1.00</span>
+                </div>
+              </div>
+              <div className="rounded-lg border border-red-950/30 bg-slate-950 p-2.5 flex flex-col justify-between">
+                <div className="flex items-center justify-between">
+                  <span className="text-[9px] font-bold uppercase tracking-wider text-slate-450">Inspected Return</span>
+                  <ScanSearch size={14} className="text-red-400" />
+                </div>
+                <div className="h-[80px] border border-red-500/20 rounded bg-red-950/15 flex flex-col justify-center items-center text-center p-1">
+                  <span className="text-[9px] text-red-400 font-semibold">Mismatch Found</span>
+                </div>
+              </div>
+            </div>
+
+            {/* In-Line CV Log */}
+            <div className="bg-slate-950/90 rounded-lg p-3 border border-slate-850 font-tech-code text-[10px] text-cyan-400 space-y-0.5">
+              <p className="text-slate-500">&gt;_ cv-core: ORB/SIFT delta 42% [WARN]</p>
+              <p className="text-red-400">&gt;_ fail: serial_number tag tampered [FAIL]</p>
+            </div>
+
           </div>
         </div>
 
-        <div className="relative">
-          <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-2xl shadow-slate-900/10">
-            <div className="flex items-center justify-between border-b border-slate-200 pb-4">
-              <div>
-                <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">Live case</p>
-                <p className="mt-1 text-lg font-bold text-slate-950">XPS-LABEL-03 inspection</p>
-              </div>
-              <span className="rounded-full bg-red-50 px-3 py-1 text-xs font-bold text-red-700">92 risk</span>
-            </div>
-
-            <div className="mt-5 grid grid-cols-2 gap-3">
-              <div className="aspect-[4/3] rounded-lg border border-slate-200 bg-[linear-gradient(135deg,#e7edf7,#ffffff)] p-3">
-                <div className="mb-3 flex items-center justify-between">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Golden</span>
-                  <BadgeCheck size={16} className="text-emerald-600" />
-                </div>
-                <div className="h-8 rounded bg-slate-950" />
-                <div className="mt-3 h-3 w-3/4 rounded bg-slate-300" />
-                <div className="mt-2 h-3 w-1/2 rounded bg-slate-200" />
-                <div className="mt-6 h-10 rounded border border-dashed border-slate-300 bg-white" />
-              </div>
-              <div className="aspect-[4/3] rounded-lg border border-red-200 bg-[linear-gradient(135deg,#fff1f2,#ffffff)] p-3">
-                <div className="mb-3 flex items-center justify-between">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Uploaded</span>
-                  <ScanSearch size={16} className="text-red-600" />
-                </div>
-                <div className="h-8 rounded bg-slate-950" />
-                <div className="mt-3 h-3 w-2/3 rounded bg-slate-300" />
-                <div className="mt-2 h-3 w-1/3 rounded bg-slate-200" />
-                <div className="mt-6 h-10 rounded border-2 border-red-500 bg-red-100/60" />
-              </div>
-            </div>
-
-            <div className="mt-5 grid gap-3 sm:grid-cols-4">
-              {workflow.map((item) => {
-                const Icon = item.icon;
-                return (
-                  <div key={item.label} className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-                    <Icon size={18} className="text-blue-700" />
-                    <p className="mt-3 text-sm font-bold text-slate-900">{item.label}</p>
-                    <p className="mt-1 text-xs text-slate-500">{item.value}</p>
-                  </div>
-                );
-              })}
-            </div>
-
-            <div className="mt-5 grid grid-cols-3 gap-3 border-t border-slate-200 pt-4">
-              {metrics.map((item) => (
-                <div key={item.label}>
-                  <p className="text-xl font-extrabold text-slate-950">{item.value}</p>
-                  <p className="mt-1 text-xs text-slate-500">{item.label}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-              <BrainCircuit size={20} className="text-blue-700" />
-              <p className="mt-3 text-sm font-bold">Explainable decisions</p>
-              <p className="mt-1 text-sm leading-6 text-slate-600">SSIM, OCR, template, keypoint, and color cues stay visible to reviewers.</p>
-            </div>
-            <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-              <LockKeyhole size={20} className="text-blue-700" />
-              <p className="mt-3 text-sm font-bold">Audit trail first</p>
-              <p className="mt-1 text-sm leading-6 text-slate-600">Every override and final decision is shaped for compliance review.</p>
-            </div>
-          </div>
-        </div>
       </section>
+
+      {/* Flat Footer */}
+      <footer className="w-full py-4 text-center border-t border-slate-900 bg-slate-950/20 text-[10px] text-slate-500 tracking-wide mt-auto z-40">
+        <p>© 2026 VERIVISION-AI · Platform built for repair supply chains verification.</p>
+      </footer>
+
     </main>
   );
 }

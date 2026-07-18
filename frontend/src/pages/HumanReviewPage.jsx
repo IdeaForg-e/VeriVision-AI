@@ -9,7 +9,7 @@ export default function HumanReviewPage() {
   if (loading || !caseData) {
     return (
       <Layout>
-        <div className="flex items-center justify-center h-64 text-on-surface-variant">Loading case…</div>
+        <div className="flex items-center justify-center h-64 text-slate-450">Loading case…</div>
       </Layout>
     );
   }
@@ -19,10 +19,10 @@ export default function HumanReviewPage() {
       {/* Page Title & Confidence Chip */}
       <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
         <div>
-          <h1 className="font-headline-lg text-headline-lg text-on-surface">
-            Reviewing Case #{caseData.id} · <span className="font-tech-code text-primary">{caseData.partCode}</span>
+          <h1 className="font-headline-lg text-headline-lg text-slate-200">
+            Reviewing Case #{caseData.id} · <span className="font-tech-code text-cyan-400">{caseData.partCode}</span>
           </h1>
-          <p className="text-on-surface-variant mt-1 font-body-md">{caseData.title}</p>
+          <p className="text-slate-450 mt-1 font-body-md">{caseData.title}</p>
         </div>
         <ConfidenceBadge confidencePct={caseData.confidencePct} />
       </div>
@@ -37,9 +37,9 @@ export default function HumanReviewPage() {
         />
 
         <div className="lg:col-span-4 flex flex-col gap-gutter">
-          <div className="bg-white border border-outline-variant rounded-xl shadow-sm p-card-padding flex flex-col gap-6">
+          <div className="cyber-card bg-[#0f172a]/55 border-slate-800 p-card-padding flex flex-col gap-6 shadow-lg">
             <h2 className="font-headline-sm text-headline-sm flex items-center gap-2">
-              <span className="material-symbols-outlined text-primary">gavel</span>
+              <span className="material-symbols-outlined text-cyan-400">gavel</span>
               Reviewer Decision
             </h2>
             <ReviewerComment value={notes} onChange={setNotes} />
@@ -59,7 +59,7 @@ export default function HumanReviewPage() {
 
       <CaseStatusTracker status={caseData.status} />
 
-      <p className="text-center text-on-surface-variant text-body-sm italic mt-10">
+      <p className="text-center text-slate-450 text-body-sm italic mt-10">
         "Every case has a defined next step until it reaches a final, frozen decision."
       </p>
     </Layout>

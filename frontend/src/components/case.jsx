@@ -16,27 +16,27 @@ import { useState } from "react";
 export function DetectorMetrics({ metrics = [] }) {
   if (!metrics.length) {
     return (
-      <div className="bg-white border border-outline-variant rounded-xl shadow-sm p-card-padding">
+      <div className="cyber-card bg-[#0f172a]/55 border-slate-800 p-card-padding shadow-lg">
         <h3 className="font-headline-sm text-headline-sm flex items-center gap-2 mb-3">
-          <span className="material-symbols-outlined text-primary">bar_chart</span>
+          <span className="material-symbols-outlined text-cyan-400">bar_chart</span>
           Detector Metrics
         </h3>
-        <p className="text-on-surface-variant text-body-sm italic">No detector metrics available.</p>
+        <p className="text-slate-450 text-body-sm italic">No detector metrics available.</p>
       </div>
     );
   }
 
   function barColor(score, maxScore) {
     const pct = (score / maxScore) * 100;
-    if (pct >= 80) return "bg-green-500";
+    if (pct >= 80) return "bg-emerald-500/10 border border-emerald-500/200";
     if (pct >= 50) return "bg-amber-400";
-    return "bg-red-500";
+    return "bg-red-500/10 border border-red-500/200";
   }
 
   return (
-    <div className="bg-white border border-outline-variant rounded-xl shadow-sm p-card-padding">
+    <div className="cyber-card bg-[#0f172a]/55 border-slate-800 p-card-padding shadow-lg">
       <h3 className="font-headline-sm text-headline-sm flex items-center gap-2 mb-4">
-        <span className="material-symbols-outlined text-primary">bar_chart</span>
+        <span className="material-symbols-outlined text-cyan-400">bar_chart</span>
         Detector Metrics
       </h3>
 
@@ -51,23 +51,23 @@ export function DetectorMetrics({ metrics = [] }) {
               <div className="flex items-center justify-between mb-1">
                 <div className="flex items-center gap-1.5">
                   {m.icon && (
-                    <span className="material-symbols-outlined text-[18px] text-primary">{m.icon}</span>
+                    <span className="material-symbols-outlined text-[18px] text-cyan-400">{m.icon}</span>
                   )}
-                  <span className="text-body-sm font-medium text-on-surface">{m.name}</span>
+                  <span className="text-body-sm font-medium text-slate-250">{m.name}</span>
                 </div>
-                <span className="font-tech-code text-body-sm text-on-surface-variant">
+                <span className="font-tech-code text-body-sm text-slate-450">
                   {m.unit === "%" ? `${Math.round(m.score)}%` : formatScore(m.score)}
                   {m.unit && m.unit !== "%" ? ` ${m.unit}` : ""}
                 </span>
               </div>
-              <div className="w-full h-2 bg-surface-container-highest rounded-full overflow-hidden">
+              <div className="w-full h-2 bg-slate-900 border border-slate-800 rounded-full overflow-hidden">
                 <div
                   className={`h-full rounded-full ${color} transition-all duration-700`}
                   style={{ width: `${pct}%` }}
                 />
               </div>
               {m.description && (
-                <p className="text-[11px] text-on-surface-variant mt-1 italic">{m.description}</p>
+                <p className="text-[11px] text-slate-450 mt-1 italic">{m.description}</p>
               )}
             </div>
           );
@@ -82,19 +82,19 @@ export function DetectorMetrics({ metrics = [] }) {
 // EvidenceTimeline.jsx — Chronological log of events for a case (status changes, comments, decisions)
 
 const EVENT_CONFIG = {
-  created: { icon: "add_circle", color: "text-primary", bg: "bg-primary/10" },
-  retake_requested: { icon: "history", color: "text-amber-600", bg: "bg-amber-50" },
-  resubmitted: { icon: "publish", color: "text-blue-600", bg: "bg-blue-50" },
-  reviewed: { icon: "rate_review", color: "text-primary", bg: "bg-primary/10" },
-  approved: { icon: "check_circle", color: "text-green-600", bg: "bg-green-50" },
-  rejected: { icon: "cancel", color: "text-red-600", bg: "bg-red-50" },
-  needs_evidence: { icon: "radio_button_checked", color: "text-amber-600", bg: "bg-amber-50" },
-  final_decision: { icon: "fact_check", color: "text-green-700", bg: "bg-green-50" },
-  comment: { icon: "chat", color: "text-on-surface-variant", bg: "bg-surface-container" },
+  created: { icon: "add_circle", color: "text-cyan-400", bg: "bg-cyan-500/10 text-cyan-400 border border-cyan-500/20" },
+  retake_requested: { icon: "history", color: "text-amber-600", bg: "bg-amber-500/10 border border-amber-500/20" },
+  resubmitted: { icon: "publish", color: "text-cyan-400", bg: "bg-cyan-500/10" },
+  reviewed: { icon: "rate_review", color: "text-cyan-400", bg: "bg-cyan-500/10 text-cyan-400 border border-cyan-500/20" },
+  approved: { icon: "check_circle", color: "text-green-600", bg: "bg-emerald-500/10 border border-emerald-500/20" },
+  rejected: { icon: "cancel", color: "text-red-600", bg: "bg-red-500/10 border border-red-500/20" },
+  needs_evidence: { icon: "radio_button_checked", color: "text-amber-600", bg: "bg-amber-500/10 border border-amber-500/20" },
+  final_decision: { icon: "fact_check", color: "text-green-700", bg: "bg-emerald-500/10 border border-emerald-500/20" },
+  comment: { icon: "chat", color: "text-slate-450", bg: "bg-surface-container" },
 };
 
 function getConfig(type) {
-  return EVENT_CONFIG[type] ?? { icon: "circle", color: "text-on-surface-variant", bg: "bg-surface-container" };
+  return EVENT_CONFIG[type] ?? { icon: "circle", color: "text-slate-450", bg: "bg-surface-container" };
 }
 
 /**
@@ -104,20 +104,20 @@ function getConfig(type) {
 export function EvidenceTimeline({ events = [] }) {
   if (!events.length) {
     return (
-      <div className="bg-white border border-outline-variant rounded-xl shadow-sm p-card-padding">
+      <div className="cyber-card bg-[#0f172a]/55 border-slate-800 p-card-padding shadow-lg">
         <h3 className="font-headline-sm text-headline-sm flex items-center gap-2 mb-3">
-          <span className="material-symbols-outlined text-primary">timeline</span>
+          <span className="material-symbols-outlined text-cyan-400">timeline</span>
           Evidence Timeline
         </h3>
-        <p className="text-on-surface-variant text-body-sm italic">No events recorded yet.</p>
+        <p className="text-slate-450 text-body-sm italic">No events recorded yet.</p>
       </div>
     );
   }
 
   return (
-    <div className="bg-white border border-outline-variant rounded-xl shadow-sm p-card-padding">
+    <div className="cyber-card bg-[#0f172a]/55 border-slate-800 p-card-padding shadow-lg">
       <h3 className="font-headline-sm text-headline-sm flex items-center gap-2 mb-5">
-        <span className="material-symbols-outlined text-primary">timeline</span>
+        <span className="material-symbols-outlined text-cyan-400">timeline</span>
         Evidence Timeline
       </h3>
 
@@ -144,15 +144,15 @@ export function EvidenceTimeline({ events = [] }) {
               <div className={`flex-1 pb-5 ${isLast ? "" : ""}`}>
                 <div className="flex items-center justify-between flex-wrap gap-1">
                   <span className={`text-body-sm font-semibold ${cfg.color}`}>{event.label}</span>
-                  <span className="text-[11px] text-on-surface-variant font-tech-code">
+                  <span className="text-[11px] text-slate-450 font-tech-code">
                     {formatDateTime(event.timestamp)}
                   </span>
                 </div>
                 {event.description && (
-                  <p className="text-body-sm text-on-surface-variant mt-0.5">{event.description}</p>
+                  <p className="text-body-sm text-slate-450 mt-0.5">{event.description}</p>
                 )}
                 {event.user && (
-                  <p className="text-[11px] text-on-surface-variant mt-0.5">
+                  <p className="text-[11px] text-slate-450 mt-0.5">
                     by <span className="font-medium">{event.user}</span>
                   </p>
                 )}
@@ -176,9 +176,9 @@ function getRingColor(score) {
 }
 
 function getRiskLabel(score) {
-  if (score >= 75) return { text: "High Risk", bg: "bg-red-50", text_: "text-red-700" };
-  if (score >= 50) return { text: "Medium Risk", bg: "bg-amber-50", text_: "text-amber-700" };
-  return { text: "Low Risk", bg: "bg-green-50", text_: "text-green-700" };
+  if (score >= 75) return { text: "High Risk", bg: "bg-red-500/10 border border-red-500/20", text_: "text-red-700" };
+  if (score >= 50) return { text: "Medium Risk", bg: "bg-amber-500/10 border border-amber-500/20", text_: "text-amber-700" };
+  return { text: "Low Risk", bg: "bg-emerald-500/10 border border-emerald-500/20", text_: "text-green-700" };
 }
 
 /**
@@ -222,7 +222,7 @@ export function FraudScore({ score = 0, showLabel = true, size = "md" }) {
           <span className="font-bold leading-none" style={{ color, fontSize: size === "sm" ? "1rem" : "1.5rem" }}>
             {formatFraudScore(normalised)}
           </span>
-          <span className="text-[10px] text-on-surface-variant">/100</span>
+          <span className="text-[10px] text-slate-450">/100</span>
         </div>
       </div>
 
@@ -257,15 +257,15 @@ export function HeatmapViewer({
   const [showOverlay, setShowOverlay] = useState(true);
 
   return (
-    <div className="bg-white border border-outline-variant rounded-xl shadow-sm p-card-padding">
+    <div className="cyber-card bg-[#0f172a]/55 border-slate-800 p-card-padding shadow-lg">
       <div className="flex items-center justify-between mb-4">
         <h3 className="font-headline-sm text-headline-sm flex items-center gap-2">
-          <span className="material-symbols-outlined text-primary">thermostat</span>
+          <span className="material-symbols-outlined text-cyan-400">thermostat</span>
           Heatmap Viewer
         </h3>
         <button
           onClick={() => setShowOverlay((v) => !v)}
-          className="flex items-center gap-1.5 text-body-sm text-on-surface-variant hover:text-primary transition-colors px-3 py-1 rounded-lg border border-outline-variant hover:bg-primary/5"
+          className="flex items-center gap-1.5 text-body-sm text-slate-450 hover:text-cyan-400 transition-colors px-3 py-1 rounded-lg border border-slate-800 hover:bg-primary/5"
         >
           <span className="material-symbols-outlined text-[18px]">
             {showOverlay ? "visibility_off" : "visibility"}
@@ -274,7 +274,7 @@ export function HeatmapViewer({
         </button>
       </div>
 
-      <div className="relative aspect-square bg-surface-container-lowest rounded-lg overflow-hidden border border-outline-variant select-none">
+      <div className="relative aspect-square bg-surface-container-lowest rounded-lg overflow-hidden border border-slate-800 select-none">
         {/* Base image */}
         <img
           src={imageUrl}
@@ -311,7 +311,7 @@ export function HeatmapViewer({
       </div>
 
       {label && (
-        <p className="text-center text-body-sm text-on-surface-variant italic mt-3">{label}</p>
+        <p className="text-center text-body-sm text-slate-450 italic mt-3">{label}</p>
       )}
     </div>
   );
@@ -339,14 +339,14 @@ export function ImageComparison({
   const [zoom, setZoom] = useState(null); // null | "golden" | "uploaded"
 
   return (
-    <div className="bg-white border border-outline-variant rounded-xl shadow-sm p-card-padding">
+    <div className="cyber-card bg-[#0f172a]/55 border-slate-800 p-card-padding shadow-lg">
       <div className="flex items-center justify-between mb-4">
         <h3 className="font-headline-sm text-headline-sm flex items-center gap-2">
-          <span className="material-symbols-outlined text-primary">compare</span>
+          <span className="material-symbols-outlined text-cyan-400">compare</span>
           Image Comparison
         </h3>
         {imageHash && (
-          <span className="font-tech-code text-body-sm text-on-surface-variant bg-surface-container-low px-2 py-1 rounded">
+          <span className="font-tech-code text-body-sm text-slate-450 bg-surface-container-low px-2 py-1 rounded">
             {imageHash}
           </span>
         )}
@@ -355,11 +355,11 @@ export function ImageComparison({
       <div className="grid grid-cols-2 gap-4">
         {/* Golden */}
         <div className="flex flex-col gap-2">
-          <span className="font-label-caps text-[10px] uppercase text-on-surface-variant">
+          <span className="font-label-caps text-[10px] uppercase text-slate-450">
             Golden Reference (OEM)
           </span>
           <div
-            className="relative aspect-square rounded-lg overflow-hidden border border-outline-variant bg-surface-container-lowest cursor-zoom-in group"
+            className="relative aspect-square rounded-lg overflow-hidden border border-slate-800 bg-surface-container-lowest cursor-zoom-in group"
             onClick={() => setZoom(zoom === "golden" ? null : "golden")}
           >
             <img
@@ -370,7 +370,7 @@ export function ImageComparison({
             <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
               <span className="material-symbols-outlined text-white text-3xl drop-shadow-lg">zoom_in</span>
             </div>
-            <div className="absolute bottom-2 left-2 bg-white/90 backdrop-blur px-2 py-0.5 rounded-full text-[10px] font-bold border border-outline-variant uppercase">
+            <div className="absolute bottom-2 left-2 bg-[#090d16]/90 backdrop-blur px-2 py-0.5 rounded-full text-[10px] font-bold border border-slate-800 text-slate-300 uppercase">
               Source: Master_DB
             </div>
           </div>
@@ -378,11 +378,11 @@ export function ImageComparison({
 
         {/* Uploaded */}
         <div className="flex flex-col gap-2">
-          <span className="font-label-caps text-[10px] uppercase text-on-surface-variant">
+          <span className="font-label-caps text-[10px] uppercase text-slate-450">
             Uploaded (Review Required)
           </span>
           <div
-            className="relative aspect-square rounded-lg overflow-hidden border border-outline-variant bg-surface-container-lowest cursor-zoom-in group"
+            className="relative aspect-square rounded-lg overflow-hidden border border-slate-800 bg-surface-container-lowest cursor-zoom-in group"
             onClick={() => setZoom(zoom === "uploaded" ? null : "uploaded")}
           >
             <img
@@ -445,16 +445,16 @@ export function MetadataCard({ caseData = {}, extra = [] }) {
   ].filter((r) => r.value !== undefined && r.value !== null);
 
   return (
-    <div className="bg-white border border-outline-variant rounded-xl shadow-sm p-card-padding">
+    <div className="cyber-card bg-[#0f172a]/55 border-slate-800 p-card-padding shadow-lg">
       <h3 className="font-headline-sm text-headline-sm flex items-center gap-2 mb-4">
-        <span className="material-symbols-outlined text-primary">info</span>
+        <span className="material-symbols-outlined text-cyan-400">info</span>
         Case Metadata
       </h3>
       <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-3">
         {rows.map(({ label, value }) => (
           <div key={label} className="flex flex-col gap-0.5">
-            <dt className="font-label-caps text-on-surface-variant uppercase text-[11px]">{label}</dt>
-            <dd className="font-tech-code text-on-surface text-body-sm break-all">{value ?? "—"}</dd>
+            <dt className="font-label-caps text-slate-450 uppercase text-[11px]">{label}</dt>
+            <dd className="font-tech-code text-slate-250 text-body-sm break-all">{value ?? "—"}</dd>
           </div>
         ))}
       </dl>
@@ -476,20 +476,20 @@ export function MetadataCard({ caseData = {}, extra = [] }) {
 export function OCRResults({ results = [] }) {
   if (!results.length) {
     return (
-      <div className="bg-white border border-outline-variant rounded-xl shadow-sm p-card-padding">
+      <div className="cyber-card bg-[#0f172a]/55 border-slate-800 p-card-padding shadow-lg">
         <h3 className="font-headline-sm text-headline-sm flex items-center gap-2 mb-3">
-          <span className="material-symbols-outlined text-primary">text_fields</span>
+          <span className="material-symbols-outlined text-cyan-400">text_fields</span>
           OCR Results
         </h3>
-        <p className="text-on-surface-variant text-body-sm italic">No OCR data available for this case.</p>
+        <p className="text-slate-450 text-body-sm italic">No OCR data available for this case.</p>
       </div>
     );
   }
 
   return (
-    <div className="bg-white border border-outline-variant rounded-xl shadow-sm p-card-padding">
+    <div className="cyber-card bg-[#0f172a]/55 border-slate-800 p-card-padding shadow-lg">
       <h3 className="font-headline-sm text-headline-sm flex items-center gap-2 mb-4">
-        <span className="material-symbols-outlined text-primary">text_fields</span>
+        <span className="material-symbols-outlined text-cyan-400">text_fields</span>
         OCR Results
       </h3>
 
@@ -497,22 +497,22 @@ export function OCRResults({ results = [] }) {
         {results.map((row, i) => {
           const matchIcon = row.match === true ? "check_circle" : row.match === false ? "cancel" : "help";
           const matchColor =
-            row.match === true ? "text-green-600" : row.match === false ? "text-red-500" : "text-on-surface-variant";
+            row.match === true ? "text-green-600" : row.match === false ? "text-red-500" : "text-slate-450";
 
           return (
             <div
               key={i}
-              className="grid grid-cols-[1fr_1fr_auto] gap-3 items-center border-b border-outline-variant pb-3 last:border-0 last:pb-0"
+              className="grid grid-cols-[1fr_1fr_auto] gap-3 items-center border-b border-slate-800 pb-3 last:border-0 last:pb-0"
             >
               {/* Field */}
               <div>
-                <p className="font-label-caps text-[10px] uppercase text-on-surface-variant mb-0.5">{row.field}</p>
-                <p className="font-tech-code text-body-sm text-on-surface">{row.extracted ?? "—"}</p>
+                <p className="font-label-caps text-[10px] uppercase text-slate-450 mb-0.5">{row.field}</p>
+                <p className="font-tech-code text-body-sm text-slate-250">{row.extracted ?? "—"}</p>
               </div>
               {/* Expected */}
               <div>
-                <p className="font-label-caps text-[10px] uppercase text-on-surface-variant mb-0.5">Expected</p>
-                <p className="font-tech-code text-body-sm text-on-surface-variant">{row.expected ?? "—"}</p>
+                <p className="font-label-caps text-[10px] uppercase text-slate-450 mb-0.5">Expected</p>
+                <p className="font-tech-code text-body-sm text-slate-450">{row.expected ?? "—"}</p>
               </div>
               {/* Match icon */}
               <span className={`material-symbols-outlined text-[22px] ${matchColor}`}>{matchIcon}</span>
@@ -533,7 +533,7 @@ const DECISION_CONFIG = {
     icon: "check_circle",
     title: "Approve Part",
     color: "text-green-700",
-    bg: "bg-green-50",
+    bg: "bg-emerald-500/10 border border-emerald-500/20",
     border: "border-green-200",
     badge: "bg-green-100 text-green-800",
   },
@@ -541,7 +541,7 @@ const DECISION_CONFIG = {
     icon: "cancel",
     title: "Reject Part",
     color: "text-red-700",
-    bg: "bg-red-50",
+    bg: "bg-red-500/10 border border-red-500/20",
     border: "border-red-200",
     badge: "bg-red-100 text-red-800",
   },
@@ -549,7 +549,7 @@ const DECISION_CONFIG = {
     icon: "find_in_page",
     title: "Request More Evidence",
     color: "text-amber-700",
-    bg: "bg-amber-50",
+    bg: "bg-amber-500/10 border border-amber-500/20",
     border: "border-amber-200",
     badge: "bg-amber-100 text-amber-800",
   },
@@ -571,10 +571,10 @@ export function RecommendationCard({
   const cfg = DECISION_CONFIG[recommendation] ?? {
     icon: "lightbulb",
     title: recommendation ?? "AI Recommendation",
-    color: "text-primary",
+    color: "text-cyan-400",
     bg: "bg-primary/5",
     border: "border-primary/20",
-    badge: "bg-primary/10 text-primary",
+    badge: "bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 text-cyan-400",
   };
 
   return (
@@ -593,7 +593,7 @@ export function RecommendationCard({
             )}
           </div>
           {reasoning && (
-            <p className="text-body-sm text-on-surface-variant mt-1 leading-relaxed">{reasoning}</p>
+            <p className="text-body-sm text-slate-450 mt-1 leading-relaxed">{reasoning}</p>
           )}
         </div>
       </div>
@@ -603,7 +603,7 @@ export function RecommendationCard({
           {flags.map((flag) => (
             <span
               key={flag}
-              className="flex items-center gap-1 px-2.5 py-0.5 bg-white/70 border border-outline-variant rounded-full text-[11px] font-medium text-on-surface-variant"
+              className="flex items-center gap-1 px-2.5 py-0.5 bg-slate-900 border border-slate-800 rounded-full text-[11px] font-medium text-slate-400"
             >
               <span className="material-symbols-outlined text-[14px] text-amber-500">warning</span>
               {flag}
