@@ -1,23 +1,27 @@
-import { Routes, Route, Navigate } from "react-router-dom";
-import HumanReviewPage from "../pages/HumanReviewPage.jsx";
-import FeedbackPanelPage from "../pages/FeedbackPanelPage.jsx";
+import { Navigate, Route, Routes } from "react-router-dom";
+import LandingPage from "../pages/LandingPage.jsx";
+import LoginPage from "../pages/LoginPage.jsx";
 import DailyTriagePage from "../pages/DailyTriagePage.jsx";
 import CaseDetailPage from "../pages/CaseDetailPage.jsx";
-import LoginPage from "../pages/LoginPage.jsx";
+import HumanReviewPage from "../pages/HumanReviewPage.jsx";
+import FeedbackPanelPage from "../pages/FeedbackPanelPage.jsx";
 import NotFoundPage from "../pages/NotFoundPage.jsx";
+import { ProtectedRoute } from "../components/layout.jsx";
+
+function WorkspaceRoute({ children }) {
+  return <ProtectedRoute>{children}</ProtectedRoute>;
+}
 
 export default function AppRoutes() {
   return (
     <Routes>
-      <Route path="/" element={<Navigate to="/triage" replace />} />
+      <Route path="/" element={<LandingPage />} />
       <Route path="/login" element={<LoginPage />} />
-      <Route path="/triage" element={<DailyTriagePage />} />
-      {/* :id is optional — CaseDetailPage falls back to a default case when omitted */}
-      <Route path="/case/:id" element={<CaseDetailPage />} />
-      <Route path="/case" element={<CaseDetailPage />} />
-      <Route path="/review" element={<HumanReviewPage />} />
-      <Route path="/feedback" element={<FeedbackPanelPage />} />
-      {/* 404 catch-all */}
+      <Route path="/triage" element={<WorkspaceRoute><DailyTriagePage /></WorkspaceRoute>} />
+      <Route path="/case/:id" element={<WorkspaceRoute><CaseDetailPage /></WorkspaceRoute>} />
+      <Route path="/case" element={<WorkspaceRoute><Navigate to="/triage" replace /></WorkspaceRoute>} />
+      <Route path="/review" element={<WorkspaceRoute><HumanReviewPage /></WorkspaceRoute>} />
+      <Route path="/feedback" element={<WorkspaceRoute><FeedbackPanelPage /></WorkspaceRoute>} />
       <Route path="*" element={<NotFoundPage />} />
     </Routes>
   );

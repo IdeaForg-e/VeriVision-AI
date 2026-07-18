@@ -1,59 +1,84 @@
-// Layout components: Header, Layout shell, ProtectedRoute, Sidebar, TopNavigation
-import { NavLink, useLocation, Navigate, Link } from "react-router-dom";
+import { Link, NavLink, Navigate, useLocation } from "react-router-dom";
+import { Bell, Fingerprint, LogOut, Menu, Search, UploadCloud } from "lucide-react";
 import { ROUTES } from "../utils/constants.js";
 import { useAuth } from "../hooks/useAuth.js";
 import { Loader } from "./common.jsx";
 
-const NAV_LINKS = [
-  { to: ROUTES.LOGIN, label: "Login" },
-  { to: ROUTES.TRIAGE, label: "Daily Triage" },
-  { to: ROUTES.CASE_DETAIL, label: "Case Detail" },
-  { to: ROUTES.HUMAN_REVIEW, label: "Human Review" },
-  { to: ROUTES.FEEDBACK, label: "Feedback Panel" },
+const NAV_ITEMS = [
+  { to: ROUTES.TRIAGE, icon: "dashboard", label: "Triage" },
+  { to: ROUTES.HUMAN_REVIEW, icon: "rate_review", label: "Review" },
+  { to: ROUTES.CASE_DETAIL, icon: "folder_open", label: "Cases" },
+  { to: ROUTES.FEEDBACK, icon: "tune", label: "Tuning" },
 ];
 
-export function Header() {
+function BrandMark({ compact = false }) {
   return (
-    <header className="bg-white border-b border-gray-200 shadow-sm">
-      <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-        {/* Left */}
-        <div className="flex items-center gap-8">
-          {/* Logo */}
-          <NavLink to={ROUTES.TRIAGE} className="flex items-center gap-2">
-            <div className="w-9 h-9 rounded-lg bg-blue-600 flex items-center justify-center text-white font-bold">
-              FG
-            </div>
-            <div>
-              <h1 className="font-bold text-lg">FraudGuard</h1>
-              <p className="text-xs text-gray-500">AI Inspection</p>
-            </div>
-          </NavLink>
+    <Link to={ROUTES.TRIAGE} className="flex min-w-0 items-center gap-3">
+      <div className="grid h-10 w-10 flex-shrink-0 place-items-center rounded-lg bg-slate-950 text-white">
+        <Fingerprint size={21} />
+      </div>
+      {!compact && (
+        <div className="min-w-0">
+          <p className="truncate text-sm font-extrabold tracking-[0.16em] text-slate-950">VERIVISION-AI</p>
+          <p className="truncate text-xs font-medium text-slate-500">Parts fraud inspection</p>
+        </div>
+      )}
+    </Link>
+  );
+}
+
+export function Header() {
+  const { user, logout } = useAuth();
+
+  return (
+    <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 backdrop-blur">
+      <div className="mx-auto flex h-16 max-w-[1440px] items-center justify-between gap-4 px-4 sm:px-6">
+        <div className="flex items-center gap-6">
+          <BrandMark />
+          <nav className="hidden items-center gap-1 lg:flex">
+            {NAV_ITEMS.map((item) => (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                className={({ isActive }) =>
+                  `flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold transition ${
+                    isActive ? "bg-blue-50 text-blue-700" : "text-slate-600 hover:bg-slate-100 hover:text-slate-950"
+                  }`
+                }
+              >
+                <span className="material-symbols-outlined text-[19px]">{item.icon}</span>
+                {item.label}
+              </NavLink>
+            ))}
+          </nav>
         </div>
 
-        {/* Center Navigation */}
-        <nav className="hidden xl:flex items-center gap-6 text-sm font-medium">
-          {NAV_LINKS.map(({ to, label }) => (
-            <NavLink
-              key={to}
-              to={to}
-              className={({ isActive }) =>
-                isActive
-                  ? "text-blue-600"
-                  : "text-gray-700 hover:text-blue-600 transition-colors"
-              }
-            >
-              {label}
-            </NavLink>
-          ))}
-        </nav>
-
-        {/* Right */}
-        <div className="flex items-center gap-3">
-          <button className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">
-            Capture Image
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            className="hidden items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 md:flex"
+          >
+            <UploadCloud size={16} />
+            New Inspection
           </button>
-          <button className="p-2 rounded-lg hover:bg-gray-100">
-            <span className="material-symbols-outlined">notifications</span>
+          <button type="button" className="grid h-9 w-9 place-items-center rounded-lg text-slate-500 transition hover:bg-slate-100 hover:text-slate-900">
+            <Bell size={18} />
+          </button>
+          {user && (
+            <div className="hidden items-center gap-2 rounded-full bg-slate-100 py-1 pl-1 pr-3 sm:flex">
+              <div className="grid h-7 w-7 place-items-center rounded-full bg-slate-950 text-xs font-bold text-white">
+                {user.name?.charAt(0)?.toUpperCase() || "U"}
+              </div>
+              <span className="max-w-[140px] truncate text-sm font-semibold text-slate-700">{user.name}</span>
+            </div>
+          )}
+          <button
+            type="button"
+            onClick={logout}
+            className="grid h-9 w-9 place-items-center rounded-lg text-slate-500 transition hover:bg-red-50 hover:text-red-700"
+            aria-label="Sign out"
+          >
+            <LogOut size={18} />
           </button>
         </div>
       </div>
@@ -61,21 +86,20 @@ export function Header() {
   );
 }
 
-export function Layout({ children, title, subtitle }) {
+export function Layout({ children, title, subtitle, actions }) {
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-[#f6f8fc] text-slate-950">
       <Header />
-      {(title || subtitle) && (
-        <div className="max-w-[1440px] mx-auto px-6 pt-6">
-          {title && (
-            <h1 className="font-headline-lg text-headline-lg text-on-surface">{title}</h1>
-          )}
-          {subtitle && (
-            <p className="text-on-surface-variant text-body-md mt-1">{subtitle}</p>
-          )}
-        </div>
+      {(title || subtitle || actions) && (
+        <section className="mx-auto flex max-w-[1440px] flex-col gap-4 px-4 pt-7 sm:px-6 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            {title && <h1 className="text-2xl font-extrabold tracking-normal text-slate-950">{title}</h1>}
+            {subtitle && <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-600">{subtitle}</p>}
+          </div>
+          {actions && <div className="flex items-center gap-2">{actions}</div>}
+        </section>
       )}
-      <main className="max-w-[1440px] mx-auto px-6 py-8">{children}</main>
+      <main className="mx-auto max-w-[1440px] px-4 py-7 sm:px-6">{children}</main>
     </div>
   );
 }
@@ -85,7 +109,7 @@ export function ProtectedRoute({ children }) {
   const location = useLocation();
 
   if (loading) {
-    return <Loader fullPage label="Verifying session…" />;
+    return <Loader fullPage label="Checking VERIVISION-AI session..." />;
   }
 
   if (!isAuthenticated) {
@@ -98,81 +122,46 @@ export function ProtectedRoute({ children }) {
 export function Sidebar({ collapsed = false, onToggle }) {
   const { user, logout } = useAuth();
 
-  const NAV_ITEMS = [
-    { to: ROUTES.TRIAGE, icon: "dashboard", label: "Daily Triage" },
-    { to: ROUTES.HUMAN_REVIEW, icon: "rate_review", label: "Human Review" },
-    { to: ROUTES.FEEDBACK, icon: "tune", label: "Feedback Panel" },
-    { to: ROUTES.CASE_DETAIL, icon: "folder_open", label: "Case Detail" },
-  ];
-
   return (
-    <aside
-      className={`${collapsed ? "w-16" : "w-56"
-        } flex-shrink-0 h-screen sticky top-0 bg-white border-r border-outline-variant flex flex-col transition-all duration-200 z-20`}
-    >
-      {/* Logo */}
-      <div className="flex items-center gap-3 px-4 py-5 border-b border-outline-variant">
-        <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
-          FG
-        </div>
-        {!collapsed && (
-          <div className="overflow-hidden">
-            <p className="font-bold text-sm leading-none text-on-surface">FraudGuard</p>
-            <p className="text-[11px] text-on-surface-variant leading-none mt-0.5">AI Inspection</p>
-          </div>
-        )}
+    <aside className={`${collapsed ? "w-16" : "w-60"} flex h-screen flex-shrink-0 flex-col border-r border-slate-200 bg-white transition-all`}>
+      <div className="border-b border-slate-200 p-4">
+        <BrandMark compact={collapsed} />
       </div>
-
-      {/* Nav */}
-      <nav className="flex-1 overflow-y-auto py-4 flex flex-col gap-1 px-2">
+      <nav className="flex-1 space-y-1 p-3">
         {NAV_ITEMS.map((item) => (
           <NavLink
             key={item.to}
             to={item.to}
             title={collapsed ? item.label : undefined}
             className={({ isActive }) =>
-              `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${isActive
-                ? "bg-primary/10 text-primary"
-                : "text-on-surface-variant hover:bg-surface-container hover:text-on-surface"
+              `flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-semibold transition ${
+                isActive ? "bg-blue-50 text-blue-700" : "text-slate-600 hover:bg-slate-100 hover:text-slate-950"
               }`
             }
           >
-            <span className="material-symbols-outlined text-[22px] flex-shrink-0">{item.icon}</span>
-            {!collapsed && <span className="truncate">{item.label}</span>}
+            <span className="material-symbols-outlined text-[21px]">{item.icon}</span>
+            {!collapsed && <span>{item.label}</span>}
           </NavLink>
         ))}
       </nav>
-
-      {/* Footer */}
-      <div className="border-t border-outline-variant p-3 flex flex-col gap-2">
+      <div className="border-t border-slate-200 p-3">
         {user && !collapsed && (
-          <div className="flex items-center gap-2 px-2">
-            <div className="w-7 h-7 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
-              <span className="material-symbols-outlined text-primary text-[16px]">person</span>
-            </div>
-            <div className="overflow-hidden">
-              <p className="text-body-sm font-medium text-on-surface truncate">{user.name}</p>
-              <p className="text-[11px] text-on-surface-variant truncate">{user.role}</p>
-            </div>
+          <div className="mb-2 rounded-lg bg-slate-50 p-3">
+            <p className="truncate text-sm font-bold text-slate-900">{user.name}</p>
+            <p className="truncate text-xs text-slate-500">{user.role}</p>
           </div>
         )}
         <button
+          type="button"
           onClick={logout}
-          title="Sign out"
-          className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-on-surface-variant hover:bg-error/10 hover:text-error transition-colors"
+          className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold text-slate-500 transition hover:bg-red-50 hover:text-red-700"
         >
-          <span className="material-symbols-outlined text-[20px] flex-shrink-0">logout</span>
-          {!collapsed && <span>Sign out</span>}
+          <LogOut size={17} />
+          {!collapsed && "Sign out"}
         </button>
         {onToggle && (
-          <button
-            onClick={onToggle}
-            className="flex items-center justify-center p-2 rounded-lg hover:bg-surface-container transition-colors self-end"
-            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-          >
-            <span className="material-symbols-outlined text-on-surface-variant text-[20px]">
-              {collapsed ? "chevron_right" : "chevron_left"}
-            </span>
+          <button type="button" onClick={onToggle} className="mt-2 grid h-9 w-full place-items-center rounded-lg text-slate-500 hover:bg-slate-100">
+            <Menu size={18} />
           </button>
         )}
       </div>
@@ -181,52 +170,17 @@ export function Sidebar({ collapsed = false, onToggle }) {
 }
 
 export function TopNavigation({ title, subtitle, actions }) {
-  const { pathname } = useLocation();
-  const { user } = useAuth();
-
-  const BREADCRUMB_MAP = {
-    [ROUTES.TRIAGE]: "Daily Triage",
-    [ROUTES.HUMAN_REVIEW]: "Human Review",
-    [ROUTES.FEEDBACK]: "Feedback Panel",
-    [ROUTES.CASE_DETAIL]: "Case Detail",
-    [ROUTES.LOGIN]: "Login",
-  };
-
-  const pageLabel = title ?? BREADCRUMB_MAP[pathname] ?? "FraudGuard";
-
   return (
-    <header className="bg-white border-b border-outline-variant px-6 py-3 flex items-center justify-between gap-4 sticky top-0 z-10">
-      <div className="flex items-center gap-2 min-w-0">
-        <Link
-          to={ROUTES.TRIAGE}
-          className="text-on-surface-variant hover:text-primary transition-colors flex-shrink-0"
-          aria-label="Home"
-        >
-          <span className="material-symbols-outlined text-[20px]">home</span>
-        </Link>
-        <span className="text-on-surface-variant text-body-sm flex-shrink-0">/</span>
-        <div className="min-w-0">
-          <span className="text-on-surface font-medium text-body-md truncate block">{pageLabel}</span>
-          {subtitle && (
-            <span className="text-on-surface-variant text-[11px] truncate block">{subtitle}</span>
-          )}
-        </div>
+    <header className="sticky top-0 z-20 flex items-center justify-between gap-4 border-b border-slate-200 bg-white px-5 py-3">
+      <div className="min-w-0">
+        <p className="truncate text-sm font-bold text-slate-950">{title || "VERIVISION-AI"}</p>
+        {subtitle && <p className="truncate text-xs text-slate-500">{subtitle}</p>}
       </div>
-
-      <div className="flex items-center gap-3 flex-shrink-0">
-        {actions && <div className="flex items-center gap-2">{actions}</div>}
-        <button className="p-2 rounded-lg hover:bg-surface-container transition-colors relative" aria-label="Notifications">
-          <span className="material-symbols-outlined text-on-surface-variant text-[22px]">notifications</span>
-          <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-error rounded-full" />
+      <div className="flex items-center gap-2">
+        {actions}
+        <button type="button" className="grid h-9 w-9 place-items-center rounded-lg text-slate-500 hover:bg-slate-100">
+          <Search size={17} />
         </button>
-        {user && (
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-surface-container cursor-default select-none" title={user.email}>
-            <div className="w-6 h-6 rounded-full bg-primary flex items-center justify-center text-white text-[11px] font-bold flex-shrink-0">
-              {user.name?.charAt(0)?.toUpperCase() ?? "U"}
-            </div>
-            <span className="text-body-sm font-medium text-on-surface hidden sm:block">{user.name}</span>
-          </div>
-        )}
       </div>
     </header>
   );

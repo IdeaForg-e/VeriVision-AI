@@ -1,7 +1,7 @@
 /** Central place for magic values so services/components don't hardcode them. */
 
-// TODO(backend): point this at the real API once it exists.
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api";
+export const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || "";
 
 export const STORAGE_KEYS = {
   AUTH_TOKEN: "fraudshield_auth_token",
@@ -29,6 +29,7 @@ export const CONFIDENCE_THRESHOLDS = {
 };
 
 export const ROUTES = {
+  LANDING: "/",
   LOGIN: "/login",
   TRIAGE: "/triage",
   CASE_DETAIL: "/case",

@@ -1,5 +1,11 @@
 import { createContext, useCallback, useEffect, useState } from "react";
-import { getCurrentUser, login as loginRequest, logout as logoutRequest } from "../services/authService.js";
+import {
+  getCurrentUser,
+  login as loginRequest,
+  loginWithGoogle as googleLoginRequest,
+  logout as logoutRequest,
+  register as registerRequest,
+} from "../services/authService.js";
 
 export const AuthContext = createContext(null);
 
@@ -33,13 +39,37 @@ export function AuthProvider({ children }) {
     }
   }, []);
 
+  const register = useCallback(async (payload) => {
+    setError(null);
+    try {
+      return await registerRequest(payload);
+    } catch (err) {
+      setError(err.message);
+      throw err;
+    }
+  }, []);
+
+  const loginWithGoogle = useCallback(async (idToken) => {
+    setError(null);
+    try {
+      const { user: loggedInUser } = await googleLoginRequest(idToken);
+      setUser(loggedInUser);
+      return loggedInUser;
+    } catch (err) {
+      setError(err.message);
+      throw err;
+    }
+  }, []);
+
   const logout = useCallback(async () => {
     await logoutRequest();
     setUser(null);
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, loading, error, login, logout, isAuthenticated: Boolean(user) }}>
+    <AuthContext.Provider
+      value={{ user, loading, error, login, loginWithGoogle, logout, register, isAuthenticated: Boolean(user) }}
+    >
       {children}
     </AuthContext.Provider>
   );

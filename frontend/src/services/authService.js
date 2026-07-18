@@ -1,4 +1,4 @@
-import { STORAGE_KEYS } from "../utils/constants.js";
+import { API_BASE_URL, STORAGE_KEYS } from "../utils/constants.js";
 import { api } from "./api.js";
 
 /**
@@ -10,7 +10,7 @@ export async function login(email, password) {
   formData.append("username", email);
   formData.append("password", password);
 
-  const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api"}/auth/login`, {
+  const response = await fetch(`${API_BASE_URL}/auth/login`, {
     method: "POST",
     headers: {
       "Content-Type": "application/x-www-form-urlencoded",
@@ -29,9 +29,8 @@ export async function login(email, password) {
     localStorage.setItem(STORAGE_KEYS.AUTH_TOKEN, data.access_token);
     localStorage.setItem(STORAGE_KEYS.REFRESH_TOKEN, data.access_token);
     localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify({
-      id: "user",
       name: data.name,
-      email: "user@verivision.ai",
+      email,
       role: data.role,
     }));
   } catch {
@@ -40,9 +39,44 @@ export async function login(email, password) {
 
   return {
     user: {
-      id: "user",
       name: data.name,
-      email: "user@verivision.ai",
+      email,
+      role: data.role,
+    },
+    token: data.access_token,
+    refreshToken: data.access_token,
+  };
+}
+
+export async function register({ name, email, password, role = "user" }) {
+  const data = await api.post("/auth/register", { name, email, password, role }, { auth: false });
+  return {
+    id: String(data.id),
+    name: data.name,
+    email: data.email,
+    role: data.role,
+  };
+}
+
+export async function loginWithGoogle(idToken) {
+  const data = await api.post("/auth/google", { id_token: idToken }, { auth: false });
+
+  try {
+    localStorage.setItem(STORAGE_KEYS.AUTH_TOKEN, data.access_token);
+    localStorage.setItem(STORAGE_KEYS.REFRESH_TOKEN, data.access_token);
+    localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify({
+      name: data.name,
+      email: "google-user",
+      role: data.role,
+    }));
+  } catch {
+    // localStorage unavailable
+  }
+
+  return {
+    user: {
+      name: data.name,
+      email: "google-user",
       role: data.role,
     },
     token: data.access_token,
