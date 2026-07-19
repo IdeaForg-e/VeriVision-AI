@@ -10,6 +10,7 @@ logger = logging.getLogger(__name__)
 # Lazy initialize EasyOCR reader to save startup memory/time
 _easyocr_reader = None
 
+
 def get_ocr_reader():
     global _easyocr_reader
     if _easyocr_reader is None:
@@ -52,7 +53,7 @@ def compute_ssim_diff(src_img: np.ndarray, ref_img: np.ndarray) -> tuple[float, 
 
     # Compute SSIM
     score, diff = ssim(gray_ref, gray_src, full=True)
-    
+
     # Normalize difference image
     diff = (diff + 1) * 127.5
     diff = diff.astype("uint8")
@@ -79,10 +80,16 @@ def compute_ssim_diff(src_img: np.ndarray, ref_img: np.ndarray) -> tuple[float, 
     return float(score), heatmap
 
 
-def extract_ocr_text(img: np.ndarray, roi: dict = None) -> str:
+def extract_ocr_text(img: np.ndarray, roi: dict = None) -> tuple[str, bool]:
     """
     Crops ROI (if coordinates are provided) and reads text using EasyOCR.
     roi: dict like {"x": 100, "y": 150, "width": 300, "height": 80}
+
+    Returns: (detected_text, engine_available)
+    engine_available is False when the OCR engine itself could not be
+    initialized/used — this is DIFFERENT from "no text found on the part",
+    and downstream agents need to be able to tell the two apart instead of
+    silently receiving a fabricated placeholder string.
     """
     logger.info("Executing text extraction (EasyOCR)...")
     crop = img
@@ -99,18 +106,22 @@ def extract_ocr_text(img: np.ndarray, roi: dict = None) -> str:
 
     reader = get_ocr_reader()
     if reader is None:
-        logger.warning("OCR Reader offline. Triggering dummy fallback prediction.")
-        return "91165LUS0D0D"
+        logger.error(
+            "OCR Reader offline. Returning empty detected text and flagging engine as unavailable "
+            "instead of a fabricated placeholder value — the decision agent must treat this as "
+            "'unverifiable', not as evidence of a missing/mismatched label."
+        )
+        return "", False
 
     try:
         results = reader.readtext(crop)
         texts = [res[1] for res in results]
         detected = " ".join(texts).strip()
         logger.info(f"EasyOCR parsing complete. Detected text label string: '{detected}'")
-        return detected
+        return detected, True
     except Exception as e:
         logger.error(f"Error during OCR extraction: {e}")
-        return ""
+        return "", False
 
 
 def calculate_string_diff(str1: str, str2: str) -> dict:
@@ -192,12 +203,12 @@ def match_template_roi(src_img: np.ndarray, ref_img: np.ndarray, roi_config: dic
     logger.info("Executing Template ROI sticker presence checks...")
     if not roi_config:
         logger.info("Skipping template match: roi_config is empty.")
-        return {"template_match_score": 1.0, "template_match_found": True}
+        return {"template_match_score": 1.0, "template_match_found": True, "template_match_checked": False}
 
     template_roi = roi_config.get("template_roi")
     if not template_roi:
         logger.info("Skipping template match: no template_roi coordinates configured.")
-        return {"template_match_score": 1.0, "template_match_found": True}
+        return {"template_match_score": 1.0, "template_match_found": True, "template_match_checked": False}
 
     x = template_roi.get("x", 0)
     y = template_roi.get("y", 0)
@@ -205,7 +216,7 @@ def match_template_roi(src_img: np.ndarray, ref_img: np.ndarray, roi_config: dic
     h = template_roi.get("height") if "height" in template_roi else template_roi.get("h", 0)
     if w <= 0 or h <= 0:
         logger.info("Skipping template match: width/height configured as 0.")
-        return {"template_match_score": 1.0, "template_match_found": True}
+        return {"template_match_score": 1.0, "template_match_found": True, "template_match_checked": False}
 
     logger.info(f"Cropping template ROI window: x={x}, y={y}, w={w}, h={h}")
     gray_src = _ensure_gray(src_img)
@@ -213,12 +224,12 @@ def match_template_roi(src_img: np.ndarray, ref_img: np.ndarray, roi_config: dic
 
     if y + h > gray_ref.shape[0] or x + w > gray_ref.shape[1]:
         logger.warning("Template ROI parameters exceed reference image coordinate layout shapes.")
-        return {"template_match_score": 0.0, "template_match_found": False}
+        return {"template_match_score": 0.0, "template_match_found": False, "template_match_checked": True}
 
     template = gray_ref[y:y + h, x:x + w]
     if template.size == 0:
         logger.warning("Cropped template array size is empty.")
-        return {"template_match_score": 0.0, "template_match_found": False}
+        return {"template_match_score": 0.0, "template_match_found": False, "template_match_checked": True}
 
     result = cv2.matchTemplate(gray_src, template, cv2.TM_CCOEFF_NORMED)
     score = float(result.max()) if result.size else 0.0
@@ -229,6 +240,7 @@ def match_template_roi(src_img: np.ndarray, ref_img: np.ndarray, roi_config: dic
     return {
         "template_match_score": float(np.clip(score, 0.0, 1.0)),
         "template_match_found": found,
+        "template_match_checked": True,
     }
 
 
@@ -267,15 +279,28 @@ def compare_color_histograms(src_img: np.ndarray, ref_img: np.ndarray, roi_confi
     similarity = cv2.compareHist(hist1, hist2, cv2.HISTCMP_CORREL)
     similarity = float(np.clip((similarity + 1.0) / 2.0, 0.0, 1.0))
     logger.info(f"Color histogram comparison completed. Correlation similarity index: {similarity:.3f}")
-    return {"color_hist_similarity": similarity}
+    return {"color_hist_similarity": similarity, "color_hist_checked": True}
 
 
 def run_anomaly_ensemble(src_img: np.ndarray, ref_img: np.ndarray, roi_config: dict = None) -> dict:
     """
     Runs the ensemble comparison logic.
+
+    Each sub-check is isolated in its own try/except so one failing check
+    (e.g. a crashed OCR call) degrades gracefully with a logged, flagged
+    default instead of taking down the whole inspection request. All
+    original output keys are preserved; only additive keys are introduced
+    ("ocr_engine_available", "checked_components", "errors").
     """
     logger.info("Starting Vision Layer Anomaly Ensemble suite processing...")
-    ssim_val, heatmap_img = compute_ssim_diff(src_img, ref_img)
+    errors = []
+
+    try:
+        ssim_val, heatmap_img = compute_ssim_diff(src_img, ref_img)
+    except Exception as e:
+        logger.error(f"SSIM computation failed, defaulting to worst-case score: {e}")
+        ssim_val, heatmap_img = 0.0, src_img.copy()
+        errors.append("ssim_failed")
 
     label_roi = None
     expected_serial = ""
@@ -283,30 +308,68 @@ def run_anomaly_ensemble(src_img: np.ndarray, ref_img: np.ndarray, roi_config: d
         label_roi = roi_config.get("label_roi")
         expected_serial = roi_config.get("expected_serial", "")
 
-    detected_text = extract_ocr_text(src_img, label_roi)
+    try:
+        detected_text, ocr_engine_available = extract_ocr_text(src_img, label_roi)
+    except Exception as e:
+        logger.error(f"OCR extraction raised unexpectedly: {e}")
+        detected_text, ocr_engine_available = "", False
+        errors.append("ocr_failed")
 
     ocr_diff = {"similarity": 1.0, "mismatches": []}
-    if expected_serial:
+    if expected_serial and ocr_engine_available:
         ocr_diff = calculate_string_diff(detected_text, expected_serial)
+    elif expected_serial and not ocr_engine_available:
+        logger.warning("Skipping OCR string diff: OCR engine was unavailable, so detected text cannot be trusted.")
 
-    keypoint_results = match_keypoints(src_img, ref_img)
-    template_results = match_template_roi(src_img, ref_img, roi_config)
-    color_results = compare_color_histograms(src_img, ref_img, roi_config)
+    try:
+        keypoint_results = match_keypoints(src_img, ref_img)
+    except Exception as e:
+        logger.error(f"Keypoint matching failed, defaulting to worst-case score: {e}")
+        keypoint_results = {"keypoint_match_score": 0.0, "good_matches": 0, "total_matches": 0}
+        errors.append("keypoint_failed")
 
-    matching_score = float(np.clip(
-        (keypoint_results["keypoint_match_score"] + template_results["template_match_score"] + color_results["color_hist_similarity"]) / 3.0,
-        0.0,
-        1.0,
-    ))
+    try:
+        template_results = match_template_roi(src_img, ref_img, roi_config)
+    except Exception as e:
+        logger.error(f"Template matching failed, defaulting to worst-case score: {e}")
+        template_results = {"template_match_score": 0.0, "template_match_found": False, "template_match_checked": True}
+        errors.append("template_failed")
 
-    logger.info(f"Ensemble summary metrics - SSIM: {ssim_val:.3f}, Keypoints Rate: {keypoint_results['keypoint_match_score']:.3f}, Template score: {template_results['template_match_score']:.3f}, Color match: {color_results['color_hist_similarity']:.3f}, Average Matching Score: {matching_score:.3f}")
-    
+    try:
+        color_results = compare_color_histograms(src_img, ref_img, roi_config)
+    except Exception as e:
+        logger.error(f"Color histogram comparison failed, defaulting to worst-case score: {e}")
+        color_results = {"color_hist_similarity": 0.0, "color_hist_checked": True}
+        errors.append("color_failed")
+
+    # Only average components that were actually meaningfully checked.
+    # Previously, an un-configured template/color ROI silently contributed a
+    # perfect 1.0 to the average, inflating the overall matching_score even
+    # though nothing was really verified there.
+    score_components = [keypoint_results["keypoint_match_score"]]
+    checked_components = ["keypoint"]
+    if template_results.get("template_match_checked", True):
+        score_components.append(template_results["template_match_score"])
+        checked_components.append("template")
+    if color_results.get("color_hist_checked", True):
+        score_components.append(color_results["color_hist_similarity"])
+        checked_components.append("color")
+
+    matching_score = float(np.clip(sum(score_components) / max(len(score_components), 1), 0.0, 1.0))
+
+    logger.info(
+        f"Ensemble summary metrics - SSIM: {ssim_val:.3f}, Keypoints Rate: {keypoint_results['keypoint_match_score']:.3f}, "
+        f"Template score: {template_results['template_match_score']:.3f}, Color match: {color_results['color_hist_similarity']:.3f}, "
+        f"Checked components: {checked_components}, Average Matching Score: {matching_score:.3f}, Errors: {errors or 'none'}"
+    )
+
     return {
         "ssim_score": ssim_val,
         "detected_text": detected_text,
         "expected_text": expected_serial,
         "ocr_similarity": ocr_diff["similarity"],
         "ocr_mismatches": ocr_diff["mismatches"],
+        "ocr_engine_available": ocr_engine_available,
         "keypoint_ratio": keypoint_results["keypoint_match_score"],
         "keypoint_matches": keypoint_results["good_matches"],
         "template_match_score": template_results["template_match_score"],
@@ -314,4 +377,6 @@ def run_anomaly_ensemble(src_img: np.ndarray, ref_img: np.ndarray, roi_config: d
         "color_hist_similarity": color_results["color_hist_similarity"],
         "matching_score": matching_score,
         "heatmap_img": heatmap_img,
+        "checked_components": checked_components,
+        "errors": errors,
     }

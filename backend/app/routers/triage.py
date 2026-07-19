@@ -103,10 +103,10 @@ def get_triage_queue(
         elif insp.status == "completed":
             if result and result.recommended_action != "Accept":
                 status_label = "QUARANTINE"
-                reason = verdict.replace("_", " ").title()
+                reason = result.explanation if result.explanation else verdict.replace("_", " ").title()
             else:
                 status_label = "AUTO-APPROVED"
-                reason = "Passed Inspection"
+                reason = result.explanation if result and result.explanation else "Passed Inspection"
         else:
             status_label = "PENDING QA"
             reason = "Unknown"
@@ -267,7 +267,7 @@ def get_case_detail(
         "recommendation": {
             "decision": result.recommended_action if result else "needs_more_evidence",
             "confidence": int((result.confidence or 0.5) * 100) if result else 50,
-            "reasoning": result.explanation or "AI confidence is below the auto-decide threshold. Manual review required.",
+            "reasoning": result.explanation if result else "AI confidence is below the auto-decide threshold. Manual review required.",
             "flags": [],
         },
     }
@@ -291,17 +291,25 @@ def get_case_review_detail(
     product = inspection.product
 
     golden_image_url = None
-    uploaded_image_url = f"/data/cases/{os.path.basename(inspection.captured_image_path)}" if inspection.captured_image_path else None
+    uploaded_image_url = None
+    if inspection.captured_image_path:
+        if inspection.captured_image_path.startswith("/"):
+            uploaded_image_url = inspection.captured_image_path
+        else:
+            uploaded_image_url = f"/data/cases/{os.path.basename(inspection.captured_image_path)}"
 
     if product and product.golden_references:
         golden_ref = product.golden_references[0]
-        golden_image_url = f"/data/golden/{os.path.basename(golden_ref.image_path)}" if golden_ref.image_path else None
+        if golden_ref.image_path.startswith("/"):
+            golden_image_url = golden_ref.image_path
+        else:
+            golden_image_url = f"/data/golden/{os.path.basename(golden_ref.image_path)}" if golden_ref.image_path else None
 
     # Use example images from dataset if no real images
     if not golden_image_url:
-        golden_image_url = "/dataset/golden_motherboard_clean_top_down.png"
+        golden_image_url = "/dataset/golden_motherboard.png"
     if not uploaded_image_url:
-        uploaded_image_url = "/dataset/defect_burn_marks.png"
+        uploaded_image_url = "/dataset/defect_motherboard_burn.png"
 
     return schemas.ReviewDetailResponse(
         id=inspection.case_id,

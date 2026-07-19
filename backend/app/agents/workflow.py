@@ -36,6 +36,7 @@ class InspectionState(TypedDict):
     template_match_score: Optional[float]
     template_match_found: Optional[bool]
     color_hist_similarity: Optional[float]
+    source_reference_identical: bool
     heatmap_path: Optional[str]
     
     # Decision/Policy results
@@ -130,7 +131,20 @@ def detect_anomalies_node(state: InspectionState) -> Dict[str, Any]:
         "color_roi": state["roi_config"].get("color_roi") if state["roi_config"] else None
     }
     
+    # Keep a direct, pre-alignment comparison as the ground truth for an
+    # identical upload.  A homography/illumination pass may introduce small
+    # interpolation changes, and OCR can misread a perfectly valid label.
+    # Neither is evidence of fraud when the decoded upload is exactly the
+    # golden reference.
+    original_img = cv2.imread(state["image_path"])
+    source_reference_identical = bool(
+        original_img is not None
+        and original_img.shape == ref_img.shape
+        and np.array_equal(original_img, ref_img)
+    )
+
     ensemble_results = services.run_anomaly_ensemble(aligned_img, ref_img, roi_config)
+    ensemble_results["source_reference_identical"] = source_reference_identical
     
     # Save the heatmap image to disk inside this node
     file_ext = os.path.splitext(state["image_path"])[1]
@@ -155,6 +169,7 @@ def detect_anomalies_node(state: InspectionState) -> Dict[str, Any]:
         "template_match_score": ensemble_results.get("template_match_score", 1.0),
         "template_match_found": ensemble_results.get("template_match_found", True),
         "color_hist_similarity": ensemble_results.get("color_hist_similarity", 1.0),
+        "source_reference_identical": source_reference_identical,
         "heatmap_path": heatmap_path
     }
 
@@ -168,7 +183,7 @@ def decision_node(state: InspectionState) -> Dict[str, Any]:
         logger.warning(f"[Node: Decision Judge] Skipping decision judging because previous step failed for Case {case_id}")
         return {}
 
-    logger.info(f"[Node: Decision Judge] Evaluating metrics using LLM Compliance Judge for Case {case_id}")
+    logger.info(f"[Node: Decision Judge] Evaluating deterministic evidence rules for Case {case_id}")
     
     ensemble_results = {
         "ssim_score": state["ssim_score"],
@@ -179,7 +194,8 @@ def decision_node(state: InspectionState) -> Dict[str, Any]:
         "detected_text": state["ocr_detected_text"],
         "template_match_score": state.get("template_match_score", 1.0),
         "template_match_found": state.get("template_match_found", True),
-        "color_hist_similarity": state.get("color_hist_similarity", 1.0)
+        "color_hist_similarity": state.get("color_hist_similarity", 1.0),
+        "source_reference_identical": state.get("source_reference_identical", False),
     }
     
     decision = services.make_decision(ensemble_results)
@@ -292,6 +308,7 @@ def run_inspection_pipeline(initial_state: Dict[str, Any]) -> Dict[str, Any]:
         "template_match_score": None,
         "template_match_found": None,
         "color_hist_similarity": None,
+        "source_reference_identical": False,
         "heatmap_path": None,
         "fraud_score": None,
         "verdict": None,

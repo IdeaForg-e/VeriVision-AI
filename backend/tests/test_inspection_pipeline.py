@@ -310,6 +310,23 @@ class TestCleanPass:
         assert decision["verdict"] == "clean", f"Expected 'clean', got '{decision['verdict']}'"
         assert decision["recommended_action"] == "Accept"
 
+    def test_identical_image_overrides_bad_catalog_ocr(self):
+        """An OCR/catalog error can never make an identical reference fraudulent."""
+        decision = make_decision({
+            "source_reference_identical": True,
+            "ssim_score": 1.0,
+            "ocr_similarity": 0.0,
+            "ocr_mismatches": [{"position": 0, "expected": "X", "detected": "Y"}],
+            "keypoint_ratio": 1.0,
+            "expected_text": "XPS-REV-409",
+            "detected_text": "unrelated OCR output",
+            "template_match_score": 1.0,
+            "template_match_found": True,
+            "color_hist_similarity": 1.0,
+        })
+        assert decision["fraud_score"] == 0
+        assert decision["verdict"] == "clean"
+
 
 # =============================================================================
 # TEST: OCR String Diff Utility

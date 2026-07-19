@@ -1,37 +1,34 @@
-import os
-import json
-import requests
 import logging
-from app.config import settings
 
 logger = logging.getLogger(__name__)
 
-def clean_json_string(text: str) -> str:
-    """Helper to clean markdown wrappers from LLM JSON responses."""
-    text = text.strip()
-    if text.startswith("```json"):
-        text = text[7:]
-    elif text.startswith("```"):
-        text = text[3:]
-    if text.endswith("```"):
-        text = text[:-3]
-    return text.strip()
-
+VALID_VERDICTS = {"clean", "tampered", "missing", "mismatched", "reused"}
+VALID_ACTIONS = {
+    "Accept",
+    "Quarantine & Escalate",
+    "Request Vendor Verification",
+    "Request Additional Angle",
+}
 def make_decision(ensemble_results: dict) -> dict:
     """
     Evaluates evidence from Vision Layer and computes the final verdict,
     fraud score (0-100), confidence level, and recommended action.
-    
-    Tries calling OpenRouter LLM first. On API/parsing failure or missing key,
-    gracefully falls back to local weighted mathematical thresholds.
+
+    Uses deterministic, evidence-based rules.  A language model must not
+    assign a risk score: its output can vary for identical detector evidence
+    and cannot be allowed to override measured image comparisons.
+
+    Output keys are unchanged from the original contract (fraud_score, verdict,
+    confidence, recommended_action) plus one new, additive key: "reasoning" —
+    a short, grounded justification string that Agent 5 (Explainer) consumes so
+    both agents stay consistent with each other.
     """
-    # Load dynamic thresholds from Pipeline Tuning Panel
     try:
         from app.routers.triage import _PIPELINE_CONFIG
         thresholds = _PIPELINE_CONFIG.get("thresholds", {})
     except Exception:
         thresholds = {}
-        
+
     ssim_target = thresholds.get("ssim", 0.85)
     keypoint_delta = thresholds.get("keypointDeltaPct", 15)
     ocr_fuzzy = thresholds.get("ocrFuzzyPct", 100)
@@ -42,94 +39,36 @@ def make_decision(ensemble_results: dict) -> dict:
     kp_ratio = ensemble_results.get("keypoint_ratio", 1.0)
     expected_text = ensemble_results.get("expected_text", "")
     detected_text = ensemble_results.get("detected_text", "")
-    
-    # Template and color match indicators
+
     temp_score = ensemble_results.get("template_match_score", 1.0)
     temp_found = ensemble_results.get("template_match_found", True)
     color_sim = ensemble_results.get("color_hist_similarity", 1.0)
+    source_reference_identical = bool(ensemble_results.get("source_reference_identical", False))
 
-    logger.info(f"Make Decision called with metrics: SSIM={ssim:.3f}, OCR Sim={ocr_sim:.2f}, Mismatches={len(ocr_mismatches)}, Keypoints Rate={kp_ratio:.3f}, Template Found={temp_found} ({temp_score:.2f}), Color Hist={color_sim:.3f}")
-    logger.info(f"Tuning Panel Calibration Target Values: SSIM={ssim_target:.2f}, Keypoint Delta={keypoint_delta}%, OCR Fuzzy Strictness={ocr_fuzzy}%")
+    logger.info(
+        f"Make Decision called with metrics: SSIM={ssim:.3f}, OCR Sim={ocr_sim:.2f}, "
+        f"Mismatches={len(ocr_mismatches)}, Keypoints Rate={kp_ratio:.3f}, "
+        f"Template Found={temp_found} ({temp_score:.2f}), Color Hist={color_sim:.3f}"
+    )
+    logger.info(
+        f"Tuning Panel Calibration Target Values: SSIM={ssim_target:.2f}, "
+        f"Keypoint Delta={keypoint_delta}%, OCR Fuzzy Strictness={ocr_fuzzy}%"
+    )
 
-    # ==========================================
-    # 🧠 METHOD 1: Try OpenRouter LLM Compliance Judge
-    # ==========================================
-    openrouter_key = settings.OPENROUTER_API_KEY
-    openrouter_model = settings.OPENROUTER_MODEL
+    # This is an invariant, not a heuristic: the same decoded image as the
+    # approved reference has no visual fraud evidence.  It also prevents a
+    # bad catalog serial or an OCR read error from falsely rejecting it.
+    if source_reference_identical:
+        logger.info("Decision invariant: upload pixels exactly match the golden reference; assigning zero risk.")
+        return {
+            "fraud_score": 0,
+            "verdict": "clean",
+            "confidence": 1.0,
+            "recommended_action": "Accept",
+            "reasoning": "The uploaded image is pixel-identical to the approved golden reference.",
+        }
 
-    if openrouter_key:
-        logger.info(f"Initiating OpenRouter Compliance Judge Query using model: {openrouter_model}")
-        prompt = (
-            f"You are the Compliance & Decision Agent for a visual manufacturing QC parts inspection system.\n"
-            f"Compare these incoming inspection metrics against the user's calibrated threshold configurations:\n\n"
-            f"--- Active Calibration Targets ---\n"
-            f"- Minimum Allowed SSIM (Structural Similarity): {ssim_target:.2f}\n"
-            f"- Maximum Keypoint Match Deviation (Delta Margin): {keypoint_delta}%\n"
-            f"- Minimum OCR Fuzzy Match Strictness: {ocr_fuzzy}%\n\n"
-            f"--- Inspection Metrics ---\n"
-            f"- SSIM score: {ssim:.3f} (1.0 is identical, lower means physical/structural changes found)\n"
-            f"- Keypoint match ratio: {kp_ratio:.3f} (deviation from standard configuration layout)\n"
-            f"- Template match status: {'FOUND' if temp_found else 'MISSING'} (Score: {temp_score:.2f}, checks if logo/label sticker is present)\n"
-            f"- Color histogram correlation: {color_sim:.2f} (1.0 is identical colors, lower indicates color/material anomaly)\n"
-            f"- OCR Expected serial/label: '{expected_text}'\n"
-            f"- OCR Detected serial/label: '{detected_text}'\n"
-            f"- OCR Character Mismatches: {ocr_mismatches}\n"
-            f"- OCR similarity rate: {ocr_sim:.2f} (1.0 is exact match)\n\n"
-            f"--- Verdict Selection Logic ---\n"
-            f"1. VERDICT IS 'missing' if the expected label sticker/logo is NOT found (template match status is MISSING).\n"
-            f"2. VERDICT IS 'mismatched' if the OCR similarity rate is below the minimum strictness target ({ocr_fuzzy/100:.2f}) and text matches partially. If it's a minor character substitution (like 0 vs O), set recommended_action to 'Request Vendor Verification'.\n"
-            f"3. VERDICT IS 'tampered' if the SSIM score is significantly below the minimum target ({ssim_target:.2f}), or if keypoint match is extremely low, or if color histogram shows major changes (indicating burnt parts, wrong model, or fake labels).\n"
-            f"4. VERDICT IS 'reused' if the SSIM is slightly below the target ({ssim_target:.2f}) and keypoints match decently, suggesting superficial wear (scratches, dust, residues) rather than structural replacement.\n"
-            f"5. VERDICT IS 'clean' if all metrics satisfy or exceed their respective calibration targets.\n\n"
-            f"Respond ONLY with a valid, parseable JSON object with no markdown fences, no reasoning text. Use this exact schema:\n"
-            f"{{\n"
-            f"  \"fraud_score\": <integer, 0 to 100 representing probability of fraud>,\n"
-            f"  \"verdict\": \"<string, must be one of: clean, tampered, missing, mismatched, reused>\",\n"
-            f"  \"confidence\": <float, 0.0 to 1.0 representing classification confidence>,\n"
-            f"  \"recommended_action\": \"<string, must be one of: Accept, Quarantine & Escalate, Request Vendor Verification, Request Additional Angle>\"\n"
-            f"}}"
-        )
-
-        try:
-            url = "https://openrouter.ai/api/v1/chat/completions"
-            headers = {
-                "Authorization": f"Bearer {openrouter_key}",
-                "Content-Type": "application/json",
-                "HTTP-Referer": "https://github.com/IdeaForg-e/VeriVision-AI",
-                "X-Title": "VeriVision QC Decision"
-            }
-            payload = {
-                "model": openrouter_model,
-                "messages": [
-                    {"role": "user", "content": prompt}
-                ],
-                "temperature": 0.0  # Strict deterministic answers
-            }
-            response = requests.post(url, json=payload, headers=headers, timeout=10)
-            if response.status_code == 200:
-                res_data = response.json()
-                raw_reply = res_data["choices"][0]["message"]["content"].strip()
-                cleaned_reply = clean_json_string(raw_reply)
-                decision_data = json.loads(cleaned_reply)
-                
-                # Basic validation of keys
-                required_keys = ["fraud_score", "verdict", "confidence", "recommended_action"]
-                if all(k in decision_data for k in required_keys):
-                    logger.info(f"OpenRouter Compliance Judge successfully returned decision: {decision_data}")
-                    return {
-                        "fraud_score": int(decision_data["fraud_score"]),
-                        "verdict": str(decision_data["verdict"]).lower(),
-                        "confidence": float(decision_data["confidence"]),
-                        "recommended_action": str(decision_data["recommended_action"])
-                    }
-            else:
-                logger.warning(f"OpenRouter returned status {response.status_code}. Details: {response.text}")
-        except Exception as e:
-            logger.error(f"Decision LLM Agent failed: {e}. Bypassing to local fallback rules...")
-
-    # ==========================================
-    # 🧮 METHOD 2: Local Rule-Based Fallback Matrix
-    # ==========================================
+    # Deterministic rule-based scoring matrix.
     logger.info("Executing local mathematical fallback scoring matrix...")
     ssim_loss = max(0.0, 1.0 - ssim)
     ocr_loss = max(0.0, 1.0 - ocr_sim)
@@ -139,32 +78,37 @@ def make_decision(ensemble_results: dict) -> dict:
 
     # Weights: SSIM = 40%, OCR = 25%, Keypoints = 15%, Template/Logo = 10%, Color Correlation = 10%
     weighted_score = (ssim_loss * 40) + (ocr_loss * 25) + (min(kp_loss, 1.0) * 15) + (template_loss * 10) + (color_loss * 10)
-    
-    # Scale up for visibility
     fraud_score = int(min(max(weighted_score * 1.5, 0.0), 100.0))
-    logger.info(f"Local calculated losses - SSIM: {ssim_loss:.3f}, OCR: {ocr_loss:.3f}, Keypoints: {kp_loss:.3f}, Template: {template_loss:.1f}, Color: {color_loss:.3f}. Weighted Score: {weighted_score:.2f} -> Fraud Score: {fraud_score}")
+    logger.info(
+        f"Local calculated losses - SSIM: {ssim_loss:.3f}, OCR: {ocr_loss:.3f}, Keypoints: {kp_loss:.3f}, "
+        f"Template: {template_loss:.1f}, Color: {color_loss:.3f}. Weighted Score: {weighted_score:.2f} -> Fraud Score: {fraud_score}"
+    )
 
     verdict = "clean"
     recommended_action = "Accept"
     confidence = 0.90
+    reason_note = "All measured metrics fell within tolerance of the golden reference."
 
     # 1. Check template/logo presence (High priority)
     if not temp_found:
         verdict = "missing"
         recommended_action = "Quarantine & Escalate"
         confidence = 0.98
+        reason_note = "Expected label/logo template was not detected on the part."
         logger.info(f"Local Decision: Template/logo is MISSING. Verdict forced to {verdict.upper()}.")
-    
+
     # 2. Check structure (ssim loss)
     elif ssim_loss > (1.0 - ssim_target):
         if kp_loss > (keypoint_delta / 100.0) or color_loss > 0.40:
             verdict = "tampered"
             recommended_action = "Quarantine & Escalate"
             confidence = 0.95
+            reason_note = f"Structural (SSIM={ssim:.2f}) and keypoint/color deviations exceed tampering thresholds."
         else:
             verdict = "reused"
             recommended_action = "Request Vendor Verification"
             confidence = 0.85
+            reason_note = f"Structural similarity (SSIM={ssim:.2f}) below target but keypoints/color remain consistent, suggesting wear rather than tampering."
         logger.info(f"Local Decision: SSIM difference exceeds tuning limit ({1.0 - ssim_target:.2f}). Verdict assigned to {verdict.upper()}.")
 
     # 3. Check OCR serial text matching
@@ -172,22 +116,26 @@ def make_decision(ensemble_results: dict) -> dict:
         verdict = "missing"
         recommended_action = "Quarantine & Escalate"
         confidence = 0.98
+        reason_note = "Expected serial/label text was not readable or absent on the part."
         logger.info("Local Decision: OCR text mismatch: Label text is empty.")
+
     elif len(ocr_mismatches) > 0 and (ocr_sim * 100) < ocr_fuzzy:
         verdict = "mismatched"
         recommended_action = "Quarantine & Escalate"
         confidence = 0.95
-        
+
         substitutions = {('O', '0'), ('0', 'O'), ('I', '1'), ('1', 'I'), ('S', '5'), ('5', 'S')}
         is_minor_leet = all(
-            (m.get("detected"), m.get("expected")) in substitutions 
+            (m.get("detected"), m.get("expected")) in substitutions
             for m in ocr_mismatches
         )
         if is_minor_leet:
             recommended_action = "Request Vendor Verification"
             confidence = 0.80
+            reason_note = f"Detected serial '{detected_text}' differs from expected '{expected_text}' only by minor leet-speak character substitutions."
             logger.info("Local Decision: Character mismatches detected are minor (leet-speak). Downgraded action to Vendor Verification.")
         else:
+            reason_note = f"Detected serial '{detected_text}' does not match expected '{expected_text}' ({len(ocr_mismatches)} character mismatches)."
             logger.info("Local Decision: Critical character mismatch detected in serial number.")
 
     # 4. Check color consistency (Color correlation checks)
@@ -195,6 +143,7 @@ def make_decision(ensemble_results: dict) -> dict:
         verdict = "tampered"
         recommended_action = "Request Vendor Verification"
         confidence = 0.80
+        reason_note = f"Color/material histogram correlation ({color_sim:.2f}) deviates significantly from the golden reference, suggesting non-OEM material."
         logger.info(f"Local Decision: Color spectrum mismatch detected (non-OEM). Verdict set to {verdict.upper()}.")
 
     # Fallback bounds adjustments
@@ -202,27 +151,34 @@ def make_decision(ensemble_results: dict) -> dict:
         verdict = "mismatched"
         recommended_action = "Quarantine & Escalate"
         confidence = 0.90
+        reason_note = "Borderline template status mismatch correction applied."
         logger.info("Local Decision: Borderline template status mismatch correction.")
 
     if color_sim < 0.60 and verdict == "clean":
         verdict = "mismatched"
         recommended_action = "Request Vendor Verification"
         confidence = 0.85
+        reason_note = f"Color similarity ({color_sim:.2f}) fell below the acceptable floor despite other checks passing."
         logger.info("Local Decision: Borderline color similarity deviation matching correction.")
 
-    if ssim < ssim_target and verdict == "clean":
-        verdict = "clean"
-        recommended_action = "Accept"
+    # Low-confidence adjustment: if SSIM alone sits below the tuning target but
+    # no other rule fired, treat it as likely background noise/reflection rather
+    # than a real defect. Verdict stays 'clean', but confidence is lowered so the
+    # case surfaces for human review instead of auto-accepting silently.
+    if verdict == "clean" and ssim < ssim_target:
         confidence = 0.60
+        reason_note = f"SSIM ({ssim:.2f}) is below the tuning target ({ssim_target:.2f}) but no other anomaly triggered; likely background noise — confidence lowered for review."
         logger.info(f"Local Decision: High background noise/reflection (ssim {ssim:.2f} < target {ssim_target:.2f}). Confidence index set to low (0.60).")
 
     if 40 <= fraud_score <= 70:
         confidence = 0.45
+        reason_note += " Fraud score falls in the borderline 40-70 range, forcing human-in-the-loop review."
         logger.info("Local Decision: Borderline fraud score (40-70). Confidence forced to 0.45 to trigger human-in-the-loop review.")
 
     return {
         "fraud_score": fraud_score,
         "verdict": verdict,
         "confidence": confidence,
-        "recommended_action": recommended_action
+        "recommended_action": recommended_action,
+        "reasoning": reason_note,
     }

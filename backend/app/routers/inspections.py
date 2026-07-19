@@ -51,7 +51,10 @@ async def create_inspection(
                 bf = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
                 for prod in products:
                     for ref in prod.golden_references:
-                        ref_img = cv2.imread(ref.image_path)
+                        ref_image_path = ref.image_path
+                        if not os.path.isabs(ref_image_path):
+                            ref_image_path = os.path.join(settings.BASE_DIR, ref_image_path)
+                        ref_img = cv2.imread(ref_image_path)
                         if ref_img is None:
                             continue
                         gray_ref = cv2.cvtColor(ref_img, cv2.COLOR_BGR2GRAY)
