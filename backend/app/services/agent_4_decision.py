@@ -25,6 +25,17 @@ def make_decision(ensemble_results: dict) -> dict:
     Tries calling OpenRouter LLM first. On API/parsing failure or missing key,
     gracefully falls back to local weighted mathematical thresholds.
     """
+    # Load dynamic thresholds from Pipeline Tuning Panel
+    try:
+        from app.routers.triage import _PIPELINE_CONFIG
+        thresholds = _PIPELINE_CONFIG.get("thresholds", {})
+    except Exception:
+        thresholds = {}
+        
+    ssim_target = thresholds.get("ssim", 0.85)
+    keypoint_delta = thresholds.get("keypointDeltaPct", 15)
+    ocr_fuzzy = thresholds.get("ocrFuzzyPct", 100)
+
     ssim = ensemble_results.get("ssim_score", 1.0)
     ocr_sim = ensemble_results.get("ocr_similarity", 1.0)
     ocr_mismatches = ensemble_results.get("ocr_mismatches", [])
@@ -38,6 +49,7 @@ def make_decision(ensemble_results: dict) -> dict:
     color_sim = ensemble_results.get("color_hist_similarity", 1.0)
 
     logger.info(f"Make Decision called with metrics: SSIM={ssim:.3f}, OCR Sim={ocr_sim:.2f}, Mismatches={len(ocr_mismatches)}, Keypoints Rate={kp_ratio:.3f}, Template Found={temp_found} ({temp_score:.2f}), Color Hist={color_sim:.3f}")
+    logger.info(f"Tuning Panel Calibration Target Values: SSIM={ssim_target:.2f}, Keypoint Delta={keypoint_delta}%, OCR Fuzzy Strictness={ocr_fuzzy}%")
 
     # ==========================================
     # 🧠 METHOD 1: Try OpenRouter LLM Compliance Judge
@@ -139,8 +151,8 @@ def make_decision(ensemble_results: dict) -> dict:
         logger.info(f"Local Decision: Template/logo is MISSING. Verdict forced to {verdict.upper()}.")
     
     # 2. Check structure (ssim loss)
-    elif ssim_loss > 0.35:
-        if kp_loss > 0.40 or color_loss > 0.40:
+    elif ssim_loss > (1.0 - ssim_target):
+        if kp_loss > (keypoint_delta / 100.0) or color_loss > 0.40:
             verdict = "tampered"
             recommended_action = "Quarantine & Escalate"
             confidence = 0.95
@@ -148,7 +160,7 @@ def make_decision(ensemble_results: dict) -> dict:
             verdict = "reused"
             recommended_action = "Request Vendor Verification"
             confidence = 0.85
-        logger.info(f"Local Decision: SSIM difference exceeds limits. Verdict assigned to {verdict.upper()}.")
+        logger.info(f"Local Decision: SSIM difference exceeds tuning limit ({1.0 - ssim_target:.2f}). Verdict assigned to {verdict.upper()}.")
 
     # 3. Check OCR serial text matching
     elif expected_text and not detected_text.strip():
@@ -156,7 +168,7 @@ def make_decision(ensemble_results: dict) -> dict:
         recommended_action = "Quarantine & Escalate"
         confidence = 0.98
         logger.info("Local Decision: OCR text mismatch: Label text is empty.")
-    elif len(ocr_mismatches) > 0:
+    elif len(ocr_mismatches) > 0 and (ocr_sim * 100) < ocr_fuzzy:
         verdict = "mismatched"
         recommended_action = "Quarantine & Escalate"
         confidence = 0.95
@@ -193,11 +205,11 @@ def make_decision(ensemble_results: dict) -> dict:
         confidence = 0.85
         logger.info("Local Decision: Borderline color similarity deviation matching correction.")
 
-    if ssim < settings.SSIM_THRESHOLD and verdict == "clean":
+    if ssim < ssim_target and verdict == "clean":
         verdict = "clean"
         recommended_action = "Accept"
         confidence = 0.60
-        logger.info("Local Decision: High background noise/reflection. Confidence index set to low (0.60).")
+        logger.info(f"Local Decision: High background noise/reflection (ssim {ssim:.2f} < target {ssim_target:.2f}). Confidence index set to low (0.60).")
 
     if 40 <= fraud_score <= 70:
         confidence = 0.45
