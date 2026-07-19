@@ -1,10 +1,42 @@
 import { Layout } from "../components/layout.jsx";
 import { EvidencePanel, ConfidenceBadge, CaseVelocity, CaseStatusTracker, ReviewerComment, ReviewDecision } from "../components/review.jsx";
 import { useReview } from "../hooks/useReview.js";
+import { useSearchParams, useNavigate } from "react-router-dom";
+import { ROUTES } from "../utils/constants.js";
 
 export default function HumanReviewPage() {
-  const { caseData, loading, notes, setNotes, region, handleRegionChange, decisionState, submitDecision } =
-    useReview("F-2026-02");
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const caseId = searchParams.get("caseId");
+
+  if (!caseId) {
+    return (
+      <Layout
+        title="Human Review Workspace"
+        subtitle="Perform manual override verification on flagged components."
+      >
+        <div className="flex flex-col items-center justify-center py-20 text-center px-4">
+          <div className="h-16 w-16 rounded-full bg-slate-900 border border-slate-800 flex items-center justify-center text-cyan-400 mb-6 shadow-[0_0_15px_rgba(6,182,212,0.1)]">
+            <span className="material-symbols-outlined text-[32px]">rate_review</span>
+          </div>
+          <h2 className="text-xl font-extrabold text-slate-100">No Active Case Selected</h2>
+          <p className="text-sm text-slate-400 max-w-md mt-2 leading-relaxed">
+            Human Review is designed to override specific AI inspection verdicts. Go to the Reports Archive page, select a scan, and click "Open in Human Review" to evaluate it.
+          </p>
+          <button
+            onClick={() => navigate(ROUTES.CASE_DETAIL)}
+            className="mt-6 flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-cyan-500 to-blue-600 text-white rounded-lg font-bold hover:opacity-90 transition shadow-[0_0_10px_rgba(6,182,212,0.15)] text-xs"
+          >
+            <span className="material-symbols-outlined text-[16px]">folder_open</span>
+            Go to Reports Archive
+          </button>
+        </div>
+      </Layout>
+    );
+  }
+
+  const { caseData, loading, notes, setNotes, region, handleRegionChange, handleRegionCommit, decisionState, submitDecision } =
+    useReview(caseId);
 
   if (loading || !caseData) {
     return (
@@ -33,7 +65,7 @@ export default function HumanReviewPage() {
           caseData={caseData}
           region={region}
           onRegionChange={handleRegionChange}
-          onRegionCommit={handleRegionChange}
+          onRegionCommit={handleRegionCommit}
         />
 
         <div className="lg:col-span-4 flex flex-col gap-gutter">

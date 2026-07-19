@@ -37,3 +37,11 @@ export async function updateCaseStatus(caseId, status) {
   const data = await api.post(`/triage/cases/${caseId}/status`, { status });
   return data;
 }
+
+export async function getProducts() {
+  return await api.get("/products");
+}
+
+export async function createInspection(formData) {
+  return await api.post("/inspections", formData);
+}

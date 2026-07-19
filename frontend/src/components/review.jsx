@@ -44,7 +44,10 @@ export function CaseVelocity({ targetMinutes, elapsedMinutes }) {
 }
 
 export function CaseStatusTracker({ status }) {
-  const activeIndex = STEPS.findIndex((s) => s.key === status);
+  let activeIndex = STEPS.findIndex((s) => s.key === status);
+  if (status === "completed" || status === "approved" || status === "rejected") {
+    activeIndex = 3; // Highlight 'Final Decision' milestone when case is complete
+  }
 
   return (
     <div className="mt-8 cyber-card bg-[#0f172a]/55 border-slate-800 p-6 shadow-lg">

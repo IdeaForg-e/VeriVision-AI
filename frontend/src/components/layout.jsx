@@ -4,13 +4,16 @@ import { ROUTES } from "../utils/constants.js";
 import { useAuth } from "../hooks/useAuth.js";
 import { Loader } from "./common.jsx";
 import { useState, useEffect } from "react";
+import UploadInspectionModal from "./UploadInspectionModal.jsx";
 
-const NAV_ITEMS = [
-  { to: ROUTES.TRIAGE, icon: "dashboard", label: "Triage" },
-  { to: ROUTES.HUMAN_REVIEW, icon: "rate_review", label: "Review" },
-  { to: ROUTES.CASE_DETAIL, icon: "folder_open", label: "Cases" },
-  { to: ROUTES.FEEDBACK, icon: "tune", label: "Tuning" },
-];
+function getNavItems(isAdmin) {
+  return [
+    { to: ROUTES.TRIAGE, icon: "dashboard", label: "AI Inspection" },
+    { to: ROUTES.CASE_DETAIL, icon: "folder_open", label: "Reports" },
+    { to: ROUTES.HUMAN_REVIEW, icon: "rate_review", label: "Review" },
+    { to: ROUTES.FEEDBACK, icon: "tune", label: "Tuning" },
+  ];
+}
 
 function BrandMark({ compact = false }) {
   return (
@@ -31,6 +34,9 @@ function BrandMark({ compact = false }) {
 export function Header() {
   const { user, logout } = useAuth();
   const [isLight, setIsLight] = useState(() => document.body.classList.contains("light-theme"));
+  const [isUploadOpen, setIsUploadOpen] = useState(false);
+  
+  const navItems = getNavItems(user?.role === "admin");
 
   const toggleTheme = () => {
     if (document.body.classList.contains("light-theme")) {
@@ -58,7 +64,7 @@ export function Header() {
         <div className="flex items-center gap-6">
           <BrandMark />
           <nav className="hidden items-center gap-1 lg:flex">
-            {NAV_ITEMS.map((item) => (
+            {navItems.map((item) => (
               <NavLink
                 key={item.to}
                 to={item.to}
@@ -78,6 +84,7 @@ export function Header() {
         <div className="flex items-center gap-2">
           <button
             type="button"
+            onClick={() => setIsUploadOpen(true)}
             className="hidden items-center gap-2 rounded-lg border border-cyan-500/30 bg-cyan-950/30 px-3 py-2 text-sm font-semibold text-cyan-400 transition hover:bg-cyan-900/50 hover:border-cyan-400/50 md:flex"
           >
             <UploadCloud size={16} />
@@ -96,6 +103,15 @@ export function Header() {
           <button type="button" className="grid h-9 w-9 place-items-center rounded-lg text-slate-400 transition hover:bg-slate-900 hover:text-white">
             <Bell size={18} />
           </button>
+          {user?.role === "admin" && (
+            <Link
+              to={ROUTES.CATALOG}
+              className="flex items-center gap-1.5 rounded-lg border border-cyan-500/25 bg-cyan-500/10 px-3 py-1.5 text-xs font-extrabold text-cyan-400 hover:bg-cyan-500/20 hover:border-cyan-500/40 transition shadow-[0_0_12px_rgba(6,182,212,0.1)] mr-1"
+            >
+              <span className="material-symbols-outlined text-[17px]">admin_panel_settings</span>
+              Admin Console
+            </Link>
+          )}
           {user && (
             <div className="hidden items-center gap-2 rounded-full bg-slate-900 py-1 pl-1 pr-3 border border-slate-800 sm:flex">
               <div className="grid h-7 w-7 place-items-center rounded-full bg-gradient-to-tr from-cyan-500 to-purple-600 text-xs font-bold text-white">
@@ -114,6 +130,10 @@ export function Header() {
           </button>
         </div>
       </div>
+      <UploadInspectionModal
+        open={isUploadOpen}
+        onClose={() => setIsUploadOpen(false)}
+      />
     </header>
   );
 }
@@ -153,6 +173,7 @@ export function ProtectedRoute({ children }) {
 
 export function Sidebar({ collapsed = false, onToggle }) {
   const { user, logout } = useAuth();
+  const navItems = getNavItems(user?.role === "admin");
 
   return (
     <aside className={`${collapsed ? "w-16" : "w-60"} flex h-screen flex-shrink-0 flex-col border-r border-slate-200 bg-[#090d16] transition-all`}>
@@ -160,14 +181,14 @@ export function Sidebar({ collapsed = false, onToggle }) {
         <BrandMark compact={collapsed} />
       </div>
       <nav className="flex-1 space-y-1 p-3">
-        {NAV_ITEMS.map((item) => (
+        {navItems.map((item) => (
           <NavLink
             key={item.to}
             to={item.to}
             title={collapsed ? item.label : undefined}
             className={({ isActive }) =>
               `flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-semibold transition ${
-                isActive ? "bg-blue-50 text-blue-700" : "text-slate-600 hover:bg-slate-100 hover:text-slate-950"
+                isActive ? "bg-cyan-500/10 text-cyan-400 border border-cyan-500/20" : "text-slate-400 hover:bg-slate-900/60 hover:text-slate-100"
               }`
             }
           >

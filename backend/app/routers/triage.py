@@ -215,13 +215,12 @@ def get_case_detail(
     # Build OCR results from the inspection result
     ocr_results = []
     if result:
-        if result.ocr_detected_text:
-            ocr_results.append({
-                "field": "Detected Text",
-                "extracted": result.ocr_detected_text,
-                "expected": result.ocr_expected_text or None,
-                "match": result.ocr_detected_text == result.ocr_expected_text if result.ocr_expected_text else None,
-            })
+        ocr_results.append({
+            "field": "Barcode / Label Text Check",
+            "extracted": result.ocr_detected_text or "No text detected",
+            "expected": result.ocr_expected_text or "N/A",
+            "match": (result.ocr_detected_text == result.ocr_expected_text) if (result.ocr_detected_text and result.ocr_expected_text) else False,
+        })
 
     # Build detector metrics
     metrics = []

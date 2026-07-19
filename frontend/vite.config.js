@@ -6,7 +6,7 @@ export default defineConfig({
   plugins: [react()],
   server: {
     port: 5173,
-    open: true,
+    open: false,
     proxy: {
       // Forward all /api/* and /data/* and /dataset/* calls to the FastAPI backend
       "/api": {

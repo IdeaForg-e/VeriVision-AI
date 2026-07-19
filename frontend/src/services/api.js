@@ -29,15 +29,21 @@ function getToken() {
 
 export async function apiRequest(path, { method = "GET", body, headers = {}, auth = true } = {}) {
   const token = auth ? getToken() : null;
+  const isFormData = body instanceof FormData;
+
+  const finalHeaders = {
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...headers,
+  };
+
+  if (!isFormData) {
+    finalHeaders["Content-Type"] = "application/json";
+  }
 
   const response = await fetch(`${API_BASE_URL}${path}`, {
     method,
-    headers: {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...headers,
-    },
-    body: body ? JSON.stringify(body) : undefined,
+    headers: finalHeaders,
+    body: isFormData ? body : (body ? JSON.stringify(body) : undefined),
   });
 
   let data = null;

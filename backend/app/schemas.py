@@ -35,22 +35,6 @@ class GoogleLoginRequest(BaseModel):
     id_token: str
 
 
-# --- Product Schemas ---
-class ProductBase(BaseModel):
-    part_number: str
-    name: str
-    commodity: str
-
-class ProductCreate(ProductBase):
-    pass
-
-class ProductResponse(ProductBase):
-    id: int
-    created_at: datetime
-
-    model_config = ConfigDict(from_attributes=True)
-
-
 # --- Golden Reference Schemas ---
 class GoldenReferenceBase(BaseModel):
     product_id: int
@@ -68,6 +52,23 @@ class GoldenReferenceCreate(BaseModel):
 class GoldenReferenceResponse(GoldenReferenceBase):
     id: int
     created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+# --- Product Schemas ---
+class ProductBase(BaseModel):
+    part_number: str
+    name: str
+    commodity: str
+
+class ProductCreate(ProductBase):
+    pass
+
+class ProductResponse(ProductBase):
+    id: int
+    created_at: datetime
+    golden_references: List[GoldenReferenceResponse] = []
 
     model_config = ConfigDict(from_attributes=True)
 

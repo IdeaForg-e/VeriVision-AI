@@ -28,6 +28,13 @@ export function useReview(caseId) {
     setRegion(newRegion);
   }, []);
 
+  const handleRegionCommit = useCallback((newRegion) => {
+    setRegion(newRegion);
+    updateROIRegion(caseId, newRegion)
+      .then((res) => console.log("ROI updated successfully on backend:", res))
+      .catch((err) => console.error("Failed to save ROI on backend:", err));
+  }, [caseId]);
+
   const submitDecision = useCallback(
     async (decision) => {
       setDecisionState({ pending: decision, lastResult: null, error: null });
@@ -48,6 +55,7 @@ export function useReview(caseId) {
     setNotes,
     region,
     handleRegionChange,
+    handleRegionCommit,
     decisionState,
     submitDecision,
   };

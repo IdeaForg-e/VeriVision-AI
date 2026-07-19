@@ -1,5 +1,6 @@
 import os
 import cv2
+import numpy as np
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, status
 from sqlalchemy.orm import Session
 from typing import List, Optional
@@ -17,28 +18,80 @@ router = APIRouter(prefix="/inspections", tags=["Inspections"])
 
 @router.post("", response_model=schemas.InspectionResponse, status_code=status.HTTP_201_CREATED)
 async def create_inspection(
-    product_id: int = Form(...),
+    product_id: Optional[int] = Form(None),
     capture_site: str = Form(...),
     capture_angle: str = Form("top"),
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
     current_user: models.User = Depends(utils.get_current_user)
 ):
-    logger.info(f"Incoming inspection request: Product ID {product_id}, Site: {capture_site}, Angle: {capture_angle}")
-    # 1. Verify product exists
-    product = db.query(models.Product).filter(models.Product.id == product_id).first()
-    if not product:
-        logger.warning(f"Inspection failed: Product ID {product_id} not found")
-        raise HTTPException(status_code=404, detail="Product not found")
+    logger.info(f"Incoming inspection request. Product ID: {product_id}, Site: {capture_site}, Angle: {capture_angle}")
+    
+    # Read file content into memory
+    contents = await file.read()
+    nparr = np.frombuffer(contents, np.uint8)
+    src_img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+    
+    if src_img is None:
+        raise HTTPException(status_code=400, detail="Invalid uploaded image file.")
+
+    if product_id is None:
+        logger.info("Product ID not provided. Running layout matching against all template golden references...")
+        # Auto-detect product
+        products = db.query(models.Product).all()
+        best_product = None
+        best_rate = -1.0
+        
+        try:
+            gray_src = cv2.cvtColor(src_img, cv2.COLOR_BGR2GRAY)
+            orb = cv2.ORB_create(nfeatures=1000)
+            kp_src, des_src = orb.detectAndCompute(gray_src, None)
+            
+            if des_src is not None:
+                bf = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
+                for prod in products:
+                    for ref in prod.golden_references:
+                        ref_img = cv2.imread(ref.image_path)
+                        if ref_img is None:
+                            continue
+                        gray_ref = cv2.cvtColor(ref_img, cv2.COLOR_BGR2GRAY)
+                        kp_ref, des_ref = orb.detectAndCompute(gray_ref, None)
+                        if des_ref is None:
+                            continue
+                        
+                        matches = bf.match(des_src, des_ref)
+                        good_matches = [m for m in matches if m.distance < 50]
+                        match_rate = len(good_matches) / max(len(kp_src), len(kp_ref), 1)
+                        logger.info(f"Layout matching template '{prod.part_number}': match rate = {match_rate:.3f}")
+                        
+                        if match_rate > best_rate:
+                            best_rate = match_rate
+                            best_product = prod
+        except Exception as e:
+            logger.error(f"Error during layout auto-detection: {e}")
+            
+        if best_product and best_rate >= 0.10:
+            product = best_product
+            product_id = product.id
+            logger.info(f"Layout recognized: Product {product.part_number} (ID: {product_id}) matched with {best_rate*100:.1f}% rate")
+        else:
+            logger.warning("Unrecognized image layout. Match rate below threshold.")
+            raise HTTPException(
+                status_code=400,
+                detail="Golden reference image not found for this product. Please contact your administrator to upload the golden image of the part or product."
+            )
+    else:
+        # 1. Verify product exists
+        product = db.query(models.Product).filter(models.Product.id == product_id).first()
+        if not product:
+            logger.warning(f"Inspection failed: Product ID {product_id} not found")
+            raise HTTPException(status_code=404, detail="Product not found")
 
     # 2. Verify Golden Reference exists for this product and angle
     golden_ref = services.select_golden_reference(product_id, capture_angle, db)
     if not golden_ref:
-        logger.warning(f"Inspection failed: No Golden Reference found for Product {product_id} at angle {capture_angle}")
-        raise HTTPException(
-            status_code=400, 
-            detail=f"No Golden Reference image found for this product and angle ({capture_angle})"
-        )
+        logger.warning(f"Inspection failed: Golden reference not found for product {product_id} and angle {capture_angle}")
+        raise HTTPException(status_code=400, detail="Golden reference image not found for this product. Please contact your system administrator to upload the OEM golden reference standard.")
 
     # 3. Create case folder & Save uploaded file
     case_id = str(uuid.uuid4())
@@ -49,8 +102,7 @@ async def create_inspection(
     logger.info(f"Saving uploaded inspection image to {file_path} (Case ID: {case_id})")
     try:
         with open(file_path, "wb") as f:
-            content = await file.read()
-            f.write(content)
+            f.write(contents)
     except Exception as e:
         logger.error(f"Failed to save image for Case {case_id}: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to save uploaded image: {str(e)}")

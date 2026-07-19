@@ -87,7 +87,10 @@ def extract_ocr_text(img: np.ndarray, roi: dict = None) -> str:
     logger.info("Executing text extraction (EasyOCR)...")
     crop = img
     if roi:
-        x, y, w, h = roi.get("x", 0), roi.get("y", 0), roi.get("width", 0), roi.get("height", 0)
+        x = roi.get("x", 0)
+        y = roi.get("y", 0)
+        w = roi.get("width") if "width" in roi else roi.get("w", 0)
+        h = roi.get("height") if "height" in roi else roi.get("h", 0)
         logger.info(f"Cropping target image to ROI bounding boxes: x={x}, y={y}, w={w}, h={h}")
         if y + h <= img.shape[0] and x + w <= img.shape[1]:
             crop = img[y:y + h, x:x + w]
@@ -196,7 +199,10 @@ def match_template_roi(src_img: np.ndarray, ref_img: np.ndarray, roi_config: dic
         logger.info("Skipping template match: no template_roi coordinates configured.")
         return {"template_match_score": 1.0, "template_match_found": True}
 
-    x, y, w, h = template_roi.get("x", 0), template_roi.get("y", 0), template_roi.get("width", 0), template_roi.get("height", 0)
+    x = template_roi.get("x", 0)
+    y = template_roi.get("y", 0)
+    w = template_roi.get("width") if "width" in template_roi else template_roi.get("w", 0)
+    h = template_roi.get("height") if "height" in template_roi else template_roi.get("h", 0)
     if w <= 0 or h <= 0:
         logger.info("Skipping template match: width/height configured as 0.")
         return {"template_match_score": 1.0, "template_match_found": True}
@@ -237,7 +243,10 @@ def compare_color_histograms(src_img: np.ndarray, ref_img: np.ndarray, roi_confi
     ref = _ensure_rgb(ref_img)
 
     if color_roi:
-        x, y, w, h = color_roi.get("x", 0), color_roi.get("y", 0), color_roi.get("width", 0), color_roi.get("height", 0)
+        x = color_roi.get("x", 0)
+        y = color_roi.get("y", 0)
+        w = color_roi.get("width") if "width" in color_roi else color_roi.get("w", 0)
+        h = color_roi.get("height") if "height" in color_roi else color_roi.get("h", 0)
         logger.info(f"Cropping color histogram ROI: x={x}, y={y}, w={w}, h={h}")
         if y + h <= src.shape[0] and x + w <= src.shape[1] and y + h <= ref.shape[0] and x + w <= ref.shape[1]:
             src = src[y:y + h, x:x + w]

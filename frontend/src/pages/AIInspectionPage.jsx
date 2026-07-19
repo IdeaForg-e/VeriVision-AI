@@ -3,7 +3,7 @@ import { Layout } from "../components/layout.jsx";
 import { StatsCards, QueueFilters, QueueTable, PipelineStatus } from "../components/triage.jsx";
 import { getTriageQueue, getTriageStats, getPipelineStatus } from "../services/triageService.js";
 
-export default function DailyTriagePage() {
+export default function AIInspectionPage() {
   // Search & Filter
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
@@ -69,7 +69,7 @@ export default function DailyTriagePage() {
 
   if (loading && cases.length === 0) {
     return (
-      <Layout title="Daily Triage Dashboard" subtitle="Monitor inspection cases and AI pipeline">
+      <Layout title="AI Inspection Dashboard" subtitle="Monitor inspection cases and AI pipeline">
         <div className="flex items-center justify-center h-64 text-on-surface-variant">
           Loading triage data...
         </div>
@@ -79,7 +79,7 @@ export default function DailyTriagePage() {
 
   return (
     <Layout
-      title="Daily Triage Dashboard"
+      title="AI Inspection Dashboard"
       subtitle="Monitor inspection cases and AI pipeline"
     >
       {/* Statistics */}

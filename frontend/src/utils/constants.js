@@ -36,5 +36,6 @@ export const ROUTES = {
   TRIAGE: "/triage",
   CASE_DETAIL: "/case",
   HUMAN_REVIEW: "/review",
+  CATALOG: "/catalog",
   FEEDBACK: "/feedback",
 };

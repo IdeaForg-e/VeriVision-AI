@@ -1,22 +1,50 @@
 import os
+import sys
 import shutil
 from sqlalchemy.orm import Session
 
 from app.database import SessionLocal, Base, engine
 from app import models, utils
-from app.config import settings
 
-def seed():
-    print("Initializing Database Seeding...")
-    # Clean recreate all database tables
-    Base.metadata.drop_all(bind=engine)
-    Base.metadata.create_all(bind=engine)
+# Paths relative to this backend directory
+BACKEND_DIR = os.path.dirname(os.path.abspath(__file__))
+PROJECT_ROOT = os.path.dirname(BACKEND_DIR)
+DATASET_DIR = os.path.join(PROJECT_ROOT, "dataset")
+GOLDEN_DIR = os.path.join(BACKEND_DIR, "data", "golden")
+
+def seed(force=False):
+    print("Checking Database state...")
+    
+    # Check if force drop requested
+    if force:
+        print("[FORCE] Dropping and recreating all database tables...")
+        Base.metadata.drop_all(bind=engine)
+        Base.metadata.create_all(bind=engine)
+    else:
+        # Make sure tables exist without dropping existing data
+        Base.metadata.create_all(bind=engine)
+
+    # Ensure golden directory exists
+    os.makedirs(GOLDEN_DIR, exist_ok=True)
 
     db: Session = SessionLocal()
 
     try:
-        # 1. Create Default Users
-        print("Creating default user accounts...")
+        # Check if users and products already exist
+        user_count = db.query(models.User).count()
+        product_count = db.query(models.Product).count()
+
+        if not force and user_count > 0 and product_count > 0:
+            print("[INFO] Database already populated. Seeding skipped.")
+            return
+
+        print("Seeding default user accounts...")
+        # Clear existing users if forcing
+        if force:
+            db.query(models.User).delete()
+            db.query(models.Product).delete()
+            db.query(models.GoldenReference).delete()
+
         users = [
             models.User(
                 name="System Administrator",
@@ -32,180 +60,84 @@ def seed():
             )
         ]
         db.add_all(users)
-        db.commit()
+        db.flush() # Populate IDs
 
-        # 2. Create Default Products
-        print("Creating default product parts...")
-        products = {
-            "XPS-MB-409": models.Product(
+        print("Registering default parts templates...")
+        products = [
+            models.Product(
                 part_number="XPS-MB-409",
                 name="Dell XPS 15 Motherboard",
                 commodity="motherboard"
             ),
-            "XPS-LABEL-03": models.Product(
+            models.Product(
                 part_number="XPS-LABEL-03",
                 name="XPS Warranty Label Sticker",
                 commodity="label"
+            ),
+            models.Product(
+                part_number="XPS-CHIP-IC",
+                name="XPS Microchip Assembly",
+                commodity="microchip"
             )
-        }
-        db.add_all(products.values())
+        ]
+        db.add_all(products)
+        db.flush()
+
+        print("Copying and linking OEM Golden reference standards...")
+        
+        # Product 1: Motherboard
+        mb_src = os.path.join(DATASET_DIR, "golden_motherboard.png")
+        mb_dest_filename = "golden_motherboard.png"
+        mb_dest = os.path.join(GOLDEN_DIR, mb_dest_filename)
+        if os.path.exists(mb_src):
+            shutil.copy(mb_src, mb_dest)
+            db.add(models.GoldenReference(
+                product_id=products[0].id,
+                image_path=f"data/golden/{mb_dest_filename}",
+                expected_serial="XPS-REV-409",
+                angle="top",
+                roi_config={}
+            ))
+            print(f"Linked golden reference for: {products[0].part_number}")
+
+        # Product 2: Warranty Label
+        lbl_src = os.path.join(DATASET_DIR, "golden_warranty_label.png")
+        lbl_dest_filename = "golden_warranty_label.png"
+        lbl_dest = os.path.join(GOLDEN_DIR, lbl_dest_filename)
+        if os.path.exists(lbl_src):
+            shutil.copy(lbl_src, lbl_dest)
+            db.add(models.GoldenReference(
+                product_id=products[1].id,
+                image_path=f"data/golden/{lbl_dest_filename}",
+                expected_serial="91165LUS0DDD",
+                angle="top",
+                roi_config={"label_roi": {"x": 420, "y": 50, "width": 420, "height": 220}}
+            ))
+            print(f"Linked golden reference for: {products[1].part_number}")
+
+        # Product 3: Microchip
+        chip_src = os.path.join(DATASET_DIR, "golden_microchip.png")
+        chip_dest_filename = "golden_microchip.png"
+        chip_dest = os.path.join(GOLDEN_DIR, chip_dest_filename)
+        if os.path.exists(chip_src):
+            shutil.copy(chip_src, chip_dest)
+            db.add(models.GoldenReference(
+                product_id=products[2].id,
+                image_path=f"data/golden/{chip_dest_filename}",
+                expected_serial=None,
+                angle="top",
+                roi_config={"label_roi": {"x": 250, "y": 250, "width": 200, "height": 100}}
+            ))
+            print(f"Linked golden reference for: {products[2].part_number}")
+
         db.commit()
-
-        # Refresh to get IDs
-        db.refresh(products["XPS-MB-409"])
-        db.refresh(products["XPS-LABEL-03"])
-
-        # 3. Setup Golden References using our real dataset images
-        print("Copying golden reference images and setting up database records...")
-        
-        # Paths to original dataset files
-        dataset_dir = os.path.join(os.path.dirname(settings.BASE_DIR), "dataset")
-        ref_motherboard_src = os.path.join(dataset_dir, "golden_motherboard_full_top_down.png")
-        ref_label_src = os.path.join(dataset_dir, "golden_03_label_close.png")
-
-        # Golden references list in database
-        references = []
-
-        # Product 1: Motherboard Top-Down Reference
-        if os.path.exists(ref_motherboard_src):
-            mb_golden_dest = os.path.join(settings.GOLDEN_DIR, "golden_mb_top.png")
-            shutil.copy(ref_motherboard_src, mb_golden_dest)
-            
-            # Copy to cases folder as well to satisfy /data/cases/... queries in UI
-            mb_case_dest = os.path.join(os.path.dirname(settings.GOLDEN_DIR), "cases", "golden_mb_top.png")
-            shutil.copy(ref_motherboard_src, mb_case_dest)
-            
-            references.append(
-                models.GoldenReference(
-                    product_id=products["XPS-MB-409"].id,
-                    image_path=mb_golden_dest,
-                    expected_serial="XPS-REV-409",
-                    roi_config={"label_roi": {"x": 200, "y": 620, "width": 150, "height": 80}},
-                    angle="top"
-                )
-            )
-            print("Seeded Golden Reference for Dell XPS Motherboard.")
-        else:
-            print(f"Warning: Motherboard reference image not found at {ref_motherboard_src}")
-
-        # Product 2: Label Close-Up Reference
-        if os.path.exists(ref_label_src):
-            label_golden_dest = os.path.join(settings.GOLDEN_DIR, "golden_label_close.png")
-            shutil.copy(ref_label_src, label_golden_dest)
-            
-            # Copy to cases folder as well
-            label_case_dest = os.path.join(os.path.dirname(settings.GOLDEN_DIR), "cases", "golden_label_close.png")
-            shutil.copy(ref_label_src, label_case_dest)
-            
-            references.append(
-                models.GoldenReference(
-                    product_id=products["XPS-LABEL-03"].id,
-                    image_path=label_golden_dest,
-                    expected_serial="91165LUS0DDD",
-                    roi_config={"label_roi": {"x": 420, "y": 50, "width": 420, "height": 220}},
-                    angle="top"
-                )
-            )
-            print("Seeded Golden Reference for Warranty Label Sticker.")
-        else:
-            print(f"Warning: Label reference image not found at {ref_label_src}")
-
-        if references:
-            db.add_all(references)
-            db.commit()
-
-        # 4. Create Mock Inspections for Dashboard Data
-        print("Creating mock inspection cases...")
-        from datetime import datetime, timedelta
-        
-        now = datetime.utcnow()
-        
-        # Case 1: Clean
-        i1 = models.Inspection(
-            case_id="F-2026-02",
-            product_id=products["XPS-MB-409"].id,
-            user_id=users[1].id,
-            captured_image_path=mb_golden_dest if os.path.exists(ref_motherboard_src) else "/dataset/golden_motherboard_full_top_down.png",
-            capture_site="Line-1",
-            capture_angle="top",
-            status="completed",
-            created_at=now - timedelta(minutes=45)
-        )
-        db.add(i1)
-        db.commit()
-        db.refresh(i1)
-        
-        r1 = models.InspectionResult(
-            inspection_id=i1.id,
-            ssim_score=0.98,
-            keypoint_match_rate=0.95,
-            ocr_detected_text="XPS-REV-409",
-            ocr_expected_text="XPS-REV-409",
-            fraud_score=10,
-            verdict="clean",
-            confidence=0.92,
-            recommended_action="Accept",
-            explanation="Parts verified correctly.",
-            heatmap_path=None
-        )
-        db.add(r1)
-
-        # Case 2: Tampered / Quarantine
-        i2 = models.Inspection(
-            case_id="C-2026-03",
-            product_id=products["XPS-LABEL-03"].id,
-            user_id=users[1].id,
-            captured_image_path="/dataset/defect_burn_marks.png",
-            capture_site="Line-2",
-            capture_angle="top",
-            status="completed",
-            created_at=now - timedelta(minutes=10)
-        )
-        db.add(i2)
-        db.commit()
-        db.refresh(i2)
-        
-        r2 = models.InspectionResult(
-            inspection_id=i2.id,
-            ssim_score=0.62,
-            keypoint_match_rate=0.55,
-            ocr_detected_text="91165LUSODDD",
-            ocr_expected_text="91165LUS0DDD",
-            fraud_score=85,
-            verdict="tampered",
-            confidence=0.90,
-            recommended_action="Quarantine & Escalate",
-            explanation="Defects and character mismatch detected.",
-            heatmap_path=None
-        )
-        db.add(r2)
-
-        # Case 3: Pending Review
-        i3 = models.Inspection(
-            case_id="P-2026-04",
-            product_id=products["XPS-MB-409"].id,
-            user_id=users[1].id,
-            captured_image_path="/dataset/golden_motherboard_full_top_down.png",
-            capture_site="Line-1",
-            capture_angle="top",
-            status="pending",
-            created_at=now - timedelta(minutes=2)
-        )
-        db.add(i3)
-        
-        db.commit()
-
-
-        print("Database Seeding Completed Successfully! [SUCCESS]")
-        print("\nDefault Logins:")
-        print("- Admin: admin@verivision.com / admin123")
-        print("- User: user@verivision.com / user123")
-
+        print("\n[SUCCESS] Setup Completed! Default products and golden standards are ready.")
     except Exception as e:
         db.rollback()
-        print(f"Seeding Failed: {e}")
+        print(f"[ERROR] Seeding failed: {e}")
     finally:
         db.close()
 
 if __name__ == "__main__":
-    seed()
+    force_seed = "--force" in sys.argv
+    seed(force=force_seed)

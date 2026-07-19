@@ -26,11 +26,61 @@ export function DetectorMetrics({ metrics = [] }) {
     );
   }
 
-  function barColor(score, maxScore) {
-    const pct = (score / maxScore) * 100;
-    if (pct >= 80) return "bg-emerald-500/10 border border-emerald-500/200";
-    if (pct >= 50) return "bg-amber-400";
-    return "bg-red-500/10 border border-red-500/200";
+  function getBarStyles(name, score, max) {
+    const val = (score / max) * 100;
+    const isRisk = name.toLowerCase().includes("fraud");
+    const isConfidence = name.toLowerCase().includes("confidence");
+
+    if (isConfidence) {
+      return "bg-gradient-to-r from-cyan-500 to-blue-500 shadow-[0_0_8px_rgba(6,182,212,0.35)]";
+    }
+
+    if (isRisk) {
+      if (val >= 70) return "bg-gradient-to-r from-red-500 to-rose-600 shadow-[0_0_8px_rgba(239,68,68,0.45)]";
+      if (val >= 40) return "bg-gradient-to-r from-amber-400 to-orange-500 shadow-[0_0_8px_rgba(245,158,11,0.35)]";
+      return "bg-gradient-to-r from-emerald-400 to-teal-500 shadow-[0_0_8px_rgba(16,185,129,0.35)]";
+    } else {
+      // Quality/similarity metrics (SSIM, Keypoint Match) - low is bad
+      if (val < 50) return "bg-gradient-to-r from-red-500 to-rose-600 shadow-[0_0_8px_rgba(239,68,68,0.45)]";
+      if (val < 80) return "bg-gradient-to-r from-amber-400 to-orange-500 shadow-[0_0_8px_rgba(245,158,11,0.35)]";
+      return "bg-gradient-to-r from-emerald-400 to-teal-500 shadow-[0_0_8px_rgba(16,185,129,0.35)]";
+    }
+  }
+
+  function getTextColor(name, score, max) {
+    const val = (score / max) * 100;
+    const isRisk = name.toLowerCase().includes("fraud");
+    const isConfidence = name.toLowerCase().includes("confidence");
+
+    if (isConfidence) return "text-cyan-400 font-bold";
+
+    if (isRisk) {
+      if (val >= 70) return "text-red-400 font-bold";
+      if (val >= 40) return "text-amber-400 font-bold";
+      return "text-emerald-400 font-bold";
+    } else {
+      if (val < 50) return "text-red-400 font-bold";
+      if (val < 80) return "text-amber-400 font-bold";
+      return "text-emerald-400 font-bold";
+    }
+  }
+
+  function getIconColor(name, score, max) {
+    const val = (score / max) * 100;
+    const isRisk = name.toLowerCase().includes("fraud");
+    const isConfidence = name.toLowerCase().includes("confidence");
+
+    if (isConfidence) return "text-cyan-400";
+
+    if (isRisk) {
+      if (val >= 70) return "text-red-400";
+      if (val >= 40) return "text-amber-400";
+      return "text-emerald-400";
+    } else {
+      if (val < 50) return "text-red-400";
+      if (val < 80) return "text-amber-400";
+      return "text-emerald-400";
+    }
   }
 
   return (
@@ -44,30 +94,32 @@ export function DetectorMetrics({ metrics = [] }) {
         {metrics.map((m) => {
           const max = m.unit === "%" ? 100 : 1;
           const pct = Math.min((m.score / max) * 100, 100);
-          const color = barColor(m.score, max);
+          const barStyle = getBarStyles(m.name, m.score, max);
+          const textColor = getTextColor(m.name, m.score, max);
+          const iconColor = getIconColor(m.name, m.score, max);
 
           return (
             <div key={m.name}>
               <div className="flex items-center justify-between mb-1">
                 <div className="flex items-center gap-1.5">
                   {m.icon && (
-                    <span className="material-symbols-outlined text-[18px] text-cyan-400">{m.icon}</span>
+                    <span className={`material-symbols-outlined text-[18px] ${iconColor}`}>{m.icon}</span>
                   )}
-                  <span className="text-body-sm font-medium text-slate-250">{m.name}</span>
+                  <span className="text-body-sm font-semibold text-slate-200">{m.name}</span>
                 </div>
-                <span className="font-tech-code text-body-sm text-slate-450">
+                <span className={`font-tech-code text-body-sm ${textColor}`}>
                   {m.unit === "%" ? `${Math.round(m.score)}%` : formatScore(m.score)}
                   {m.unit && m.unit !== "%" ? ` ${m.unit}` : ""}
                 </span>
               </div>
-              <div className="w-full h-2 bg-slate-900 border border-slate-800 rounded-full overflow-hidden">
+              <div className="w-full h-1.5 bg-slate-900 border border-slate-850 rounded-full overflow-hidden">
                 <div
-                  className={`h-full rounded-full ${color} transition-all duration-700`}
+                  className={`h-full rounded-full transition-all duration-700 ${barStyle}`}
                   style={{ width: `${pct}%` }}
                 />
               </div>
               {m.description && (
-                <p className="text-[11px] text-slate-450 mt-1 italic">{m.description}</p>
+                <p className="text-[10px] text-slate-450 mt-1 italic">{m.description}</p>
               )}
             </div>
           );
@@ -294,14 +346,14 @@ export function HeatmapViewer({
             ) : region ? (
               /* Bounding-box overlay derived from ROI region percentages */
               <div
-                className="absolute border-2 border-primary rounded shadow-lg"
+                className="absolute border-2 border-red-500 rounded shadow-lg"
                 style={{
                   left: `${region.x}%`,
                   top: `${region.y}%`,
                   width: `${region.w}%`,
                   height: `${region.h}%`,
-                  background: "rgba(0,74,198,0.12)",
-                  boxShadow: "0 0 0 9999px rgba(0,0,0,0.25)",
+                  background: "rgba(239, 68, 68, 0.15)",
+                  boxShadow: "0 0 0 9999px rgba(0,0,0,0.25), 0 0 8px rgba(239, 68, 68, 0.5)",
                   pointerEvents: "none",
                 }}
               />
