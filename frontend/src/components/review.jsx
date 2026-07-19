@@ -105,7 +105,7 @@ export function EvidencePanel({ caseData, region, onRegionChange, onRegionCommit
           <span className="font-label-caps text-slate-400 uppercase">Golden Reference (OEM Standard)</span>
           <div className="relative aspect-square bg-slate-950 border border-slate-850 rounded-lg overflow-hidden group">
             <img
-              className="w-full h-full object-cover grayscale opacity-80"
+              className="w-full h-full object-cover"
               alt="Golden reference part"
               src={caseData.goldenImageUrl}
             />

@@ -12,6 +12,17 @@ def generate_explanation(metrics: dict) -> str:
     If OPENROUTER_API_KEY is present in settings, it queries OpenRouter.
     Otherwise, it falls back to a clean rule-based template generator.
     """
+    # Load dynamic thresholds from Pipeline Tuning Panel
+    try:
+        from app.routers.triage import _PIPELINE_CONFIG
+        thresholds = _PIPELINE_CONFIG.get("thresholds", {})
+    except Exception:
+        thresholds = {}
+        
+    ssim_target = thresholds.get("ssim", 0.85)
+    keypoint_delta = thresholds.get("keypointDeltaPct", 15)
+    ocr_fuzzy = thresholds.get("ocrFuzzyPct", 100)
+
     ssim = metrics.get("ssim_score", 1.0)
     verdict = metrics.get("verdict", "clean")
     fraud_score = metrics.get("fraud_score", 0)
@@ -32,19 +43,25 @@ def generate_explanation(metrics: dict) -> str:
     openrouter_model = settings.OPENROUTER_MODEL
     
     prompt = (
-        f"You are an AI Explainer Agent for an enterprise manufacturing QC audit platform.\n"
-        f"Explain the following part inspection metrics in a professional, audit-ready manner:\n"
-        f"- SSIM Structural Similarity: {ssim:.2f}\n"
-        f"- Template Match Status: {'FOUND' if temp_found else 'MISSING'} (Score: {temp_score:.2f}, checks label existence)\n"
-        f"- Color/Material Histogram Match: {color_sim:.2f} (lower means paint/materials deviation)\n"
-        f"- OCR Expected Label: '{expected_text}'\n"
-        f"- OCR Detected Label: '{detected_text}'\n"
-        f"- Character Mismatches: {ocr_mismatches}\n"
+        f"You are an AI Quality Inspector explaining an inspection audit to a factory manager in plain, simple, natural human language.\n"
+        f"Explain the following inspection findings directly and clearly, in relation to your calibrated safety standard thresholds. Avoid technical terms like 'SSIM' or 'histogram correlation':\n\n"
+        f"--- Calibrated Safety Standards ---\n"
+        f"- Target Surface/Layout Similarity: {ssim_target:.2f}\n"
+        f"- Allowed Keypoint Deviation Margin: {keypoint_delta}%\n"
+        f"- OCR Fuzzy Matching Strictness: {ocr_fuzzy}%\n\n"
+        f"--- Inspection Findings ---\n"
+        f"- Physical Match score: {ssim:.2f} (a low score below target means parts are missing, misplaced, or damaged)\n"
+        f"- Sticker/Label existence: {'FOUND' if temp_found else 'MISSING'} (Score: {temp_score:.2f})\n"
+        f"- Color/Material match: {color_sim:.2f} (a low score below 0.85 means discoloration, rust, burns, or stains exist)\n"
+        f"- OCR Expected Label text: '{expected_text}'\n"
+        f"- OCR Detected Label text: '{detected_text}'\n"
+        f"- Character mismatches: {ocr_mismatches}\n"
         f"- Fraud Score: {fraud_score}/100\n"
-        f"- Verdict Category: {verdict.upper()}\n"
+        f"- Final Verdict: {verdict.upper()}\n"
         f"- Recommended Action: {recommended_action}\n\n"
-        f"Write a concise 2-3 sentence technical justification summarizing what visual abnormalities were found "
-        f"and why this verdict/action was chosen. Keep it formal."
+        f"Write a clear, direct 2-3 sentence explanation summarizing what is physically wrong with the component. "
+        f"Specifically mention how much the physical match score ({ssim:.2f}) or text matches deviated from the calibrated standards (e.g. target of {ssim_target:.2f}). "
+        f"Keep the tone friendly, helpful, and natural, focusing on the visual defects found and what the factory should do next."
     )
 
     if openrouter_key:
@@ -79,39 +96,34 @@ def generate_explanation(metrics: dict) -> str:
     reasons = []
     if verdict == "clean":
         reasons.append(
-            f"The component passed visual checks with high structural similarity (SSIM: {ssim:.2f}) "
-            f"and matched all expected label markings."
+            "The component looks perfect! All parts are in the correct place, the colors match the golden standard, and the label text is correct."
         )
     elif verdict == "missing":
         reasons.append(
-            f"A missing component anomaly was triggered because the expected label sticker/logo "
-            f"was not detected on the part (SSIM: {ssim:.2f}, Template Match: {'FOUND' if temp_found else 'MISSING'})."
+            "The inspection failed because the required sticker or label is completely missing from the component."
         )
     elif verdict == "mismatched":
-        mismatch_str = ", ".join([f"position {m['position']} ('{m['detected']}' instead of '{m['expected']}')" for m in ocr_mismatches])
         reasons.append(
-            f"A label mismatch was flagged. Expected '{expected_text}' but detected '{detected_text}'. "
-            f"Mismatches found at: {mismatch_str}."
+            f"The printed text on the sticker does not match. We expected '{expected_text}' but detected '{detected_text}' instead."
         )
     elif verdict == "tampered":
         details = []
         if ssim < 0.65:
-            details.append(f"low structural similarity SSIM of {ssim:.2f}")
+            details.append("physically damaged or burned components")
         if color_sim < 0.65:
-            details.append(f"non-OEM color correlation shift ({color_sim:.2f})")
+            details.append("liquid wet stains, rust, or incorrect color substrate")
         
-        detail_msg = ", ".join(details) if details else "layout modifications"
+        detail_msg = " and ".join(details) if details else "unauthorized physical changes"
         reasons.append(
-            f"Physical tampering detected. The analysis indicates {detail_msg} deviating significantly "
-            f"from the Golden Reference, suggesting component alteration or counterfeit replacement."
+            f"This part has been tampered with. We detected {detail_msg} on the surface, which means "
+            f"this component is damaged or has been modified."
         )
     elif verdict == "reused":
         reasons.append(
-            f"Reused hardware indicators found. The surface registration reveals minor wear, adhesive residue, "
-            f"or trace scratches mismatching the golden reference board."
+            "This part looks like a reused or old component. There are clear scratches, dirt, or tape residue on the surface."
         )
 
-    reasons.append(f"Recommended action is '{recommended_action}' with a fraud index of {fraud_score}/100.")
+    reasons.append(f"We recommend you to {recommended_action.lower()} this part. The overall fraud risk rating is {fraud_score}%.")
     explanation_msg = " ".join(reasons)
     logger.info(f"Local compiled explanation: {explanation_msg}")
     return explanation_msg

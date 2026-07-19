@@ -417,7 +417,7 @@ export function ImageComparison({
             <img
               src={goldenUrl}
               alt={altGolden}
-              className="w-full h-full object-cover grayscale opacity-80 group-hover:opacity-100 group-hover:grayscale-0 transition-all duration-300"
+              className="w-full h-full object-cover transition-all duration-300"
             />
             <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
               <span className="material-symbols-outlined text-white text-3xl drop-shadow-lg">zoom_in</span>
