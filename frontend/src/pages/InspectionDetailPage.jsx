@@ -15,11 +15,11 @@ import {
   RecommendationCard 
 } from "../components/case.jsx";
 
-import { getCaseById } from "../services/caseService.js";
+import { getCaseById, deleteCase } from "../services/caseService.js";
 import { fetchCaseForReview } from "../services/reviewService.js";
 import { getTriageQueue } from "../services/triageService.js";
 import { ROUTES, REVIEW_DECISION } from "../utils/constants.js";
-import { Download, ShieldAlert, Terminal, Cpu, FileText, ArrowRight, FolderOpen, AlertTriangle } from "lucide-react";
+import { Download, ShieldAlert, Terminal, Cpu, FileText, ArrowRight, FolderOpen, AlertTriangle, Trash2 } from "lucide-react";
 
 export default function InspectionDetailPage() {
   const { id } = useParams();
@@ -69,6 +69,37 @@ export default function InspectionDetailPage() {
     if (!id) return;
     // Trigger download direct from backend route
     window.open(`http://127.0.0.1:8000/api/reports/${id}/pdf?token=${encodeURIComponent(localStorage.getItem("fraudshield_auth_token") || "")}`, "_blank");
+  };
+
+  const handleDeleteClick = async (caseId) => {
+    if (window.confirm("Are you sure you want to permanently delete this inspection report? This action cannot be undone.")) {
+      try {
+        await deleteCase(caseId);
+        if (id) {
+          navigate(ROUTES.CASE_DETAIL);
+        } else {
+          setLoading(true);
+          getTriageQueue({ page: 1, pageSize: 100 })
+            .then((res) => {
+              if (res && res.items && res.items.length > 0) {
+                setReportsList(res.items);
+                setIsEmpty(false);
+              } else {
+                setReportsList([]);
+                setIsEmpty(true);
+              }
+            })
+            .catch(() => {
+              setIsEmpty(true);
+            })
+            .finally(() => {
+              setLoading(false);
+            });
+        }
+      } catch (err) {
+        alert(err.message || "Failed to delete inspection report.");
+      }
+    }
   };
 
   if (loading) {
@@ -163,8 +194,21 @@ export default function InspectionDetailPage() {
                         </span>
                       </td>
                       <td className="py-4 px-4 text-slate-400 font-tech-code">{r.createdAt}</td>
-                      <td className="py-4 px-4 text-right">
-                        <button className="text-cyan-400 group-hover:text-cyan-300 font-bold flex items-center gap-1 ml-auto text-[10px] uppercase tracking-wider transition-all">
+                      <td className="py-4 px-4 text-right flex items-center justify-end gap-3">
+                        <button 
+                          onClick={(e) => {
+                            e.stopPropagation(); // Avoid triggering row click navigate
+                            handleDeleteClick(r.caseId);
+                          }}
+                          className="text-slate-500 hover:text-red-400 p-1.5 rounded hover:bg-red-500/10 transition-colors"
+                          title="Delete Report"
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                        <button 
+                          onClick={() => navigate(`${ROUTES.CASE_DETAIL}/${r.caseId}`)}
+                          className="text-cyan-400 group-hover:text-cyan-300 font-bold flex items-center gap-1 text-[10px] uppercase tracking-wider transition-all"
+                        >
                           View Report
                           <ArrowRight size={13} />
                         </button>

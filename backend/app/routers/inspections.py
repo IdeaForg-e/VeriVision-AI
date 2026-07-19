@@ -222,3 +222,40 @@ def get_inspection_by_case(
         )
         
     return inspection
+
+
+@router.delete("/{case_id}", status_code=status.HTTP_200_OK)
+def delete_inspection(
+    case_id: str,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(utils.get_current_user)
+):
+    """Delete an inspection case, its linked results, audit logs, and reports."""
+    inspection = db.query(models.Inspection).filter(models.Inspection.case_id == case_id).first()
+    if not inspection:
+        raise HTTPException(status_code=404, detail="Inspection case not found")
+        
+    # Authorization verification: Admin can delete all, Normal user only their own
+    if current_user.role != "admin" and inspection.user_id != current_user.id:
+        logger.warning(f"Unauthorized delete attempt by user {current_user.email} for case: {case_id}")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You are not authorized to delete this inspection case."
+        )
+        
+    try:
+        # Delete related reports
+        db.query(models.Report).filter(models.Report.inspection_id == inspection.id).delete()
+        # Delete related audit logs
+        db.query(models.AuditLog).filter(models.AuditLog.inspection_id == inspection.id).delete()
+        # Delete related results
+        db.query(models.InspectionResult).filter(models.InspectionResult.inspection_id == inspection.id).delete()
+        # Delete main inspection record
+        db.delete(inspection)
+        db.commit()
+        logger.info(f"User {current_user.email} deleted case {case_id}")
+        return {"message": "Inspection case deleted successfully"}
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Failed to delete inspection case {case_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to delete inspection case: {str(e)}")

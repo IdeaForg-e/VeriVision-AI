@@ -15,6 +15,49 @@ export default function AIInspectionPage() {
   const [activities, setActivities] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  // CSV Export for AI Inspection page
+  const exportToCSV = () => {
+    const filteredCases = cases.filter((item) => {
+      const matchesSearch = item.caseId.toLowerCase().includes(search.toLowerCase()) ||
+        item.partNumber.toLowerCase().includes(search.toLowerCase()) ||
+        item.commodity.toLowerCase().includes(search.toLowerCase());
+      const matchesStatus = statusFilter === "ALL" || item.status === statusFilter;
+      return matchesSearch && matchesStatus;
+    });
+
+    if (filteredCases.length === 0) {
+      alert("No data available to export.");
+      return;
+    }
+
+    const headers = ["Case ID", "Part Number", "Commodity", "Risk Score", "Confidence", "Reason", "Status", "Timestamp"];
+    const rows = filteredCases.map(item => [
+      item.caseId || "",
+      item.partNumber || "",
+      item.commodity || "",
+      item.riskScore || 0,
+      item.confidence || 0,
+      item.reason || "",
+      item.status || "",
+      item.createdAt || ""
+    ]);
+
+    const csvContent = [
+      headers.join(","),
+      ...rows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(","))
+    ].join("\n");
+
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `verivision_triage_${new Date().toISOString().split("T")[0]}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
   const fetchData = async () => {
     setLoading(true);
     try {
@@ -93,6 +136,7 @@ export default function AIInspectionPage() {
           statusFilter={statusFilter}
           setStatusFilter={setStatusFilter}
           onRefresh={handleRefresh}
+          onExport={exportToCSV}
         />
       </div>
 

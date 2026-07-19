@@ -164,6 +164,7 @@ export function QueueFilters({
   statusFilter,
   setStatusFilter,
   onRefresh,
+  onExport,
 }) {
   return (
     <div className="cyber-card bg-[#0f172a]/55 border-slate-800 rounded-xl p-4 shadow-sm">
@@ -214,6 +215,7 @@ export function QueueFilters({
           </button>
 
           <button
+            onClick={onExport}
             className="flex items-center gap-2 bg-gradient-to-r from-cyan-500 to-blue-600 text-white hover:bg-blue-700 px-4 py-2 rounded-lg transition-colors"
           >
             <Download size={16} />
