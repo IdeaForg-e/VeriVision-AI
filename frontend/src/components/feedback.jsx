@@ -140,21 +140,18 @@ export function OCRThreshold({ value, onChange }) {
           {isStrict ? "Strict (100%)" : `Fuzzy (${value}%)`}
         </span>
       </div>
-      <div className="relative flex items-center">
+      <div className="relative flex items-center w-full">
         <input
           type="range"
-          className="w-full h-1 bg-slate-950 rounded-lg appearance-none cursor-pointer range-cyan accent-cyan-500"
+          className="w-full cursor-pointer bg-transparent focus:outline-none"
           min={80}
           max={100}
           step={5}
           value={value}
           onChange={(e) => onChange(parseInt(e.target.value, 10))}
-          style={{
-            background: `linear-gradient(to right, ${isStrict ? '#ef4444' : '#06b6d4'} 0%, ${isStrict ? '#ef4444' : '#06b6d4'} ${percent}%, #090d16 ${percent}%, #090d16 100%)`
-          }}
         />
       </div>
-      <p className="text-[10px] text-slate-550 leading-relaxed italic">
+      <p className="text-[10px] text-slate-555 leading-relaxed italic">
         Strict match level — defines the tolerance for character substitution in serial number extraction.
       </p>
     </div>
@@ -162,8 +159,6 @@ export function OCRThreshold({ value, onChange }) {
 }
 
 export function ThresholdSlider({ label, value, min, max, step, formatValue, description, onChange }) {
-  const percent = ((value - min) / (max - min)) * 100;
-  
   return (
     <div className="space-y-3.5">
       <div className="flex justify-between items-center">
@@ -172,18 +167,15 @@ export function ThresholdSlider({ label, value, min, max, step, formatValue, des
           {formatValue(value)}
         </span>
       </div>
-      <div className="relative flex items-center">
+      <div className="relative flex items-center w-full">
         <input
           type="range"
-          className="w-full h-1 bg-slate-950 rounded-lg appearance-none cursor-pointer range-cyan accent-cyan-500"
+          className="w-full cursor-pointer bg-transparent focus:outline-none"
           min={min}
           max={max}
           step={step}
           value={value}
           onChange={(e) => onChange(parseFloat(e.target.value))}
-          style={{
-            background: `linear-gradient(to right, #06b6d4 0%, #06b6d4 ${percent}%, #090d16 ${percent}%, #090d16 100%)`
-          }}
         />
       </div>
       <p className="text-[10px] text-slate-555 leading-relaxed italic">{description}</p>
