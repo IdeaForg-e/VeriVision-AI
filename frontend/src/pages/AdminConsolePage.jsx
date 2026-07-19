@@ -17,6 +17,7 @@ import {
   Grid,
   FileText
 } from "lucide-react";
+import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Cell } from "recharts";
 
 export default function AdminConsolePage() {
   const [products, setProducts] = useState([]);
@@ -389,7 +390,7 @@ export default function AdminConsolePage() {
                             />
                             <span className="material-symbols-outlined text-slate-550 text-2xl hidden absolute">image</span>
                           </div>
-                          <div className="flex-1 space-y-1.5">
+                           <div className="flex-1 space-y-1.5">
                             <p className="text-slate-400 font-semibold flex items-center gap-1.5">
                               <Eye size={12} className="text-slate-500" />
                               Camera Angle: <span className="font-tech-code text-slate-200 uppercase font-bold bg-slate-900 border border-slate-800 px-1.5 py-0.5 rounded">{p.golden_references[0].angle}</span>
@@ -400,6 +401,37 @@ export default function AdminConsolePage() {
                               </p>
                             )}
                           </div>
+                          
+                          {/* Dynamic Acceptance Threshold Mini Chart */}
+                          <div className="w-full sm:w-44 h-16 shrink-0 bg-[#090e1a]/80 p-2 border border-slate-850 rounded-lg hidden md:block">
+                            <p className="text-[8px] uppercase text-slate-500 font-black tracking-widest mb-1.5">Acceptance Targets</p>
+                            <ResponsiveContainer width="100%" height="100%">
+                              <BarChart 
+                                layout="vertical" 
+                                data={[
+                                  { name: "SSIM", score: 85, fill: "#06b6d4" },
+                                  { name: "Matches", score: 75, fill: "#3b82f6" },
+                                  { name: "OCR", score: 95, fill: "#a855f7" }
+                                ]} 
+                                margin={{ top: 0, right: 5, left: -25, bottom: 0 }}
+                              >
+                                <XAxis type="number" domain={[0, 100]} hide />
+                                <YAxis type="category" dataKey="name" stroke="#64748b" fontSize={7} tickLine={false} axisLine={false} />
+                                <Bar dataKey="score" radius={[0, 2, 2, 0]} barSize={4}>
+                                  {
+                                    [
+                                      { fill: "#06b6d4" },
+                                      { fill: "#3b82f6" },
+                                      { fill: "#a855f7" }
+                                    ].map((entry, index) => (
+                                      <Cell key={`cell-${index}`} fill={entry.fill} />
+                                    ))
+                                  }
+                                </Bar>
+                              </BarChart>
+                            </ResponsiveContainer>
+                          </div>
+                          
                           <button
                             onClick={() => setUploadingForId(p.id)}
                             className="text-[10px] text-slate-400 hover:text-cyan-400 font-black uppercase tracking-wider px-3.5 py-2 border border-slate-800 hover:border-cyan-500/20 rounded bg-slate-900/60 hover:bg-cyan-950/10 transition-all self-end sm:self-center"
