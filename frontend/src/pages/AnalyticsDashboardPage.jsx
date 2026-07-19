@@ -185,7 +185,7 @@ export default function AnalyticsDashboardPage() {
     const fraudRate = totalCases > 0 ? ((fraudCases / totalCases) * 100).toFixed(1) : "0.0";
 
     // Commodity breakdown from queue items
-    const commodityData = Object.entries(
+    const commodityData = Object.values(
         queueItems.reduce((acc, item) => {
             const com = item.commodity || "Unknown";
             if (!acc[com]) acc[com] = { commodity: com, total: 0, fraud: 0 };
@@ -193,10 +193,10 @@ export default function AnalyticsDashboardPage() {
             if (item.status === "QUARANTINE") acc[com].fraud++;
             return acc;
         }, {})
-    ).map((_, v) => v);
+    );
 
     // Site breakdown from cases data
-    const siteData = Object.entries(
+    const siteData = Object.values(
         cases.reduce((acc, c) => {
             const site = c.partCode?.split("-")[0] || "Unknown";
             if (!acc[site]) acc[site] = { site, total: 0, fraud: 0 };
@@ -204,7 +204,7 @@ export default function AnalyticsDashboardPage() {
             if (c.status === "tampered" || c.status === "missing" || c.status === "mismatched") acc[site].fraud++;
             return acc;
         }, {})
-    ).map((_, v) => v);
+    );
 
     if (loading) {
         return (
