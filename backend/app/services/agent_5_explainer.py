@@ -38,9 +38,16 @@ def _build_prompt(ssim, verdict, fraud_score, detected_text, expected_text,
         f"- Recommended Action: {recommended_action}\n"
         f"{grounding}\n"
         f"{visual_ai_finding}\n"
-        f"Write a concise 2-3 sentence technical justification summarizing what visual abnormalities were found "
-        f"and why this verdict/action was chosen. Keep it formal and audit-ready. Reference only the metrics, "
-        f"reasoning, and Visual AI report details given above — do not speculate beyond them."
+        f"Write a detailed, fluent paragraph (6-8 sentences) that explains the inspection findings "
+        f"in natural, audit-ready language. Structure it as follows:\n\n"
+        f"1. Start by describing what the SSIM heatmap analysis revealed — mention specific SSIM score and "
+        f"what areas of the component showed structural deviation from the golden reference.\n"
+        f"2. Then describe the label verification results — what text was expected versus what was detected by OCR, "
+        f"and whether character mismatches were found.\n"
+        f"3. If relevant, mention template/logo presence and color/material correlation findings.\n"
+        f"4. Conclude with the verdict, fraud risk score, and recommended action.\n\n"
+        f"Make it sound like a senior quality auditor writing an official inspection report. "
+        f"Do not speculate beyond the metrics provided."
     )
 
 
@@ -114,54 +121,130 @@ def generate_explanation(metrics: dict) -> str:
 
         logger.warning("All Explainer LLM attempts exhausted. Falling back to template explainer...")
 
-    # Rule-Based Fallback template
+    # ── Rule-Based Fallback — Rich Paragraph ──────────────────────────────
     logger.info("Assembling rule-based local explanation template...")
-    reasons = []
-    if verdict == "clean":
-        reasons.append(
-            f"The component passed visual checks with high structural similarity (SSIM: {ssim:.2f}) "
-            f"and matched all expected label markings."
-        )
-    elif verdict == "missing":
-        reasons.append(
-            f"A missing component anomaly was triggered because the expected label sticker/logo "
-            f"was not detected on the part (SSIM: {ssim:.2f}, Template Match: {'FOUND' if temp_found else 'MISSING'})."
-        )
-    elif verdict == "mismatched":
-        mismatch_str = ", ".join([f"position {m['position']} ('{m['detected']}' instead of '{m['expected']}')" for m in ocr_mismatches])
-        reasons.append(
-            f"A label mismatch was flagged. Expected '{expected_text}' but detected '{detected_text}'. "
-            f"Mismatches found at: {mismatch_str}."
-        )
-    elif verdict == "tampered":
-        details = []
-        if ssim < 0.65:
-            details.append(f"low structural similarity SSIM of {ssim:.2f}")
-        if color_sim < 0.65:
-            details.append(f"non-OEM color correlation shift ({color_sim:.2f})")
 
-        detail_msg = ", ".join(details) if details else "layout modifications"
-        reasons.append(
-            f"Physical tampering detected. The analysis indicates {detail_msg} deviating significantly "
-            f"from the Golden Reference, suggesting component alteration or counterfeit replacement."
+    ssim_pct = ssim * 100
+    color_pct = color_sim * 100
+
+    # --- 1. SSIM / Heatmap paragraph ---
+    if ssim >= 0.85:
+        heatmap_part = (
+            f"SSIM heatmap analysis registered a structural similarity index of {ssim:.2f} ({ssim_pct:.0f}%), "
+            f"indicating the component surface matches the golden reference within acceptable tolerances. "
+            f"Pixel-level comparison shows no significant deviations in the inspected regions."
         )
-    elif verdict == "reused":
-        reasons.append(
-            f"Reused hardware indicators found. The surface registration reveals minor wear, adhesive residue, "
-            f"or trace scratches mismatching the golden reference board."
+    elif ssim >= 0.65:
+        heatmap_part = (
+            f"SSIM heatmap analysis recorded a structural similarity score of {ssim:.2f} ({ssim_pct:.0f}%), "
+            f"which falls moderately below the ideal threshold. The heatmap overlay reveals mild structural "
+            f"differences concentrated around specific zones of the component, suggesting surface-level wear "
+            f"or potential localized tampering. These regions appear as warmer (red/orange) areas in the "
+            f"difference heatmap, indicating pixel-level discrepancy between the uploaded part and the golden reference."
+        )
+    else:
+        heatmap_part = (
+            f"SSIM heatmap analysis returned a critically low structural similarity index of {ssim:.2f} ({ssim_pct:.0f}%), "
+            f"well below the acceptable threshold. The anomaly heatmap shows extensive red-highlighted regions "
+            f"across the component surface, indicating substantial structural deviation from the golden reference. "
+            f"These high-discrepancy zones are distributed across multiple areas, suggesting either a different "
+            f"manufacturing revision, significant physical damage, or a counterfeit replacement part."
         )
 
-    # Include the Visual AI anomalies list if available
-    if multimodal_report and "skipped" not in multimodal_report.lower() and "failed" not in multimodal_report.lower() and "no anomalies" not in multimodal_report.lower():
-        reasons.append(f"Visual AI details: {multimodal_report}")
+    # --- 2. OCR / Label paragraph ---
+    if verdict == "clean" or (expected_text and detected_text and expected_text == detected_text):
+        ocr_part = (
+            f"OCR-based label verification confirmed that the printed label text '{detected_text}' "
+            f"exactly matches the expected golden reference '{expected_text}', with zero character mismatches. "
+            f"The label appears authentic and unmodified."
+        )
+    elif not detected_text.strip():
+        ocr_part = (
+            f"OCR label verification failed to detect any readable text on the part surface. "
+            f"The system expected to find '{expected_text}' but the label area appears blank, illegible, "
+            f"or physically removed. This is a strong indicator of label tampering or part substitution."
+        )
+    elif detected_text != expected_text:
+        mismatch_count = len(ocr_mismatches)
+        mismatch_positions = ", ".join(
+            [f"position {m['position']} ('{m['detected']}' instead of '{m['expected']}')" 
+             for m in ocr_mismatches[:5]]
+        ) if ocr_mismatches else "throughout the label"
+        ocr_part = (
+            f"OCR label verification flagged a text mismatch: the system detected '{detected_text}' "
+            f"where '{expected_text}' was expected, with {mismatch_count} character-level discrepancies "
+            f"identified at {mismatch_positions}. This serial/label discrepancy raises concerns about "
+            f"label authenticity or part tracking integrity."
+        )
+    else:
+        ocr_part = ""
 
-    # Ground the template in Agent 4's own reasoning when available, so the
-    # fallback path stays consistent with why the decision was actually made,
-    # rather than re-deriving generic verdict boilerplate from scratch.
+    # --- 3. Template & Color paragraph ---
+    extra_parts = []
+    if not temp_found:
+        extra_parts.append(
+            f"Template matching analysis confirms that the expected manufacturer logo or certification mark "
+            f"is absent from the component surface (template match score: {temp_score:.2f}). "
+            f"Missing visual branding elements are commonly associated with counterfeit or unauthorized parts."
+        )
+    if color_sim < 0.70:
+        extra_parts.append(
+            f"Color/material histogram correlation measured {color_pct:.0f}%, indicating a significant "
+            f"deviation in surface material properties compared to the OEM golden reference. "
+            f"This discrepancy suggests the use of non-original materials, possibly from an alternate supplier "
+            f"or a counterfeit manufacturing source."
+        )
+
+    # --- 4. Verdict & Conclusion ---
+    verdict_lines = {
+        "clean": (
+            f"Based on the complete analysis, the inspection verdict is CLEAN with a fraud risk score of {fraud_score}/100. "
+            f"The recommended action is '{recommended_action}'. All visual, structural, and textual checks are consistent "
+            f"with an authentic OEM component that meets quality standards."
+        ),
+        "tampered": (
+            f"The evidence collectively supports a TAMPERED verdict with a fraud risk score of {fraud_score}/100. "
+            f"Multiple detection signals converge to indicate physical alteration or unauthorized modification of the component. "
+            f"The recommended action is '{recommended_action}' to prevent non-compliant parts from entering the supply chain."
+        ),
+        "missing": (
+            f"The inspection concludes with a MISSING component alert and a fraud risk score of {fraud_score}/100. "
+            f"Critical visual elements expected on an authentic part were not detected. "
+            f"The recommended action is '{recommended_action}' to investigate and quarantine."
+        ),
+        "mismatched": (
+            f"The overall verdict is MISMATCHED with a fraud risk score of {fraud_score}/100. "
+            f"The detected discrepancies between the submitted part and the golden reference indicate "
+            f"a possible substitution or mislabeling event. "
+            f"The recommended action is '{recommended_action}'."
+        ),
+        "reused": (
+            f"The inspection verdict is REUSED with a fraud risk score of {fraud_score}/100. "
+            f"Surface registration and wear patterns suggest the component may have been previously deployed, "
+            f"refurbished, or harvested from recycled equipment. "
+            f"The recommended action is '{recommended_action}'."
+        ),
+    }
+    conclusion = verdict_lines.get(verdict, (
+        f"Inspection complete with verdict {verdict.upper()} (fraud score: {fraud_score}/100). "
+        f"Recommended action: '{recommended_action}'."
+    ))
+
+    # Include decision agent's reasoning if available
     if decision_reasoning:
-        reasons.append(f"Decision basis: {decision_reasoning}")
+        reasoning_clause = f" The decision agent further notes: {decision_reasoning}"
+    else:
+        reasoning_clause = ""
 
-    reasons.append(f"Recommended action is '{recommended_action}' with a fraud index of {fraud_score}/100.")
-    explanation_msg = " ".join(reasons)
-    logger.info(f"Local compiled explanation: {explanation_msg}")
+    # Include multimodal report if available
+    if multimodal_report and "skipped" not in multimodal_report.lower() and "failed" not in multimodal_report.lower() and "no anomalies" not in multimodal_report.lower():
+        visual_clause = f" Visual AI inspection additionally highlights: {multimodal_report}"
+    else:
+        visual_clause = ""
+
+    # Assemble final paragraph
+    all_parts = [heatmap_part, ocr_part] + extra_parts + [conclusion + reasoning_clause + visual_clause]
+    explanation_msg = " ".join(all_parts)
+
+    logger.info(f"Local compiled explanation: {explanation_msg[:200]}...")
     return explanation_msg
