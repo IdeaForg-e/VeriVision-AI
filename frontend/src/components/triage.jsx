@@ -237,181 +237,140 @@ export function QueueRow({ item }) {
   const getStatusStyle = (status) => {
     switch (status) {
       case "QUARANTINE":
-        return "bg-red-500/10 text-red-400 border border-red-500/20";
-
+        return "bg-red-500/10 text-red-400 border border-red-500/25 shadow-[0_0_10px_rgba(239,68,68,0.05)]";
       case "PENDING QA":
-        return "bg-amber-500/10 text-amber-400 border border-amber-500/20";
-
+        return "bg-amber-500/10 text-amber-400 border border-amber-500/25 shadow-[0_0_10px_rgba(245,158,11,0.05)]";
       case "AUTO-APPROVED":
-        return "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20";
-
+        return "bg-emerald-500/10 text-emerald-400 border border-emerald-500/25 shadow-[0_0_10px_rgba(16,185,129,0.05)]";
       case "RETAKE REQUESTED":
-        return "bg-cyan-500/10 text-cyan-400 border border-cyan-500/20";
-
+        return "bg-cyan-500/10 text-cyan-400 border border-cyan-500/25 shadow-[0_0_10px_rgba(6,182,212,0.05)]";
       default:
-        return "bg-slate-800 text-slate-400 border border-slate-750";
+        return "bg-slate-800/40 text-slate-400 border border-slate-750";
     }
   };
 
   const getRiskColor = (risk) => {
-    if (risk >= 80) return "bg-red-500";
-    if (risk >= 60) return "bg-orange-500";
-    if (risk >= 40) return "bg-yellow-500";
-    return "bg-green-500";
+    if (risk >= 80) return "bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.4)]";
+    if (risk >= 60) return "bg-orange-500 shadow-[0_0_10px_rgba(249,115,22,0.4)]";
+    if (risk >= 40) return "bg-yellow-500 shadow-[0_0_10px_rgba(234,179,8,0.4)]";
+    return "bg-green-500 shadow-[0_0_10px_rgba(34,197,94,0.4)]";
   };
 
   const getStatusIcon = (status) => {
     switch (status) {
       case "QUARANTINE":
-        return <AlertTriangle size={14} />;
-
+        return <AlertTriangle size={12} />;
       case "AUTO-APPROVED":
-        return <CheckCircle2 size={14} />;
-
+        return <CheckCircle2 size={12} />;
       default:
-        return <Clock3 size={14} />;
+        return <Clock3 size={12} />;
     }
   };
 
-  // Bug fix: was using item.id (numeric 1, 2, 3) instead of the real case ID string
   const handleClick = () => navigate(`${ROUTES.CASE_DETAIL}/${item.caseId}`);
+
+  // Format creation time cleanly
+  const formattedTime = (() => {
+    if (!item.createdAt) return "";
+    try {
+      const parts = item.createdAt.split(" ");
+      // If contains AM/PM
+      if (parts.length >= 2) {
+        return `${parts[0]} ${parts[1]}`;
+      }
+      return item.createdAt;
+    } catch {
+      return item.createdAt;
+    }
+  })();
+
+  // Shorten Case ID to keep layout slim
+  const displayCaseId = item.caseId && item.caseId.length > 12 
+    ? `${item.caseId.slice(0, 8)}...${item.caseId.slice(-4)}`
+    : item.caseId;
 
   return (
     <tr
       onClick={handleClick}
-      className="group cursor-pointer border-b last:border-b-0 hover:bg-cyan-500/10 transition-all duration-200"
+      className="group cursor-pointer border-b border-slate-800/40 last:border-b-0 hover:bg-cyan-500/5 transition-all duration-150"
     >
       {/* Case ID */}
-
-      <td className="px-6 py-4">
-
-        <div>
-
-          <p className="font-semibold text-slate-200">
-            {item.caseId}
+      <td className="px-6 py-3.5">
+        <div className="flex flex-col gap-0.5">
+          <p className="font-tech-code font-bold text-slate-100 text-xs tracking-wider group-hover:text-cyan-400 transition-colors">
+            {displayCaseId}
           </p>
-
-          <p className="text-xs text-slate-500">
-            {item.createdAt}
-          </p>
-
+          <span className="text-[10px] text-slate-500 font-medium">
+            {formattedTime}
+          </span>
         </div>
-
       </td>
 
       {/* Part */}
-
-      <td className="px-4 py-4">
-
+      <td className="px-4 py-3.5">
         <div>
-
-          <p className="font-medium text-slate-300">
+          <p className="font-semibold text-slate-200 text-xs">
             {item.partNumber}
           </p>
-
-          <p className="text-xs text-slate-500">
-            {item.batch}
+          <p className="text-[10px] text-slate-500 font-tech-code tracking-wide">
+            {item.batch || "N/A"}
           </p>
-
         </div>
-
       </td>
 
       {/* Commodity */}
-
-      <td className="px-4 py-4">
-        {item.commodity}
+      <td className="px-4 py-3.5">
+        <span className="px-2 py-0.5 rounded-md bg-slate-900 border border-slate-800 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+          {item.commodity}
+        </span>
       </td>
 
       {/* Risk */}
-
-      <td className="px-4 py-4">
-
-        <div className="space-y-2">
-
-          <div className="flex justify-between text-xs">
-
-            <span className="font-semibold">
-
-              {item.riskScore}%
-
-            </span>
-
-            <span className="text-slate-500">
-
-              Risk
-
-            </span>
-
+      <td className="px-4 py-3.5">
+        <div className="w-24 space-y-1">
+          <div className="flex justify-between text-[10px]">
+            <span className="font-bold text-slate-350">{item.riskScore}%</span>
+            <span className="text-slate-500 font-semibold uppercase tracking-wider text-[8px]">Risk</span>
           </div>
-
-          <div className="w-full h-2 rounded-full bg-gray-200">
-
+          <div className="w-full h-1.5 rounded-full bg-slate-800 overflow-hidden">
             <div
-              className={`h-2 rounded-full ${getRiskColor(
-                item.riskScore
-              )}`}
-              style={{
-                width: `${item.riskScore}%`,
-              }}
+              className={`h-full rounded-full transition-all duration-500 ${getRiskColor(item.riskScore)}`}
+              style={{ width: `${item.riskScore}%` }}
             />
-
           </div>
-
         </div>
-
       </td>
 
       {/* Confidence */}
-
-      <td className="px-4 py-4">
-
-        <span className="font-semibold text-cyan-400">
-
+      <td className="px-4 py-3.5">
+        <span className="font-tech-code font-extrabold text-cyan-400 text-xs">
           {item.confidence}%
-
         </span>
-
       </td>
 
       {/* Reason */}
-
-      <td className="px-4 py-4">
-
-        <p className="text-sm text-slate-400">
-
+      <td className="px-4 py-3.5 max-w-sm">
+        <p className="text-xs text-slate-400 truncate leading-relaxed group-hover:text-slate-300 transition-colors" title={item.reason}>
           {item.reason}
-
         </p>
-
       </td>
 
       {/* Status */}
-
-      <td className="px-4 py-4">
-
+      <td className="px-4 py-3.5 text-center">
         <div
-          className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold ${getStatusStyle(
-            item.status
-          )}`}
+          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${getStatusStyle(item.status)}`}
         >
           {getStatusIcon(item.status)}
-
-          {item.status}
-
+          <span>{item.status}</span>
         </div>
-
       </td>
 
       {/* Arrow */}
-
-      <td className="px-4 py-4">
-
+      <td className="px-5 py-3.5 text-right">
         <ChevronRight
-          className="text-slate-500 group-hover:text-cyan-400 transition"
-          size={18}
+          className="text-slate-600 group-hover:text-cyan-400 group-hover:translate-x-0.5 transition-all duration-200"
+          size={16}
         />
-
       </td>
     </tr>
   );
