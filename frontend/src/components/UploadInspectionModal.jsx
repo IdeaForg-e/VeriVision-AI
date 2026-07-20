@@ -210,7 +210,7 @@ export default function UploadInspectionModal({ open, onClose, onSuccess }) {
       <button
         type="button"
         onClick={onClose}
-        className="px-5 py-2.5 rounded-lg border border-slate-800 bg-slate-900/60 text-slate-400 hover:text-slate-105 hover:bg-slate-800 hover:text-slate-100 transition font-semibold text-xs active:scale-98"
+        className="px-5 py-2.5 rounded-lg border border-slate-800 bg-slate-950/40 text-slate-400 hover:text-slate-200 hover:bg-slate-900 transition-all font-bold text-xs uppercase tracking-wider active:scale-97"
       >
         Cancel
       </button>
@@ -218,7 +218,7 @@ export default function UploadInspectionModal({ open, onClose, onSuccess }) {
         type="button"
         onClick={handleSubmit}
         disabled={!goldenFile || !customFile}
-        className="px-5 py-2.5 rounded-lg bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-extrabold text-xs shadow-[0_0_15px_rgba(6,182,212,0.25)] hover:opacity-95 hover:scale-101 active:scale-98 transition disabled:opacity-50 disabled:cursor-not-allowed"
+        className="px-6 py-2.5 rounded-lg bg-gradient-to-r from-cyan-500 via-blue-600 to-indigo-600 text-white font-extrabold text-xs uppercase tracking-wider shadow-[0_0_20px_rgba(6,182,212,0.25)] hover:shadow-[0_0_30px_rgba(6,182,212,0.45)] hover:scale-[1.02] active:scale-97 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
       >
         Start Inspection
       </button>
@@ -227,6 +227,32 @@ export default function UploadInspectionModal({ open, onClose, onSuccess }) {
 
   return (
     <Modal open={open} onClose={processing ? undefined : onClose} title="New Parts Compliance Inspection" size="lg" footer={modalFooter}>
+      <style>{`
+        @keyframes scan {
+          0% { top: 0%; }
+          50% { top: 100%; }
+          100% { top: 0%; }
+        }
+        .animate-scan-line {
+          position: absolute;
+          left: 0;
+          width: 100%;
+          height: 2px;
+          background: linear-gradient(90deg, transparent, #22d3ee, transparent);
+          box-shadow: 0 0 10px #22d3ee, 0 0 4px #22d3ee;
+          animation: scan 2s linear infinite;
+        }
+        .animate-scan-line-blue {
+          position: absolute;
+          left: 0;
+          width: 100%;
+          height: 2px;
+          background: linear-gradient(90deg, transparent, #3b82f6, transparent);
+          box-shadow: 0 0 10px #3b82f6, 0 0 4px #3b82f6;
+          animation: scan 2s linear infinite;
+        }
+      `}</style>
+
       {processing ? (
         <div className="py-4 space-y-4">
           <div className="flex flex-col items-center justify-center gap-3">
@@ -268,21 +294,23 @@ export default function UploadInspectionModal({ open, onClose, onSuccess }) {
           {/* Side-by-side Upload Compartments */}
           <div className="grid grid-cols-2 gap-5">
             {/* Golden Standard Upload */}
-            <div className="flex flex-col gap-2 animate-fade-in">
-              <label className="font-label-caps text-[10px] tracking-wider text-slate-400 uppercase font-bold flex items-center gap-1.5">
+            <div className="flex flex-col gap-2.5 animate-fade-in">
+              <label className="font-label-caps text-[9px] tracking-[0.08em] text-slate-400 uppercase font-bold flex items-center gap-1.5">
                 <Sparkles size={12} className="text-cyan-400" />
                 OEM Golden Reference Standard (Clean Part)
               </label>
               {goldenPreview ? (
-                <div className="relative flex flex-col items-center justify-center p-4 bg-slate-900/40 border border-slate-800 rounded-xl shadow-[0_4px_12px_rgba(0,0,0,0.3)] animate-fade-in group hover:border-cyan-500/20 transition-all duration-200 h-40">
-                  <div className="relative w-full h-24 rounded-lg overflow-hidden border border-slate-700 bg-slate-950 shadow-inner">
+                <div className="relative flex flex-col items-center justify-center p-3 bg-slate-900/40 border border-slate-800/80 rounded-xl shadow-[0_4px_12px_rgba(0,0,0,0.35)] animate-fade-in group hover:border-cyan-500/30 hover:shadow-[0_0_15px_rgba(6,182,212,0.05)] transition-all duration-200 h-40">
+                  <div className="relative w-full h-24 rounded-lg overflow-hidden border border-slate-700 bg-slate-950 shadow-inner flex items-center justify-center">
                     <img src={goldenPreview} className="w-full h-full object-cover" alt="Golden Preview" />
+                    {/* Glowing radar line */}
+                    <div className="animate-scan-line" />
                   </div>
                   <div className="w-full flex items-center justify-between mt-2.5 min-w-0">
                     <div className="min-w-0 text-left">
-                      <p className="text-[11px] font-bold text-slate-200 truncate">{goldenFile.name}</p>
-                      <p className="text-[9px] text-slate-500 mt-0.5 font-medium">
-                        {(goldenFile.size / 1024).toFixed(0)} KB • OEM Template
+                      <p className="text-[10px] font-bold text-slate-200 truncate">{goldenFile.name}</p>
+                      <p className="text-[8px] text-slate-500 mt-0.5 uppercase tracking-wider font-semibold">
+                        {(goldenFile.size / 1024).toFixed(0)} KB • REFERENCE STANDARD READY
                       </p>
                     </div>
                     <button
@@ -291,49 +319,52 @@ export default function UploadInspectionModal({ open, onClose, onSuccess }) {
                         setGoldenFile(null);
                         setGoldenPreview(null);
                       }}
-                      className="h-7 w-7 rounded-lg flex items-center justify-center border border-slate-850 text-slate-500 hover:text-red-400 hover:border-red-500/30 hover:bg-red-500/5 transition-all flex-shrink-0 active:scale-90"
+                      className="h-7 w-7 rounded-lg flex items-center justify-center border border-slate-800 text-slate-500 hover:text-red-400 hover:border-red-500/30 hover:bg-red-500/5 transition-all flex-shrink-0 active:scale-90"
                     >
                       <X size={12} />
                     </button>
                   </div>
                 </div>
               ) : (
-                <label className="border border-dashed border-slate-800 hover:border-cyan-500/30 bg-slate-950/20 hover:bg-cyan-950/5 rounded-xl p-6 flex flex-col items-center justify-center gap-2 cursor-pointer transition-all duration-300 group relative h-40 shadow-inner">
+                <label className="border-2 border-dashed border-slate-800 bg-slate-900/20 hover:bg-cyan-950/10 hover:border-cyan-500/40 rounded-xl p-6 flex flex-col items-center justify-center gap-2 cursor-pointer transition-all duration-300 group relative h-40 shadow-inner">
                   <input
                     type="file"
                     accept="image/*"
                     onChange={handleGoldenChange}
                     className="hidden"
                   />
-                  <div className="h-10 w-10 rounded-full bg-slate-900 border border-slate-800 flex items-center justify-center group-hover:scale-105 group-hover:border-cyan-500/30 group-hover:shadow-[0_0_12px_rgba(6,182,212,0.1)] transition-all duration-300">
+                  <div className="absolute w-11 h-11 rounded-full border border-cyan-500/10 animate-ping group-hover:border-cyan-500/20" />
+                  <div className="h-11 w-11 rounded-full bg-slate-950 border border-slate-800 flex items-center justify-center group-hover:scale-105 group-hover:border-cyan-500/30 group-hover:shadow-[0_0_12px_rgba(6,182,212,0.15)] transition-all duration-300">
                     <ImageIcon className="text-slate-500 group-hover:text-cyan-400 transition-colors duration-300" size={18} />
                   </div>
-                  <span className="text-[11px] font-bold text-slate-300 group-hover:text-slate-200 mt-1 transition-colors">
-                    Select OEM Golden image
+                  <span className="text-[11px] font-bold text-slate-300 group-hover:text-cyan-400 mt-1 transition-colors tracking-wide uppercase">
+                    Select OEM Golden
                   </span>
-                  <span className="text-[9px] text-slate-500 group-hover:text-slate-450 transition-colors text-center max-w-[180px]">
-                    Clean reference template for baseline comparison
+                  <span className="text-[9px] text-slate-500 group-hover:text-slate-400 transition-colors text-center max-w-[190px]">
+                    Clean baseline reference template
                   </span>
                 </label>
               )}
             </div>
 
             {/* Defect Scan Upload */}
-            <div className="flex flex-col gap-2 animate-fade-in">
-              <label className="font-label-caps text-[10px] tracking-wider text-slate-400 uppercase font-bold flex items-center gap-1.5">
+            <div className="flex flex-col gap-2.5 animate-fade-in">
+              <label className="font-label-caps text-[9px] tracking-[0.08em] text-slate-400 uppercase font-bold flex items-center gap-1.5">
                 <Upload size={12} className="text-blue-400" />
                 Part Image Scan (Inspection Target)
               </label>
               {targetPreview ? (
-                <div className="relative flex flex-col items-center justify-center p-4 bg-slate-900/40 border border-slate-800 rounded-xl shadow-[0_4px_12px_rgba(0,0,0,0.3)] animate-fade-in group hover:border-blue-500/20 transition-all duration-200 h-40">
-                  <div className="relative w-full h-24 rounded-lg overflow-hidden border border-slate-700 bg-slate-950 shadow-inner">
+                <div className="relative flex flex-col items-center justify-center p-3 bg-slate-900/40 border border-slate-800/80 rounded-xl shadow-[0_4px_12px_rgba(0,0,0,0.35)] animate-fade-in group hover:border-blue-500/30 hover:shadow-[0_0_15px_rgba(59,130,246,0.05)] transition-all duration-200 h-40">
+                  <div className="relative w-full h-24 rounded-lg overflow-hidden border border-slate-700 bg-slate-950 shadow-inner flex items-center justify-center">
                     <img src={targetPreview} className="w-full h-full object-cover" alt="Target Preview" />
+                    {/* Glowing radar line */}
+                    <div className="animate-scan-line-blue" />
                   </div>
                   <div className="w-full flex items-center justify-between mt-2.5 min-w-0">
                     <div className="min-w-0 text-left">
-                      <p className="text-[11px] font-bold text-slate-200 truncate">{customFile.name}</p>
-                      <p className="text-[9px] text-slate-550 mt-0.5 font-medium">
-                        {(customFile.size / 1024).toFixed(0)} KB • Scan Target
+                      <p className="text-[10px] font-bold text-slate-200 truncate">{customFile.name}</p>
+                      <p className="text-[8px] text-slate-505 mt-0.5 uppercase tracking-wider font-semibold">
+                        {(customFile.size / 1024).toFixed(0)} KB • TARGET SCAN READY
                       </p>
                     </div>
                     <button
@@ -342,28 +373,29 @@ export default function UploadInspectionModal({ open, onClose, onSuccess }) {
                         setCustomFile(null);
                         setTargetPreview(null);
                       }}
-                      className="h-7 w-7 rounded-lg flex items-center justify-center border border-slate-850 text-slate-500 hover:text-red-400 hover:border-red-500/30 hover:bg-red-500/5 transition-all flex-shrink-0 active:scale-90"
+                      className="h-7 w-7 rounded-lg flex items-center justify-center border border-slate-800 text-slate-500 hover:text-red-400 hover:border-red-500/30 hover:bg-red-500/5 transition-all flex-shrink-0 active:scale-90"
                     >
                       <X size={12} />
                     </button>
                   </div>
                 </div>
               ) : (
-                <label className="border border-dashed border-slate-800 hover:border-blue-500/30 bg-slate-950/20 hover:bg-blue-950/5 rounded-xl p-6 flex flex-col items-center justify-center gap-2 cursor-pointer transition-all duration-300 group relative h-40 shadow-inner">
+                <label className="border-2 border-dashed border-slate-800 bg-slate-900/20 hover:bg-blue-950/10 hover:border-blue-500/40 rounded-xl p-6 flex flex-col items-center justify-center gap-2 cursor-pointer transition-all duration-300 group relative h-40 shadow-inner">
                   <input
                     type="file"
                     accept="image/*"
                     onChange={handleTargetChange}
                     className="hidden"
                   />
-                  <div className="h-10 w-10 rounded-full bg-slate-900 border border-slate-800 flex items-center justify-center group-hover:scale-105 group-hover:border-blue-500/30 group-hover:shadow-[0_0_12px_rgba(59,130,246,0.1)] transition-all duration-300">
+                  <div className="absolute w-11 h-11 rounded-full border border-blue-500/10 animate-ping group-hover:border-blue-500/20" />
+                  <div className="h-11 w-11 rounded-full bg-slate-950 border border-slate-800 flex items-center justify-center group-hover:scale-105 group-hover:border-blue-500/30 group-hover:shadow-[0_0_12px_rgba(59,130,246,0.15)] transition-all duration-300">
                     <Upload className="text-slate-500 group-hover:text-blue-400 transition-colors duration-300" size={16} />
                   </div>
-                  <span className="text-[11px] font-bold text-slate-300 group-hover:text-slate-200 mt-1 transition-colors">
-                    Select inspection scan
+                  <span className="text-[11px] font-bold text-slate-300 group-hover:text-blue-400 mt-1 transition-colors tracking-wide uppercase">
+                    Select target scan
                   </span>
-                  <span className="text-[9px] text-slate-550 group-hover:text-slate-450 transition-colors text-center max-w-[180px]">
-                    Captured photo of the part to run compliance checks
+                  <span className="text-[9px] text-slate-550 group-hover:text-slate-400 transition-colors text-center max-w-[190px]">
+                    Captured photo of the target part
                   </span>
                 </label>
               )}
@@ -373,35 +405,42 @@ export default function UploadInspectionModal({ open, onClose, onSuccess }) {
           {/* Form details consolidated row (Prevents vertical cutoff) */}
           <div className="grid grid-cols-3 gap-4 pb-2">
             <div className="flex flex-col gap-1.5">
-              <label className="font-label-caps text-[10px] tracking-wider text-slate-450 uppercase font-semibold">Expected Serial Number (Optional)</label>
+              <label className="font-label-caps text-[9px] tracking-[0.08em] text-slate-450 uppercase font-bold">Expected Serial Number (Optional)</label>
               <input
                 type="text"
                 value={expectedSerial}
                 onChange={(e) => setExpectedSerial(e.target.value)}
                 placeholder="e.g. 91165LUS0DDD"
-                className="cyber-input rounded-lg text-xs bg-slate-900 border border-slate-800 text-slate-200 px-3 py-2.5 h-10 shadow-sm"
+                className="cyber-input rounded-lg text-xs bg-slate-950 border border-slate-800 text-slate-200 px-3 py-2.5 h-10 w-full focus:shadow-[0_0_15px_rgba(6,182,212,0.15)] transition-all duration-200 shadow-sm"
               />
             </div>
             <div className="flex flex-col gap-1.5">
-              <label className="font-label-caps text-[10px] tracking-wider text-slate-450 uppercase font-semibold">Capture Site</label>
+              <label className="font-label-caps text-[9px] tracking-[0.08em] text-slate-450 uppercase font-bold">Capture Site</label>
               <input
                 type="text"
                 value={captureSite}
                 onChange={(e) => setCaptureSite(e.target.value)}
                 placeholder="e.g. Line-1"
-                className="cyber-input rounded-lg text-xs bg-slate-900 border border-slate-800 text-slate-200 px-3 py-2.5 h-10 shadow-sm"
+                className="cyber-input rounded-lg text-xs bg-slate-950 border border-slate-800 text-slate-200 px-3 py-2.5 h-10 w-full focus:shadow-[0_0_15px_rgba(6,182,212,0.15)] transition-all duration-200 shadow-sm"
               />
             </div>
-            <div className="flex flex-col gap-1.5">
-              <label className="font-label-caps text-[10px] tracking-wider text-slate-450 uppercase font-semibold">Camera Angle</label>
-              <select
-                value={captureAngle}
-                onChange={(e) => setCaptureAngle(e.target.value)}
-                className="cyber-input rounded-lg text-xs bg-slate-900 border border-slate-800 text-slate-200 px-3 py-2 h-10 cursor-pointer shadow-sm"
-              >
-                <option value="top">Top Down (Default)</option>
-                <option value="angled">Angled Perspective</option>
-              </select>
+            <div className="flex flex-col gap-1.5 relative">
+              <label className="font-label-caps text-[9px] tracking-[0.08em] text-slate-450 uppercase font-bold">Camera Angle</label>
+              <div className="relative">
+                <select
+                  value={captureAngle}
+                  onChange={(e) => setCaptureAngle(e.target.value)}
+                  className="cyber-input rounded-lg text-xs bg-slate-950 border border-slate-850 text-slate-200 px-3 py-2.5 h-10 w-full cursor-pointer shadow-sm appearance-none pr-8 focus:shadow-[0_0_15px_rgba(6,182,212,0.15)] transition-all duration-200"
+                >
+                  <option value="top">Top Down (Default)</option>
+                  <option value="angled">Angled Perspective</option>
+                </select>
+                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-slate-400">
+                  <svg className="fill-current h-3 w-3" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
+                    <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/>
+                  </svg>
+                </div>
+              </div>
             </div>
           </div>
         </form>
