@@ -206,7 +206,7 @@ export default function UploadInspectionModal({ open, onClose, onSuccess }) {
   };
 
   const modalFooter = !processing && (
-    <div className="flex justify-end gap-3 w-full border-t border-slate-800 pt-4 mt-2">
+    <div className="flex justify-end gap-3 w-full">
       <button
         type="button"
         onClick={onClose}
@@ -226,7 +226,7 @@ export default function UploadInspectionModal({ open, onClose, onSuccess }) {
   );
 
   return (
-    <Modal open={open} onClose={processing ? undefined : onClose} title="New Parts Compliance Inspection" size="md" footer={modalFooter}>
+    <Modal open={open} onClose={processing ? undefined : onClose} title="New Parts Compliance Inspection" size="lg" footer={modalFooter}>
       {processing ? (
         <div className="py-4 space-y-4">
           <div className="flex flex-col items-center justify-center gap-3">
@@ -244,7 +244,7 @@ export default function UploadInspectionModal({ open, onClose, onSuccess }) {
           </div>
         </div>
       ) : (
-        <form onSubmit={handleSubmit} className="space-y-5 text-slate-300 text-body-sm">
+        <form onSubmit={handleSubmit} className="space-y-6 text-slate-300 text-body-sm">
           {errorMsg && (
             <div className="flex gap-3 bg-red-950/20 border border-red-500/25 text-red-400 rounded-lg p-4 animate-shake shadow-[0_4px_15px_rgba(239,68,68,0.08)]">
               <AlertCircle className="shrink-0 text-red-500" size={18} />
@@ -265,130 +265,139 @@ export default function UploadInspectionModal({ open, onClose, onSuccess }) {
             </div>
           )}
 
-          {/* Golden Standard Upload */}
-          <div className="flex flex-col gap-1.5 animate-fade-in">
-            <label className="font-label-caps text-[10px] tracking-wider text-slate-500 uppercase font-semibold flex items-center gap-1">
-              <Sparkles size={11} className="text-cyan-400" />
-              OEM Golden Reference Standard (Clean Part)
-            </label>
-            {goldenPreview ? (
-              <div className="relative flex items-center justify-between gap-4 p-3 bg-slate-900/60 border border-slate-800 rounded-xl shadow-[0_4px_12px_rgba(0,0,0,0.3)] animate-fade-in group hover:border-cyan-500/20 transition-all duration-200">
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="relative w-14 h-14 rounded-lg overflow-hidden border border-slate-700 bg-slate-950 flex-shrink-0 shadow-inner">
+          {/* Side-by-side Upload Compartments */}
+          <div className="grid grid-cols-2 gap-5">
+            {/* Golden Standard Upload */}
+            <div className="flex flex-col gap-2 animate-fade-in">
+              <label className="font-label-caps text-[10px] tracking-wider text-slate-400 uppercase font-bold flex items-center gap-1.5">
+                <Sparkles size={12} className="text-cyan-400" />
+                OEM Golden Reference Standard (Clean Part)
+              </label>
+              {goldenPreview ? (
+                <div className="relative flex flex-col items-center justify-center p-4 bg-slate-900/40 border border-slate-800 rounded-xl shadow-[0_4px_12px_rgba(0,0,0,0.3)] animate-fade-in group hover:border-cyan-500/20 transition-all duration-200 h-40">
+                  <div className="relative w-full h-24 rounded-lg overflow-hidden border border-slate-700 bg-slate-950 shadow-inner">
                     <img src={goldenPreview} className="w-full h-full object-cover" alt="Golden Preview" />
                   </div>
-                  <div className="min-w-0 text-left">
-                    <p className="text-xs font-bold text-slate-200 truncate">{goldenFile.name}</p>
-                    <p className="text-[10px] text-slate-500 mt-0.5 font-medium">
-                      {(goldenFile.size / 1024).toFixed(0)} KB • Reference Standard
-                    </p>
+                  <div className="w-full flex items-center justify-between mt-2.5 min-w-0">
+                    <div className="min-w-0 text-left">
+                      <p className="text-[11px] font-bold text-slate-200 truncate">{goldenFile.name}</p>
+                      <p className="text-[9px] text-slate-500 mt-0.5 font-medium">
+                        {(goldenFile.size / 1024).toFixed(0)} KB • OEM Template
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setGoldenFile(null);
+                        setGoldenPreview(null);
+                      }}
+                      className="h-7 w-7 rounded-lg flex items-center justify-center border border-slate-850 text-slate-500 hover:text-red-400 hover:border-red-500/30 hover:bg-red-500/5 transition-all flex-shrink-0 active:scale-90"
+                    >
+                      <X size={12} />
+                    </button>
                   </div>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setGoldenFile(null);
-                    setGoldenPreview(null);
-                  }}
-                  className="h-8 w-8 rounded-lg flex items-center justify-center border border-slate-800 text-slate-500 hover:text-red-400 hover:border-red-500/30 hover:bg-red-500/5 transition-all flex-shrink-0 active:scale-90"
-                >
-                  <X size={14} />
-                </button>
-              </div>
-            ) : (
-              <label className="border border-dashed border-slate-800 hover:border-cyan-500/40 bg-slate-950/40 hover:bg-cyan-950/5 rounded-xl p-5 flex flex-col items-center justify-center gap-2 cursor-pointer transition-all duration-200 group relative">
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleGoldenChange}
-                  className="hidden"
-                />
-                <ImageIcon className="text-slate-500 group-hover:text-cyan-400 transition" size={22} />
-                <span className="text-xs font-bold text-slate-350 group-hover:text-slate-200 mt-0.5 max-w-[340px] truncate">
-                  Select or drag OEM standard image
-                </span>
-                <span className="text-[9px] text-slate-550">Clean reference template for baseline comparison</span>
-              </label>
-            )}
-          </div>
+              ) : (
+                <label className="border border-dashed border-slate-800 hover:border-cyan-500/30 bg-slate-950/20 hover:bg-cyan-950/5 rounded-xl p-6 flex flex-col items-center justify-center gap-2 cursor-pointer transition-all duration-300 group relative h-40 shadow-inner">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleGoldenChange}
+                    className="hidden"
+                  />
+                  <div className="h-10 w-10 rounded-full bg-slate-900 border border-slate-800 flex items-center justify-center group-hover:scale-105 group-hover:border-cyan-500/30 group-hover:shadow-[0_0_12px_rgba(6,182,212,0.1)] transition-all duration-300">
+                    <ImageIcon className="text-slate-500 group-hover:text-cyan-400 transition-colors duration-300" size={18} />
+                  </div>
+                  <span className="text-[11px] font-bold text-slate-300 group-hover:text-slate-200 mt-1 transition-colors">
+                    Select OEM Golden image
+                  </span>
+                  <span className="text-[9px] text-slate-500 group-hover:text-slate-450 transition-colors text-center max-w-[180px]">
+                    Clean reference template for baseline comparison
+                  </span>
+                </label>
+              )}
+            </div>
 
-          {/* Defect Scan Upload */}
-          <div className="flex flex-col gap-1.5 animate-fade-in">
-            <label className="font-label-caps text-[10px] tracking-wider text-slate-500 uppercase font-semibold flex items-center gap-1">
-              <Upload size={11} className="text-blue-400" />
-              Part Image Scan (Inspection Target)
-            </label>
-            {targetPreview ? (
-              <div className="relative flex items-center justify-between gap-4 p-3 bg-slate-900/60 border border-slate-800 rounded-xl shadow-[0_4px_12px_rgba(0,0,0,0.3)] animate-fade-in group hover:border-blue-500/20 transition-all duration-200">
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="relative w-14 h-14 rounded-lg overflow-hidden border border-slate-700 bg-slate-950 flex-shrink-0 shadow-inner">
+            {/* Defect Scan Upload */}
+            <div className="flex flex-col gap-2 animate-fade-in">
+              <label className="font-label-caps text-[10px] tracking-wider text-slate-400 uppercase font-bold flex items-center gap-1.5">
+                <Upload size={12} className="text-blue-400" />
+                Part Image Scan (Inspection Target)
+              </label>
+              {targetPreview ? (
+                <div className="relative flex flex-col items-center justify-center p-4 bg-slate-900/40 border border-slate-800 rounded-xl shadow-[0_4px_12px_rgba(0,0,0,0.3)] animate-fade-in group hover:border-blue-500/20 transition-all duration-200 h-40">
+                  <div className="relative w-full h-24 rounded-lg overflow-hidden border border-slate-700 bg-slate-950 shadow-inner">
                     <img src={targetPreview} className="w-full h-full object-cover" alt="Target Preview" />
                   </div>
-                  <div className="min-w-0 text-left">
-                    <p className="text-xs font-bold text-slate-200 truncate">{customFile.name}</p>
-                    <p className="text-[10px] text-slate-500 mt-0.5 font-medium">
-                      {(customFile.size / 1024).toFixed(0)} KB • Target Scan
-                    </p>
+                  <div className="w-full flex items-center justify-between mt-2.5 min-w-0">
+                    <div className="min-w-0 text-left">
+                      <p className="text-[11px] font-bold text-slate-200 truncate">{customFile.name}</p>
+                      <p className="text-[9px] text-slate-550 mt-0.5 font-medium">
+                        {(customFile.size / 1024).toFixed(0)} KB • Scan Target
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCustomFile(null);
+                        setTargetPreview(null);
+                      }}
+                      className="h-7 w-7 rounded-lg flex items-center justify-center border border-slate-850 text-slate-500 hover:text-red-400 hover:border-red-500/30 hover:bg-red-500/5 transition-all flex-shrink-0 active:scale-90"
+                    >
+                      <X size={12} />
+                    </button>
                   </div>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setCustomFile(null);
-                    setTargetPreview(null);
-                  }}
-                  className="h-8 w-8 rounded-lg flex items-center justify-center border border-slate-800 text-slate-500 hover:text-red-400 hover:border-red-500/30 hover:bg-red-500/5 transition-all flex-shrink-0 active:scale-90"
-                >
-                  <X size={14} />
-                </button>
-              </div>
-            ) : (
-              <label className="border border-dashed border-slate-800 hover:border-blue-500/40 bg-slate-950/40 hover:bg-blue-950/5 rounded-xl p-5 flex flex-col items-center justify-center gap-2 cursor-pointer transition-all duration-200 group relative">
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleTargetChange}
-                  className="hidden"
-                />
-                <Upload className="text-slate-500 group-hover:text-blue-500 transition" size={22} />
-                <span className="text-xs font-bold text-slate-350 group-hover:text-slate-200 mt-0.5 max-w-[340px] truncate">
-                  Select or drag inspection scan image
-                </span>
-                <span className="text-[9px] text-slate-550">Captured photo of the part to run compliance rules against</span>
-              </label>
-            )}
+              ) : (
+                <label className="border border-dashed border-slate-800 hover:border-blue-500/30 bg-slate-950/20 hover:bg-blue-950/5 rounded-xl p-6 flex flex-col items-center justify-center gap-2 cursor-pointer transition-all duration-300 group relative h-40 shadow-inner">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleTargetChange}
+                    className="hidden"
+                  />
+                  <div className="h-10 w-10 rounded-full bg-slate-900 border border-slate-800 flex items-center justify-center group-hover:scale-105 group-hover:border-blue-500/30 group-hover:shadow-[0_0_12px_rgba(59,130,246,0.1)] transition-all duration-300">
+                    <Upload className="text-slate-500 group-hover:text-blue-400 transition-colors duration-300" size={16} />
+                  </div>
+                  <span className="text-[11px] font-bold text-slate-300 group-hover:text-slate-200 mt-1 transition-colors">
+                    Select inspection scan
+                  </span>
+                  <span className="text-[9px] text-slate-550 group-hover:text-slate-450 transition-colors text-center max-w-[180px]">
+                    Captured photo of the part to run compliance checks
+                  </span>
+                </label>
+              )}
+            </div>
           </div>
 
-          {/* Barcode details */}
-          <div className="flex flex-col gap-1.5">
-            <label className="font-label-caps text-[10px] tracking-wider text-slate-500 uppercase font-semibold">Expected Serial Number (Optional)</label>
-            <input
-              type="text"
-              value={expectedSerial}
-              onChange={(e) => setExpectedSerial(e.target.value)}
-              placeholder="e.g. 91165LUS0DDD (Checks label character mismatches)"
-              className="cyber-input rounded-lg text-sm bg-slate-900 border border-slate-800 text-slate-200 px-3.5 py-2.5 h-10 shadow-sm"
-            />
-          </div>
-
-          {/* Camera Info */}
-          <div className="grid grid-cols-2 gap-4 pb-2">
+          {/* Form details consolidated row (Prevents vertical cutoff) */}
+          <div className="grid grid-cols-3 gap-4 pb-2">
             <div className="flex flex-col gap-1.5">
-              <label className="font-label-caps text-[10px] tracking-wider text-slate-500 uppercase font-semibold">Capture Site</label>
+              <label className="font-label-caps text-[10px] tracking-wider text-slate-450 uppercase font-semibold">Expected Serial Number (Optional)</label>
+              <input
+                type="text"
+                value={expectedSerial}
+                onChange={(e) => setExpectedSerial(e.target.value)}
+                placeholder="e.g. 91165LUS0DDD"
+                className="cyber-input rounded-lg text-xs bg-slate-900 border border-slate-800 text-slate-200 px-3 py-2.5 h-10 shadow-sm"
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <label className="font-label-caps text-[10px] tracking-wider text-slate-450 uppercase font-semibold">Capture Site</label>
               <input
                 type="text"
                 value={captureSite}
                 onChange={(e) => setCaptureSite(e.target.value)}
                 placeholder="e.g. Line-1"
-                className="cyber-input rounded-lg text-sm bg-slate-900 border border-slate-800 text-slate-200 px-3.5 py-2.5 h-10 shadow-sm"
+                className="cyber-input rounded-lg text-xs bg-slate-900 border border-slate-800 text-slate-200 px-3 py-2.5 h-10 shadow-sm"
               />
             </div>
             <div className="flex flex-col gap-1.5">
-              <label className="font-label-caps text-[10px] tracking-wider text-slate-500 uppercase font-semibold">Camera Angle</label>
+              <label className="font-label-caps text-[10px] tracking-wider text-slate-450 uppercase font-semibold">Camera Angle</label>
               <select
                 value={captureAngle}
                 onChange={(e) => setCaptureAngle(e.target.value)}
-                className="cyber-input rounded-lg text-sm bg-slate-900 border border-slate-800 text-slate-200 px-3.5 py-2 h-10 cursor-pointer shadow-sm"
+                className="cyber-input rounded-lg text-xs bg-slate-900 border border-slate-800 text-slate-200 px-3 py-2 h-10 cursor-pointer shadow-sm"
               >
                 <option value="top">Top Down (Default)</option>
                 <option value="angled">Angled Perspective</option>
