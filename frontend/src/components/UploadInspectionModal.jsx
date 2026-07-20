@@ -206,11 +206,11 @@ export default function UploadInspectionModal({ open, onClose, onSuccess }) {
   };
 
   const modalFooter = !processing && (
-    <div className="flex justify-end gap-3 w-full">
+    <div className="flex justify-end gap-3 w-full border-t border-slate-800/80 pt-4 mt-2">
       <button
         type="button"
         onClick={onClose}
-        className="px-5 py-2.5 rounded-lg border border-slate-800 bg-slate-950/40 text-slate-400 hover:text-slate-200 hover:bg-slate-900 transition-all font-bold text-xs uppercase tracking-wider active:scale-97"
+        className="px-5 py-2.5 rounded-lg border border-slate-800 bg-slate-950/40 text-slate-450 hover:text-slate-200 hover:bg-slate-900 transition-all font-bold text-xs uppercase tracking-wider active:scale-97"
       >
         Cancel
       </button>
@@ -218,38 +218,58 @@ export default function UploadInspectionModal({ open, onClose, onSuccess }) {
         type="button"
         onClick={handleSubmit}
         disabled={!goldenFile || !customFile}
-        className="px-6 py-2.5 rounded-lg bg-gradient-to-r from-cyan-500 via-blue-600 to-indigo-600 text-white font-extrabold text-xs uppercase tracking-wider shadow-[0_0_20px_rgba(6,182,212,0.25)] hover:shadow-[0_0_30px_rgba(6,182,212,0.45)] hover:scale-[1.02] active:scale-97 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+        className="px-6 py-2.5 rounded-lg bg-gradient-to-r from-cyan-500 via-blue-600 to-indigo-600 text-white font-extrabold text-xs uppercase tracking-wider shadow-[0_0_20px_rgba(6,182,212,0.25)] hover:shadow-[0_0_30px_rgba(6,182,212,0.45)] hover:scale-[1.02] active:scale-97 transition-all duration-300 disabled:opacity-40 disabled:cursor-not-allowed"
       >
-        Start Inspection
+        Start Diagnostic Scan
       </button>
     </div>
   );
 
+  const customTitle = (
+    <div className="flex items-center gap-3">
+      <div className="relative flex h-3 w-3">
+        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
+        <span className="relative inline-flex rounded-full h-3 w-3 bg-cyan-500 shadow-[0_0_10px_#22d3ee]"></span>
+      </div>
+      <div className="flex flex-col">
+        <span className="text-xs font-black tracking-[0.2em] text-cyan-400 uppercase">VeriVision QC</span>
+        <span className="text-[10px] text-slate-400 tracking-wider font-semibold -mt-0.5">NEW COMPLIANCE SCAN SYSTEM</span>
+      </div>
+    </div>
+  );
+
   return (
-    <Modal open={open} onClose={processing ? undefined : onClose} title="New Parts Compliance Inspection" size="lg" footer={modalFooter}>
+    <Modal open={open} onClose={processing ? undefined : onClose} title={customTitle} size="lg" footer={modalFooter}>
       <style>{`
         @keyframes scan {
           0% { top: 0%; }
           50% { top: 100%; }
           100% { top: 0%; }
         }
+        @keyframes pulse-glow {
+          0%, 100% { opacity: 0.12; }
+          50% { opacity: 0.28; }
+        }
         .animate-scan-line {
           position: absolute;
           left: 0;
           width: 100%;
-          height: 2px;
+          height: 3px;
           background: linear-gradient(90deg, transparent, #22d3ee, transparent);
-          box-shadow: 0 0 10px #22d3ee, 0 0 4px #22d3ee;
-          animation: scan 2s linear infinite;
+          box-shadow: 0 0 12px #22d3ee, 0 0 6px #22d3ee;
+          animation: scan 2.2s linear infinite;
         }
         .animate-scan-line-blue {
           position: absolute;
           left: 0;
           width: 100%;
-          height: 2px;
+          height: 3px;
           background: linear-gradient(90deg, transparent, #3b82f6, transparent);
-          box-shadow: 0 0 10px #3b82f6, 0 0 4px #3b82f6;
-          animation: scan 2s linear infinite;
+          box-shadow: 0 0 12px #3b82f6, 0 0 6px #3b82f6;
+          animation: scan 2.2s linear infinite;
+        }
+        .glow-mesh {
+          animation: pulse-glow 5s ease-in-out infinite;
         }
       `}</style>
 
@@ -270,7 +290,7 @@ export default function UploadInspectionModal({ open, onClose, onSuccess }) {
           </div>
         </div>
       ) : (
-        <form onSubmit={handleSubmit} className="space-y-6 text-slate-300 text-body-sm">
+        <form onSubmit={handleSubmit} className="space-y-6 text-slate-350 text-body-sm relative">
           {errorMsg && (
             <div className="flex gap-3 bg-red-950/20 border border-red-500/25 text-red-400 rounded-lg p-4 animate-shake shadow-[0_4px_15px_rgba(239,68,68,0.08)]">
               <AlertCircle className="shrink-0 text-red-500" size={18} />
@@ -292,15 +312,19 @@ export default function UploadInspectionModal({ open, onClose, onSuccess }) {
           )}
 
           {/* Side-by-side Upload Compartments */}
-          <div className="grid grid-cols-2 gap-5">
+          <div className="grid grid-cols-2 gap-5 relative">
             {/* Golden Standard Upload */}
-            <div className="flex flex-col gap-2.5 animate-fade-in">
+            <div className="flex flex-col gap-2.5 animate-fade-in relative group">
               <label className="font-label-caps text-[9px] tracking-[0.08em] text-slate-400 uppercase font-bold flex items-center gap-1.5">
                 <Sparkles size={12} className="text-cyan-400" />
                 OEM Golden Reference Standard (Clean Part)
               </label>
+
+              {/* Backglow layer on Hover */}
+              <div className="absolute -inset-0.5 bg-gradient-to-br from-cyan-500 to-purple-600 rounded-xl blur opacity-0 group-hover:opacity-15 transition duration-500 top-6" />
+
               {goldenPreview ? (
-                <div className="relative flex flex-col items-center justify-center p-3 bg-slate-900/40 border border-slate-800/80 rounded-xl shadow-[0_4px_12px_rgba(0,0,0,0.35)] animate-fade-in group hover:border-cyan-500/30 hover:shadow-[0_0_15px_rgba(6,182,212,0.05)] transition-all duration-200 h-40">
+                <div className="relative flex flex-col items-center justify-center p-3 bg-slate-900/60 border border-slate-850 rounded-xl shadow-[0_4px_15px_rgba(0,0,0,0.4)] animate-fade-in group-hover:border-cyan-500/40 transition-all duration-300 h-40">
                   <div className="relative w-full h-24 rounded-lg overflow-hidden border border-slate-700 bg-slate-950 shadow-inner flex items-center justify-center">
                     <img src={goldenPreview} className="w-full h-full object-cover" alt="Golden Preview" />
                     {/* Glowing radar line */}
@@ -326,16 +350,16 @@ export default function UploadInspectionModal({ open, onClose, onSuccess }) {
                   </div>
                 </div>
               ) : (
-                <label className="border-2 border-dashed border-slate-800 bg-slate-900/20 hover:bg-cyan-950/10 hover:border-cyan-500/40 rounded-xl p-6 flex flex-col items-center justify-center gap-2 cursor-pointer transition-all duration-300 group relative h-40 shadow-inner">
+                <label className="relative border-2 border-dashed border-slate-700/60 bg-slate-900/40 hover:bg-cyan-950/15 hover:border-cyan-500/60 rounded-xl p-6 flex flex-col items-center justify-center gap-2 cursor-pointer transition-all duration-300 h-40 shadow-inner">
                   <input
                     type="file"
                     accept="image/*"
                     onChange={handleGoldenChange}
                     className="hidden"
                   />
-                  <div className="absolute w-11 h-11 rounded-full border border-cyan-500/10 animate-ping group-hover:border-cyan-500/20" />
-                  <div className="h-11 w-11 rounded-full bg-slate-950 border border-slate-800 flex items-center justify-center group-hover:scale-105 group-hover:border-cyan-500/30 group-hover:shadow-[0_0_12px_rgba(6,182,212,0.15)] transition-all duration-300">
-                    <ImageIcon className="text-slate-500 group-hover:text-cyan-400 transition-colors duration-300" size={18} />
+                  <div className="absolute w-12 h-12 rounded-full border border-cyan-500/10 animate-ping group-hover:border-cyan-500/25" />
+                  <div className="h-12 w-12 rounded-full bg-slate-950 border border-slate-800 flex items-center justify-center group-hover:scale-105 group-hover:border-cyan-500/30 group-hover:shadow-[0_0_15px_rgba(6,182,212,0.2)] transition-all duration-300">
+                    <Sparkles className="text-slate-500 group-hover:text-cyan-400 transition-colors duration-300" size={18} />
                   </div>
                   <span className="text-[11px] font-bold text-slate-300 group-hover:text-cyan-400 mt-1 transition-colors tracking-wide uppercase">
                     Select OEM Golden
@@ -348,13 +372,17 @@ export default function UploadInspectionModal({ open, onClose, onSuccess }) {
             </div>
 
             {/* Defect Scan Upload */}
-            <div className="flex flex-col gap-2.5 animate-fade-in">
+            <div className="flex flex-col gap-2.5 animate-fade-in relative group">
               <label className="font-label-caps text-[9px] tracking-[0.08em] text-slate-400 uppercase font-bold flex items-center gap-1.5">
                 <Upload size={12} className="text-blue-400" />
                 Part Image Scan (Inspection Target)
               </label>
+
+              {/* Backglow layer on Hover */}
+              <div className="absolute -inset-0.5 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl blur opacity-0 group-hover:opacity-15 transition duration-500 top-6" />
+
               {targetPreview ? (
-                <div className="relative flex flex-col items-center justify-center p-3 bg-slate-900/40 border border-slate-800/80 rounded-xl shadow-[0_4px_12px_rgba(0,0,0,0.35)] animate-fade-in group hover:border-blue-500/30 hover:shadow-[0_0_15px_rgba(59,130,246,0.05)] transition-all duration-200 h-40">
+                <div className="relative flex flex-col items-center justify-center p-3 bg-slate-900/60 border border-slate-850 rounded-xl shadow-[0_4px_15px_rgba(0,0,0,0.4)] animate-fade-in group-hover:border-blue-500/40 transition-all duration-300 h-40">
                   <div className="relative w-full h-24 rounded-lg overflow-hidden border border-slate-700 bg-slate-950 shadow-inner flex items-center justify-center">
                     <img src={targetPreview} className="w-full h-full object-cover" alt="Target Preview" />
                     {/* Glowing radar line */}
@@ -363,7 +391,7 @@ export default function UploadInspectionModal({ open, onClose, onSuccess }) {
                   <div className="w-full flex items-center justify-between mt-2.5 min-w-0">
                     <div className="min-w-0 text-left">
                       <p className="text-[10px] font-bold text-slate-200 truncate">{customFile.name}</p>
-                      <p className="text-[8px] text-slate-505 mt-0.5 uppercase tracking-wider font-semibold">
+                      <p className="text-[8px] text-slate-500 mt-0.5 uppercase tracking-wider font-semibold">
                         {(customFile.size / 1024).toFixed(0)} KB • TARGET SCAN READY
                       </p>
                     </div>
@@ -380,15 +408,15 @@ export default function UploadInspectionModal({ open, onClose, onSuccess }) {
                   </div>
                 </div>
               ) : (
-                <label className="border-2 border-dashed border-slate-800 bg-slate-900/20 hover:bg-blue-950/10 hover:border-blue-500/40 rounded-xl p-6 flex flex-col items-center justify-center gap-2 cursor-pointer transition-all duration-300 group relative h-40 shadow-inner">
+                <label className="relative border-2 border-dashed border-slate-700/60 bg-slate-900/40 hover:bg-blue-950/15 hover:border-blue-500/50 rounded-xl p-6 flex flex-col items-center justify-center gap-2 cursor-pointer transition-all duration-300 h-40 shadow-inner">
                   <input
                     type="file"
                     accept="image/*"
                     onChange={handleTargetChange}
                     className="hidden"
                   />
-                  <div className="absolute w-11 h-11 rounded-full border border-blue-500/10 animate-ping group-hover:border-blue-500/20" />
-                  <div className="h-11 w-11 rounded-full bg-slate-950 border border-slate-800 flex items-center justify-center group-hover:scale-105 group-hover:border-blue-500/30 group-hover:shadow-[0_0_12px_rgba(59,130,246,0.15)] transition-all duration-300">
+                  <div className="absolute w-12 h-12 rounded-full border border-blue-500/10 animate-ping group-hover:border-blue-500/25" />
+                  <div className="h-12 w-12 rounded-full bg-slate-950 border border-slate-800 flex items-center justify-center group-hover:scale-105 group-hover:border-blue-500/30 group-hover:shadow-[0_0_15px_rgba(59,130,246,0.2)] transition-all duration-300">
                     <Upload className="text-slate-500 group-hover:text-blue-400 transition-colors duration-300" size={16} />
                   </div>
                   <span className="text-[11px] font-bold text-slate-300 group-hover:text-blue-400 mt-1 transition-colors tracking-wide uppercase">
