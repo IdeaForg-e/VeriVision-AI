@@ -428,31 +428,21 @@ export default function AnalyticsDashboardPage() {
                     {monthlyTrend.length > 0 ? (
                         <div className="space-y-6">
                             <ResponsiveContainer width="100%" height={260}>
-                                <AreaChart data={monthlyTrend}>
-                                    <defs>
-                                        <linearGradient id="colorTotal" x1="0" y1="0" x2="0" y2="1">
-                                            <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.25}/>
-                                            <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
-                                        </linearGradient>
-                                        <linearGradient id="colorFraud" x1="0" y1="0" x2="0" y2="1">
-                                            <stop offset="5%" stopColor="#ef4444" stopOpacity={0.25}/>
-                                            <stop offset="95%" stopColor="#ef4444" stopOpacity={0}/>
-                                        </linearGradient>
-                                    </defs>
+                                <BarChart data={monthlyTrend} barGap={4} barCategoryGap="30%">
                                     <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" strokeOpacity={0.4} />
                                     <XAxis dataKey="month" stroke="#64748b" fontSize={11} axisLine={false} tickLine={false} />
                                     <YAxis stroke="#64748b" fontSize={11} axisLine={false} tickLine={false} />
-                                    <Tooltip content={<CustomTooltip />} />
+                                    <Tooltip content={<CustomTooltip />} cursor={{ fill: '#1e293b', opacity: 0.3 }} />
                                     <Legend
                                         verticalAlign="bottom"
                                         height={30}
-                                        iconType="circle"
-                                        iconSize={8}
+                                        iconType="rect"
+                                        iconSize={10}
                                         formatter={(value) => <span className="text-xs text-slate-400">{value}</span>}
                                     />
-                                    <Area type="monotone" dataKey="total_inspections" stroke="#3b82f6" strokeWidth={2} name="Total Received" fillOpacity={1} fill="url(#colorTotal)" />
-                                    <Area type="monotone" dataKey="fraud_cases" stroke="#ef4444" strokeWidth={2} name="Fraud Cases" fillOpacity={1} fill="url(#colorFraud)" />
-                                </AreaChart>
+                                    <Bar dataKey="total_inspections" fill="#3b82f6" name="Total Received" radius={[4, 4, 0, 0]} maxBarSize={45} />
+                                    <Bar dataKey="fraud_cases" fill="#ef4444" name="Fraud Cases" radius={[4, 4, 0, 0]} maxBarSize={45} />
+                                </BarChart>
                             </ResponsiveContainer>
 
                             {/* Granular Monthly Performance Table */}
