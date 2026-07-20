@@ -1,8 +1,14 @@
-// AnalyticsDashboardPage.jsx — Only backend data, zero mock/simulation data
+// AnalyticsDashboardPage.jsx — Pure backend data, zero mock/simulation data
 import { useState, useEffect } from "react";
 import { Layout } from "../components/layout.jsx";
 import { getTriageStats, getTriageQueue } from "../services/triageService.js";
 import { getCases } from "../services/caseService.js";
+import {
+    getVendorAnalytics,
+    getVendorDetail,
+    getSiteAnalytics,
+    getRepeatOffenders
+} from "../services/analyticsService.js";
 import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
     PieChart, Pie, Cell
@@ -10,7 +16,7 @@ import {
 import {
     TrendingUp, AlertTriangle, CheckCircle, Activity, BarChart3,
     PieChart as PieChartIcon, Database, Layers, Eye, Download, RefreshCw,
-    Truck, Cpu, FileText, Sliders
+    Truck, Cpu, FileText, Sliders, ChevronDown, ChevronUp, Calendar, ShieldAlert
 } from "lucide-react";
 
 const COLORS = ["#10b981", "#ef4444", "#f59e0b", "#8b5cf6", "#3b82f6", "#64748b"];
@@ -100,17 +106,40 @@ export default function AnalyticsDashboardPage() {
     const [stats, setStats] = useState(null);
     const [loading, setLoading] = useState(true);
 
+    // New backend data states
+    const [vendors, setVendors] = useState([]);
+    const [sites, setSites] = useState([]);
+    const [repeatOffenders, setRepeatOffenders] = useState([]);
+
+    // Interactive selected vendor details state
+    const [selectedVendor, setSelectedVendor] = useState(null);
+    const [vendorDetailLoading, setVendorDetailLoading] = useState(false);
+    const [vendorDetails, setVendorDetails] = useState(null);
+
     const fetchData = async () => {
         setLoading(true);
         try {
-            const [queueResult, statsData, casesData] = await Promise.all([
+            const [
+                queueResult,
+                statsData,
+                casesData,
+                vendorData,
+                siteData,
+                offendersData
+            ] = await Promise.all([
                 getTriageQueue({ page: 1, pageSize: 1000, filters: {} }),
                 getTriageStats(),
-                getCases()
+                getCases(),
+                getVendorAnalytics(),
+                getSiteAnalytics(),
+                getRepeatOffenders()
             ]);
             setQueueItems(Array.isArray(queueResult?.items) ? queueResult.items : []);
             setCases(casesData || []);
             setStats(statsData);
+            setVendors(vendorData || []);
+            setSites(siteData || []);
+            setRepeatOffenders(offendersData || []);
         } catch (err) {
             console.error("Failed to load analytics data:", err);
         } finally {
@@ -118,7 +147,27 @@ export default function AnalyticsDashboardPage() {
         }
     };
 
-    useEffect(() => { fetchData(); }, []);
+    useEffect(() => {
+        fetchData();
+    }, []);
+
+    const handleVendorClick = async (vendorName) => {
+        if (selectedVendor === vendorName) {
+            setSelectedVendor(null);
+            setVendorDetails(null);
+            return;
+        }
+        setSelectedVendor(vendorName);
+        setVendorDetailLoading(true);
+        try {
+            const detail = await getVendorDetail(vendorName);
+            setVendorDetails(detail);
+        } catch (err) {
+            console.error("Failed to load vendor detail:", err);
+        } finally {
+            setVendorDetailLoading(false);
+        }
+    };
 
     // CSV Export function — downloads current queue data as .csv file
     const exportToCSV = () => {
@@ -195,17 +244,6 @@ export default function AnalyticsDashboardPage() {
         }, {})
     );
 
-    // Site breakdown from cases data
-    const siteData = Object.values(
-        cases.reduce((acc, c) => {
-            const site = c.partCode?.split("-")[0] || "Unknown";
-            if (!acc[site]) acc[site] = { site, total: 0, fraud: 0 };
-            acc[site].total++;
-            if (c.status === "tampered" || c.status === "missing" || c.status === "mismatched") acc[site].fraud++;
-            return acc;
-        }, {})
-    );
-
     if (loading) {
         return (
             <Layout title="Fraud Analytics Dashboard" subtitle="Real-time fraud intelligence from inspection data">
@@ -247,6 +285,39 @@ export default function AnalyticsDashboardPage() {
                 </div>
             }
         >
+            {/* Repeat Offender Alerts (Top Prominent Banner) */}
+            {repeatOffenders.length > 0 && (
+                <div className="space-y-3 mb-8">
+                    {repeatOffenders.map((offender) => (
+                        <div
+                            key={offender.vendor}
+                            className="relative group overflow-hidden rounded-xl border border-red-500/20 bg-gradient-to-r from-red-950/40 via-red-950/20 to-slate-950/50 p-4 shadow-[0_0_20px_rgba(239,68,68,0.05)]"
+                        >
+                            <div className="absolute top-0 left-0 bottom-0 w-1 bg-red-500" />
+                            <div className="flex items-center justify-between flex-wrap gap-4">
+                                <div className="flex items-center gap-3">
+                                    <div className="h-9 w-9 rounded-lg bg-red-500/10 border border-red-500/20 flex items-center justify-center text-red-400">
+                                        <ShieldAlert size={18} />
+                                    </div>
+                                    <div>
+                                        <h4 className="text-xs font-black tracking-wider text-red-400 uppercase">
+                                            {offender.status === "Repeat Offender" ? "⚠️ Repeat Offender Flagged" : "⚠️ Watch List Vendor"}
+                                        </h4>
+                                        <p className="text-[11px] text-slate-400 mt-0.5">
+                                            Vendor <span className="font-extrabold text-slate-200">{offender.vendor}</span> has registered{" "}
+                                            <span className="font-extrabold text-red-400">{offender.fraud_cases} fraud cases</span> within the last {offender.days_window} days.
+                                        </p>
+                                    </div>
+                                </div>
+                                <span className="text-[9px] font-black tracking-widest uppercase px-3 py-1 rounded bg-red-950/40 border border-red-500/30 text-red-400">
+                                    {offender.status}
+                                </span>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            )}
+
             {/* KPI Cards — All Backend Data */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
                 <StatCard label="Total Cases Inspected" value={totalCases} icon={Layers} color="cyan" sublabel={`${stats?.autoApproved || 0} auto-approved`} />
@@ -335,78 +406,188 @@ export default function AnalyticsDashboardPage() {
                 </ChartCard>
             </div>
 
-            {/* Fraud by Site — Backend Data from cases */}
-            {siteData.length > 0 && (
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-                    <ChartCard
-                        title="Fraud by Capture Site"
-                        icon={Truck}
-                        iconColor="bg-blue-950/20 border-blue-500/20 text-blue-400"
-                        badge="LIVE"
-                        badgeColor="bg-emerald-950/20 border-emerald-500/20 text-emerald-400"
-                    >
-                        <ResponsiveContainer width="100%" height={250}>
-                            <BarChart data={siteData} barGap={4}>
-                                <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" strokeOpacity={0.4} />
-                                <XAxis dataKey="site" stroke="#64748b" fontSize={11} axisLine={false} tickLine={false} />
-                                <YAxis stroke="#64748b" fontSize={11} axisLine={false} tickLine={false} />
-                                <Tooltip content={<CustomTooltip />} cursor={{ fill: '#1e293b', opacity: 0.3 }} />
-                                <Legend
-                                    verticalAlign="bottom"
-                                    height={30}
-                                    iconType="rect"
-                                    iconSize={10}
-                                    formatter={(value) => <span className="text-xs text-slate-400">{value}</span>}
-                                />
-                                <Bar dataKey="total" fill="#3b82f6" name="Total Cases" radius={[4, 4, 0, 0]} maxBarSize={50} />
-                                <Bar dataKey="fraud" fill="#ef4444" name="Fraud Cases" radius={[4, 4, 0, 0]} maxBarSize={50} />
-                            </BarChart>
-                        </ResponsiveContainer>
-                    </ChartCard>
+            {/* Vendor Performance Integrity Dashboard (NEW SECTION) */}
+            <div className="relative group mb-8">
+                <div className="relative bg-[#0f172a]/55 border border-slate-800/80 rounded-xl shadow-lg overflow-hidden">
+                    <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-cyan-500/30 to-transparent" />
+                    <div className="px-6 py-4 border-b border-slate-800 bg-[#0d1527]/50 flex items-center justify-between">
+                        <div className="flex items-center gap-2.5">
+                            <div className="h-7 w-7 rounded-lg bg-cyan-950/20 border border-cyan-500/20 flex items-center justify-center text-cyan-400">
+                                <Database size={14} />
+                            </div>
+                            <h2 className="text-xs font-extrabold uppercase tracking-wider text-slate-200">Vendor Integrity Dashboard</h2>
+                        </div>
+                        <span className="text-[9px] text-slate-500 bg-slate-900 px-2 py-1 rounded-full border border-slate-800 font-semibold">{vendors.length} VENDORS</span>
+                    </div>
 
-                    {/* Commodity Pass Rate Ranking */}
-                    <ChartCard
-                        title="Commodity Pass Rate Ranking"
-                        icon={TrendingUp}
-                        iconColor="bg-emerald-950/20 border-emerald-500/20 text-emerald-400"
-                        badge="LIVE"
-                        badgeColor="bg-emerald-950/20 border-emerald-500/20 text-emerald-400"
-                    >
-                        <div className="space-y-2">
-                            {commodityData.length > 0 ? (
-                                commodityData
-                                    .map(c => ({ ...c, passRate: c.total > 0 ? Math.round(((c.total - c.fraud) / c.total) * 100) : 0 }))
-                                    .sort((a, b) => b.passRate - a.passRate)
-                                    .slice(0, 8)
-                                    .map((item, i) => (
-                                        <div key={item.commodity} className="flex items-center gap-3 p-2.5 rounded-lg bg-slate-900/40 border border-slate-800/80">
-                                            <span className="w-6 h-6 rounded flex items-center justify-center text-[10px] font-extrabold text-slate-500">{i + 1}</span>
-                                            <div className="flex-1 min-w-0">
-                                                <div className="flex justify-between items-center mb-1">
-                                                    <span className="text-xs font-bold text-slate-200 capitalize truncate">{item.commodity}</span>
-                                                    <span className="text-[10px] text-slate-500">{item.total} cases</span>
-                                                </div>
-                                                <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
-                                                    <div
-                                                        className={`h-full rounded-full ${item.passRate >= 90 ? 'bg-emerald-500' : item.passRate >= 75 ? 'bg-amber-500' : 'bg-red-500'}`}
-                                                        style={{ width: `${item.passRate}%` }}
-                                                    />
-                                                </div>
-                                                <div className="text-right mt-0.5">
-                                                    <span className={`text-[9px] font-bold font-tech-code ${item.passRate >= 90 ? 'text-emerald-400' : item.passRate >= 75 ? 'text-amber-400' : 'text-red-400'}`}>
-                                                        {item.passRate}% pass rate
+                    <div className="overflow-x-auto">
+                        {vendors.length > 0 ? (
+                            <table className="w-full text-xs">
+                                <thead>
+                                    <tr className="border-b border-slate-800 bg-slate-900/30 text-slate-500 uppercase text-[9px] tracking-wider">
+                                        <th className="text-left px-6 py-3">Vendor</th>
+                                        <th className="text-center px-6 py-3">Components Supplied</th>
+                                        <th className="text-center px-6 py-3">Fraud Cases</th>
+                                        <th className="text-center px-6 py-3">Fraud Rate</th>
+                                        <th className="text-right px-6 py-3 pr-8">Trust Score</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-800/50">
+                                    {vendors.map((vendor) => {
+                                        const isExpanded = selectedVendor === vendor.vendor;
+                                        return (
+                                            <>
+                                                <tr
+                                                    key={vendor.vendor}
+                                                    onClick={() => handleVendorClick(vendor.vendor)}
+                                                    className="hover:bg-slate-900/40 cursor-pointer transition-colors"
+                                                >
+                                                    <td className="px-6 py-4 font-bold text-slate-200 flex items-center gap-2">
+                                                        {isExpanded ? <ChevronUp size={14} className="text-cyan-400" /> : <ChevronDown size={14} className="text-slate-500" />}
+                                                        {vendor.vendor}
+                                                    </td>
+                                                    <td className="px-6 py-4 text-center text-slate-300 font-tech-code">{vendor.components_supplied}</td>
+                                                    <td className="px-6 py-4 text-center text-red-400 font-bold font-tech-code">{vendor.fraud_cases}</td>
+                                                    <td className="px-6 py-4 text-center text-slate-300 font-tech-code">{vendor.fraud_rate}%</td>
+                                                    <td className="px-6 py-4 text-right pr-8">
+                                                        <div className="flex items-center justify-end gap-2.5">
+                                                            <div className="w-20 h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                                                                <div
+                                                                    className={`h-full rounded-full ${vendor.trust_score >= 85 ? 'bg-emerald-500' : vendor.trust_score >= 70 ? 'bg-amber-500' : 'bg-red-500'}`}
+                                                                    style={{ width: `${vendor.trust_score}%` }}
+                                                                />
+                                                            </div>
+                                                            <span className={`text-[10px] font-bold font-tech-code ${vendor.trust_score >= 85 ? 'text-emerald-400' : vendor.trust_score >= 70 ? 'text-amber-400' : 'text-red-400'}`}>
+                                                                {vendor.trust_score}
+                                                            </span>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                                {/* Expanded collapsable Vendor drill-down details */}
+                                                {isExpanded && (
+                                                    <tr>
+                                                        <td colSpan="5" className="bg-slate-950/70 border-y border-slate-850 px-8 py-5">
+                                                            {vendorDetailLoading ? (
+                                                                <div className="flex items-center gap-2 text-xs text-slate-500">
+                                                                    <RefreshCw size={12} className="animate-spin text-cyan-400" />
+                                                                    <span>Loading vendor history metrics...</span>
+                                                                </div>
+                                                            ) : vendorDetails ? (
+                                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 text-xs">
+                                                                    {/* Trend list */}
+                                                                    <div className="space-y-3">
+                                                                        <h4 className="text-[10px] font-black uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                                                                            <Calendar size={13} className="text-cyan-400" />
+                                                                            Monthly Supply Breakdown
+                                                                        </h4>
+                                                                        <div className="space-y-2">
+                                                                            {vendorDetails.monthly_trend?.map((item) => (
+                                                                                <div key={item.month} className="flex items-center justify-between border-b border-slate-900 pb-1.5">
+                                                                                    <span className="font-extrabold text-slate-300">{item.month}</span>
+                                                                                    <div className="flex items-center gap-4 text-[11px] font-tech-code">
+                                                                                        <span className="text-red-450 font-semibold">{item.fraud} Fraud</span>
+                                                                                        <span className="text-emerald-450">{item.genuine} Genuine</span>
+                                                                                    </div>
+                                                                                </div>
+                                                                            ))}
+                                                                        </div>
+                                                                    </div>
+                                                                    {/* Defective components supplied */}
+                                                                    <div className="space-y-3">
+                                                                        <h4 className="text-[10px] font-black uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                                                                            <AlertTriangle size={13} className="text-red-400" />
+                                                                            Fraud Components Flagged
+                                                                        </h4>
+                                                                        {vendorDetails.fraud_components?.length > 0 ? (
+                                                                            <div className="flex flex-wrap gap-2">
+                                                                                {vendorDetails.fraud_components.map((comp) => (
+                                                                                    <span key={comp} className="px-2.5 py-1 rounded-md bg-red-950/20 border border-red-500/20 text-red-400 text-[10px] font-bold">
+                                                                                        {comp}
+                                                                                    </span>
+                                                                                ))}
+                                                                            </div>
+                                                                        ) : (
+                                                                            <p className="text-[11px] text-slate-500 italic">No fraud components recorded for this supplier.</p>
+                                                                        )}
+                                                                    </div>
+                                                                </div>
+                                                            ) : (
+                                                                <p className="text-xs text-slate-500">Failed to load detailed metrics.</p>
+                                                            )}
+                                                        </td>
+                                                    </tr>
+                                                )}
+                                            </>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                        ) : (
+                            <div className="py-10 text-center text-slate-500">
+                                <p className="text-xs">No vendor analytics recorded.</p>
+                                <p className="text-[10px] text-slate-650 mt-1 uppercase tracking-wide">Select or type a Vendor name during new scans to compile supplier analytics</p>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </div>
+
+            {/* Regional Site Analytics Table (NEW SECTION) */}
+            <div className="relative group mb-8">
+                <div className="relative bg-[#0f172a]/55 border border-slate-800/80 rounded-xl shadow-lg overflow-hidden">
+                    <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-emerald-500/20 to-transparent" />
+                    <div className="px-6 py-4 border-b border-slate-800 bg-[#0d1527]/50 flex items-center justify-between">
+                        <div className="flex items-center gap-2.5">
+                            <div className="h-7 w-7 rounded-lg bg-emerald-950/20 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
+                                <Truck size={14} />
+                            </div>
+                            <h2 className="text-xs font-extrabold uppercase tracking-wider text-slate-200">Site Compliance Metrics</h2>
+                        </div>
+                        <span className="text-[9px] text-slate-500 bg-slate-900 px-2 py-1 rounded-full border border-slate-800 font-semibold">{sites.length} PLANTS</span>
+                    </div>
+
+                    <div className="overflow-x-auto">
+                        {sites.length > 0 ? (
+                            <table className="w-full text-xs">
+                                <thead>
+                                    <tr className="border-b border-slate-800 bg-slate-900/30 text-slate-500 uppercase text-[9px] tracking-wider">
+                                        <th className="text-left px-6 py-3.5">Plant / Site</th>
+                                        <th className="text-center px-6 py-3.5">Total Inspections</th>
+                                        <th className="text-center px-6 py-3.5">Fraud Cases</th>
+                                        <th className="text-right px-6 py-3.5 pr-8">Fraud Rate</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-800/50">
+                                    {sites.map((site) => (
+                                        <tr key={site.site} className="hover:bg-slate-900/20 transition-colors">
+                                            <td className="px-6 py-4 font-bold text-slate-200">{site.site}</td>
+                                            <td className="px-6 py-4 text-center text-slate-300 font-tech-code">{site.inspections}</td>
+                                            <td className="px-6 py-4 text-center text-red-400 font-bold font-tech-code">{site.fraud_cases}</td>
+                                            <td className="px-6 py-4 text-right pr-8">
+                                                <div className="flex items-center justify-end gap-2.5">
+                                                    <div className="w-20 h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                                                        <div
+                                                            className={`h-full rounded-full ${site.fraud_rate >= 15 ? 'bg-red-500' : site.fraud_rate >= 5 ? 'bg-amber-500' : 'bg-emerald-500'}`}
+                                                            style={{ width: `${site.fraud_rate}%` }}
+                                                        />
+                                                    </div>
+                                                    <span className={`text-[10px] font-bold font-tech-code ${site.fraud_rate >= 15 ? 'text-red-400' : site.fraud_rate >= 5 ? 'text-amber-400' : 'text-emerald-400'}`}>
+                                                        {site.fraud_rate}%
                                                     </span>
                                                 </div>
-                                            </div>
-                                        </div>
-                                    ))
-                            ) : (
-                                <div className="py-8 text-center text-slate-500 text-xs">No data available</div>
-                            )}
-                        </div>
-                    </ChartCard>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        ) : (
+                            <div className="py-10 text-center text-slate-500">
+                                <p className="text-xs">No site metrics recorded.</p>
+                            </div>
+                        )}
+                    </div>
                 </div>
-            )}
+            </div>
 
             {/* Recent Cases Table — Backend Data */}
             <div className="relative group">

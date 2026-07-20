@@ -6,7 +6,7 @@ from fastapi.staticfiles import StaticFiles
 
 from app.config import settings
 from app.database import engine, Base
-from app.routers import auth, products, inspections, reviews, reports, triage
+from app.routers import auth, products, inspections, reviews, reports, triage, analytics
 
 # Setup basic logging configuration
 logging.basicConfig(
@@ -44,6 +44,7 @@ app.include_router(inspections.router, prefix="/api")
 app.include_router(reviews.router, prefix="/api")
 app.include_router(reports.router, prefix="/api")
 app.include_router(triage.router, prefix="/api")
+app.include_router(analytics.router, prefix="/api")
 
 # Mount 'data' directory static files so frontend can fetch and show raw and heatmap images
 data_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data")

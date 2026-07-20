@@ -98,6 +98,8 @@ class InspectionResponse(BaseModel):
     captured_image_path: str
     capture_site: str
     capture_angle: str
+    vendor: Optional[str] = None
+    component_name: Optional[str] = None
     status: str
     created_at: datetime
     result: Optional[InspectionResultResponse] = None
@@ -213,3 +215,34 @@ class ReviewDetailResponse(BaseModel):
     targetResolutionMinutes: int
     elapsedMinutes: float
     status: str
+
+
+# --- Analytics Schemas ---
+class VendorAnalyticsItem(BaseModel):
+    vendor: str
+    components_supplied: int
+    fraud_cases: int
+    fraud_rate: float
+    trust_score: int
+
+class SiteAnalyticsItem(BaseModel):
+    site: str
+    inspections: int
+    fraud_cases: int
+    fraud_rate: float
+
+class RepeatOffenderItem(BaseModel):
+    vendor: str
+    fraud_cases: int
+    days_window: int = 90
+    status: str  # "Repeat Offender", "Watch List"
+
+class VendorMonthlyDetailItem(BaseModel):
+    month: str
+    fraud: int
+    genuine: int
+
+class VendorDetailResponse(BaseModel):
+    vendor: str
+    monthly_trend: List[VendorMonthlyDetailItem]
+    fraud_components: List[str]

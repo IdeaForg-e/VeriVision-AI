@@ -14,6 +14,8 @@ export default function UploadInspectionModal({ open, onClose, onSuccess }) {
   const [customFile, setCustomFile] = useState(null);
   const [goldenFile, setGoldenFile] = useState(null);
   const [expectedSerial, setExpectedSerial] = useState("");
+  const [componentName, setComponentName] = useState("");
+  const [vendor, setVendor] = useState("");
 
   // Visual thumbnail previews
   const [goldenPreview, setGoldenPreview] = useState(null);
@@ -38,6 +40,8 @@ export default function UploadInspectionModal({ open, onClose, onSuccess }) {
     setGoldenPreview(null);
     setTargetPreview(null);
     setExpectedSerial("");
+    setComponentName("");
+    setVendor("");
   }, [open]);
 
   useEffect(() => {
@@ -137,6 +141,8 @@ export default function UploadInspectionModal({ open, onClose, onSuccess }) {
       formData.append("file", customFile);
       formData.append("golden_file", goldenFile);
       if (expectedSerial) formData.append("expected_serial", expectedSerial.trim());
+      if (vendor) formData.append("vendor", vendor.trim());
+      if (componentName) formData.append("component_name", componentName.trim());
       const result = await createInspection(formData);
       setProcessing(false);
       onClose();
@@ -316,28 +322,48 @@ export default function UploadInspectionModal({ open, onClose, onSuccess }) {
           </div>
 
           {/* Form Fields */}
-          <div className="grid grid-cols-3 gap-4 pt-1">
-            <div>
-              <label className="text-[9px] font-bold tracking-wider text-slate-500 uppercase mb-1.5 block">Serial Number (Optional)</label>
-              <input type="text" value={expectedSerial} onChange={(e) => setExpectedSerial(e.target.value)}
-                placeholder="e.g. 91165LUS0DDD"
-                className="w-full h-10 px-3.5 rounded-xl bg-slate-900/80 border border-slate-700/60 text-slate-200 text-xs placeholder:text-slate-600 focus:border-cyan-500/40 focus:shadow-[0_0_15px_rgba(6,182,212,0.1)] transition-all" />
+          <div className="space-y-4 pt-1">
+            <div className="grid grid-cols-3 gap-4">
+              <div>
+                <label className="text-[9px] font-bold tracking-wider text-slate-500 uppercase mb-1.5 block">Component Name</label>
+                <input type="text" value={componentName} onChange={(e) => setComponentName(e.target.value)}
+                  placeholder="e.g. Brake Disc"
+                  className="w-full h-10 px-3.5 rounded-xl bg-slate-900/80 border border-slate-700/60 text-slate-200 text-xs placeholder:text-slate-700 focus:border-cyan-500/40 focus:shadow-[0_0_15px_rgba(6,182,212,0.1)] transition-all" />
+              </div>
+              <div>
+                <label className="text-[9px] font-bold tracking-wider text-slate-500 uppercase mb-1.5 block">Component ID / Serial (Optional)</label>
+                <input type="text" value={expectedSerial} onChange={(e) => setExpectedSerial(e.target.value)}
+                  placeholder="e.g. BD-001"
+                  className="w-full h-10 px-3.5 rounded-xl bg-slate-900/80 border border-slate-700/60 text-slate-200 text-xs placeholder:text-slate-700 focus:border-cyan-500/40 focus:shadow-[0_0_15px_rgba(6,182,212,0.1)] transition-all" />
+              </div>
+              <div>
+                <label className="text-[9px] font-bold tracking-wider text-slate-500 uppercase mb-1.5 block">Vendor</label>
+                <input type="text" value={vendor} onChange={(e) => setVendor(e.target.value)}
+                  placeholder="e.g. Vendor A"
+                  className="w-full h-10 px-3.5 rounded-xl bg-slate-900/80 border border-slate-700/60 text-slate-200 text-xs placeholder:text-slate-700 focus:border-cyan-500/40 focus:shadow-[0_0_15px_rgba(6,182,212,0.1)] transition-all" />
+              </div>
             </div>
-            <div>
-              <label className="text-[9px] font-bold tracking-wider text-slate-500 uppercase mb-1.5 block">Capture Site</label>
-              <input type="text" value={captureSite} onChange={(e) => setCaptureSite(e.target.value)}
-                placeholder="e.g. Line-1"
-                className="w-full h-10 px-3.5 rounded-xl bg-slate-900/80 border border-slate-700/60 text-slate-200 text-xs placeholder:text-slate-600 focus:border-cyan-500/40 focus:shadow-[0_0_15px_rgba(6,182,212,0.1)] transition-all" />
-            </div>
-            <div>
-              <label className="text-[9px] font-bold tracking-wider text-slate-500 uppercase mb-1.5 block">Camera Angle</label>
-              <div className="relative">
-                <select value={captureAngle} onChange={(e) => setCaptureAngle(e.target.value)}
-                  className="w-full h-10 px-3.5 rounded-xl bg-slate-900/80 border border-slate-700/60 text-slate-200 text-xs appearance-none cursor-pointer focus:border-cyan-500/40 focus:shadow-[0_0_15px_rgba(6,182,212,0.1)] transition-all">
-                  <option value="top">Top Down (Default)</option>
-                  <option value="angled">Angled Perspective</option>
-                </select>
-                <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
+
+            <div className="grid grid-cols-3 gap-4">
+              <div>
+                <label className="text-[9px] font-bold tracking-wider text-slate-500 uppercase mb-1.5 block">Capture Site</label>
+                <input type="text" value={captureSite} onChange={(e) => setCaptureSite(e.target.value)}
+                  placeholder="e.g. Line-1"
+                  className="w-full h-10 px-3.5 rounded-xl bg-slate-900/80 border border-slate-700/60 text-slate-200 text-xs placeholder:text-slate-700 focus:border-cyan-500/40 focus:shadow-[0_0_15px_rgba(6,182,212,0.1)] transition-all" />
+              </div>
+              <div>
+                <label className="text-[9px] font-bold tracking-wider text-slate-500 uppercase mb-1.5 block">Camera Angle</label>
+                <div className="relative">
+                  <select value={captureAngle} onChange={(e) => setCaptureAngle(e.target.value)}
+                    className="w-full h-10 px-3.5 rounded-xl bg-slate-900/80 border border-slate-700/60 text-slate-200 text-xs appearance-none cursor-pointer focus:border-cyan-500/40 focus:shadow-[0_0_15px_rgba(6,182,212,0.1)] transition-all">
+                    <option value="top">Top Down (Default)</option>
+                    <option value="angled">Angled Perspective</option>
+                  </select>
+                  <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
+                </div>
+              </div>
+              <div className="flex items-end justify-start pb-2">
+                <span className="text-[8px] text-slate-600 font-semibold tracking-wider uppercase">ALL SCAN DATA INTEGRATED TO DB</span>
               </div>
             </div>
           </div>

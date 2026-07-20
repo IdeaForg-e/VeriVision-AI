@@ -23,6 +23,8 @@ async def create_inspection(
     file: UploadFile = File(...),
     golden_file: UploadFile = File(...),
     expected_serial: Optional[str] = Form(None),
+    vendor: Optional[str] = Form(None),
+    component_name: Optional[str] = Form(None),
     db: Session = Depends(get_db),
     current_user: models.User = Depends(utils.get_current_user)
 ):
@@ -94,7 +96,7 @@ async def create_inspection(
 
     # 4. Dynamically register Product in Database
     custom_part_num = f"AUTO-{uuid.uuid4().hex[:6].upper()}"
-    custom_name = f"Auto-detected {detected_commodity.title()} ({file.filename})"
+    custom_name = component_name.strip() if component_name else f"Auto-detected {detected_commodity.title()} ({file.filename})"
     
     db_product = models.Product(
         part_number=custom_part_num,
@@ -142,6 +144,8 @@ async def create_inspection(
         captured_image_path=file_path,
         capture_site=capture_site,
         capture_angle=capture_angle,
+        vendor=vendor.strip() if vendor else None,
+        component_name=component_name.strip() if component_name else None,
         status="pending"
     )
     db.add(db_inspection)

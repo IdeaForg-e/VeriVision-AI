@@ -55,6 +55,8 @@ class Inspection(Base):
     captured_image_path = Column(String, nullable=False)
     capture_site = Column(String, nullable=False)
     capture_angle = Column(String, default="top")
+    vendor = Column(String, nullable=True)          # e.g. "Vendor A"
+    component_name = Column(String, nullable=True)  # e.g. "Brake Disc"
     status = Column(String, default="pending")  # pending, completed, retake_needed
     created_at = Column(DateTime, default=datetime.utcnow)
 
