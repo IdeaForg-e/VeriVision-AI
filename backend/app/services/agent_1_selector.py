@@ -15,6 +15,7 @@ def verify_comparison_viability(src_image_path: str, ref_image_path: str) -> dic
     1. Decodability and file integrity on disk.
     2. Aspect ratio orientation alignment (prevents mixing portrait and landscape).
     3. Resolution scale variations (prevents comparing a tiny thumbnail with a 4K image).
+    4. Visual layout agreement (prevents matching completely different objects).
     """
     logger.info(f"[Agent 1: Selector] Verifying comparison viability between: {src_image_path} and {ref_image_path}")
 
@@ -32,7 +33,28 @@ def verify_comparison_viability(src_image_path: str, ref_image_path: str) -> dic
     if ref is None:
         return {"viable": False, "detail": "Unable to read golden reference standard image."}
 
-    # 2. Aspect Ratio Check
+    # 2. Visual Layout Matching Check (ORB keypoints agreement)
+    gray_src = cv2.cvtColor(src, cv2.COLOR_BGR2GRAY)
+    gray_ref = cv2.cvtColor(ref, cv2.COLOR_BGR2GRAY)
+    orb = cv2.ORB_create(nfeatures=500)
+    kp_src, des_src = orb.detectAndCompute(gray_src, None)
+    kp_ref, des_ref = orb.detectAndCompute(gray_ref, None)
+    
+    if des_src is not None and des_ref is not None:
+        bf = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
+        try:
+            matches = bf.match(des_src, des_ref)
+            good_matches = [m for m in matches if m.distance < 50]
+            if len(good_matches) < 3:
+                logger.warning("[Agent 1: Selector] Visual mismatch detected: Less than 3 ORB matches found between images.")
+                return {
+                    "viable": False,
+                    "detail": "This part's golden image was not available in our database. Please contact your admin."
+                }
+        except Exception as match_err:
+            logger.error(f"[Agent 1: Selector] Keypoint matching failed during viability check: {match_err}")
+
+    # 3. Aspect Ratio Check
     h_ref, w_ref = ref.shape[:2]
     h_src, w_src = src.shape[:2]
 
@@ -47,7 +69,7 @@ def verify_comparison_viability(src_image_path: str, ref_image_path: str) -> dic
             "detail": f"Aspect ratio mismatch detected (Golden: {ar_ref:.2f}, Captured: {ar_src:.2f}). Bypassing pixel alignment for semantic AI comparison."
         }
 
-    # 3. Resolution / Scale Check
+    # 4. Resolution / Scale Check
     w_ratio = w_src / max(w_ref, 1)
     h_ratio = h_src / max(h_ref, 1)
 

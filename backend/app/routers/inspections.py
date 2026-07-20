@@ -16,12 +16,25 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/inspections", tags=["Inspections"])
 
+@router.get("/catalog", response_model=List[schemas.ProductResponse])
+def get_catalog_products(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(utils.get_current_user)
+):
+    """
+    Returns all pre-registered Golden Catalog reference standards (those starting with GOLD-).
+    """
+    logger.info(f"User {current_user.email} fetching Golden Catalog references list.")
+    products = db.query(models.Product).filter(models.Product.part_number.like("GOLD-%")).all()
+    return products
+
 @router.post("", response_model=schemas.InspectionResponse, status_code=status.HTTP_201_CREATED)
 async def create_inspection(
     capture_site: str = Form(...),
     capture_angle: str = Form("top"),
     file: UploadFile = File(...),
-    golden_file: UploadFile = File(...),
+    golden_file: Optional[UploadFile] = File(None),
+    catalog_part_number: Optional[str] = Form(None),
     expected_serial: Optional[str] = Form(None),
     vendor: Optional[str] = Form(None),
     component_name: Optional[str] = Form(None),
@@ -29,26 +42,17 @@ async def create_inspection(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(utils.get_current_user)
 ):
-    logger.info(f"Incoming inspection request. Site: {capture_site}, Angle: {capture_angle}")
+    logger.info(f"Incoming inspection request. Site: {capture_site}, Angle: {capture_angle}, Catalog ID: {catalog_part_number}")
     
     # 1. Read files and validate decoding
     contents = await file.read()
     nparr = np.frombuffer(contents, np.uint8)
     src_img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
     
-    golden_contents = await golden_file.read()
-    nparr_golden = np.frombuffer(golden_contents, np.uint8)
-    ref_img = cv2.imdecode(nparr_golden, cv2.IMREAD_COLOR)
-    
     if src_img is None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Unable to decode uploaded captured/defective image scan. Please upload a valid JPG or PNG photo."
-        )
-    if ref_img is None:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Unable to decode uploaded golden reference standard image. Please upload a valid JPG or PNG photo."
         )
 
     # Validate resolution (min 150x150)
@@ -57,68 +61,131 @@ async def create_inspection(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Uploaded captured image resolution is too low (minimum 150x150 pixels required)."
         )
-    if ref_img.shape[0] < 150 or ref_img.shape[1] < 150:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Uploaded golden reference image resolution is too low (minimum 150x150 pixels required)."
-        )
 
-    # 2. Save dynamic Golden Reference file to settings.GOLDEN_DIR
-    golden_id = str(uuid.uuid4())
-    golden_ext = os.path.splitext(golden_file.filename)[1] or ".png"
-    golden_filename = f"golden_{golden_id}{golden_ext}"
-    golden_file_path = os.path.join(settings.GOLDEN_DIR, golden_filename)
-    
-    logger.info(f"Saving uploaded golden reference standard image to {golden_file_path}")
-    try:
-        with open(golden_file_path, "wb") as f:
-            f.write(golden_contents)
-    except Exception as e:
-        logger.error(f"Failed to save golden image standard: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to save golden reference image standard on server: {str(e)}"
-        )
+    db_product = None
+    golden_file_path = ""
+    roi_json = None
+    detected_commodity = ""
 
-    # 3. Auto-classify the commodity of the golden standard
-    detected_commodity = services.classify_part_commodity(golden_file_path)
-    logger.info(f"Part commodity dynamically classified as: '{detected_commodity}'")
+    # 2. Resolve Golden Reference (Catalog standard vs Custom upload)
+    if catalog_part_number:
+        db_product = db.query(models.Product).filter(models.Product.part_number == catalog_part_number).first()
+        if not db_product:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="This part's golden image was not available in our database. Please contact your admin."
+            )
 
+        db_golden = db.query(models.GoldenReference).filter(
+            models.GoldenReference.product_id == db_product.id
+        ).first()
 
-    # Set up default ROI configuration based on the detected commodity
-    if detected_commodity == "label":
-        roi_json = { "label_roi": { "x": 420, "y": 50, "width": 420, "height": 220 } }
-    elif detected_commodity == "motherboard":
-        roi_json = { "label_roi": { "x": 200, "y": 620, "width": 150, "height": 80 } }
-    elif detected_commodity == "microchip":
-        roi_json = { "label_roi": { "x": 250, "y": 250, "width": 200, "height": 100 } }
+        if not db_golden or not db_golden.image_path:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="This part's golden image was not available in our database. Please contact your admin."
+            )
+
+        filename = os.path.basename(db_golden.image_path)
+        golden_file_path = os.path.join(settings.GOLDEN_DIR, filename)
+
+        if not os.path.exists(golden_file_path):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="This part's golden image was not available in our database. Please contact your admin."
+            )
+
+        ref_img = cv2.imread(golden_file_path)
+        if ref_img is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="This part's golden image was not available in our database. Please contact your admin."
+            )
+
+        detected_commodity = db_product.commodity
+        roi_json = db_golden.roi_config
+        if not expected_serial:
+            expected_serial = db_golden.expected_serial
+        golden_file_path = os.path.abspath(golden_file_path)
+
     else:
-        roi_json = { "label_roi": { "x": 100, "y": 100, "width": 300, "height": 200 } }
+        if not golden_file:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Either a pre-registered catalog part number or a custom golden reference image file upload is required."
+            )
 
-    # 4. Dynamically register Product in Database
-    custom_part_num = f"AUTO-{uuid.uuid4().hex[:6].upper()}"
-    custom_name = component_name.strip() if component_name else f"Auto-detected {detected_commodity.title()} ({file.filename})"
-    
-    db_product = models.Product(
-        part_number=custom_part_num,
-        name=custom_name,
-        commodity=detected_commodity
-    )
-    db.add(db_product)
-    db.commit()
-    db.refresh(db_product)
-    
-    # 5. Register Golden Reference in Database
-    db_golden = models.GoldenReference(
-        product_id=db_product.id,
-        image_path=f"data/golden/{golden_filename}",
-        expected_serial=expected_serial,
-        angle=capture_angle,
-        roi_config=roi_json
-    )
-    db.add(db_golden)
-    db.commit()
-    db.refresh(db_golden)
+        golden_contents = await golden_file.read()
+        nparr_golden = np.frombuffer(golden_contents, np.uint8)
+        ref_img = cv2.imdecode(nparr_golden, cv2.IMREAD_COLOR)
+
+        if ref_img is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Unable to decode uploaded golden reference standard image. Please upload a valid JPG or PNG photo."
+            )
+
+        if ref_img.shape[0] < 150 or ref_img.shape[1] < 150:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Uploaded golden reference image resolution is too low (minimum 150x150 pixels required)."
+            )
+
+        # Save dynamic Golden Reference file to settings.GOLDEN_DIR
+        golden_id = str(uuid.uuid4())
+        golden_ext = os.path.splitext(golden_file.filename)[1] or ".png"
+        golden_filename = f"golden_{golden_id}{golden_ext}"
+        golden_file_path = os.path.join(settings.GOLDEN_DIR, golden_filename)
+        
+        logger.info(f"Saving uploaded golden reference standard image to {golden_file_path}")
+        try:
+            with open(golden_file_path, "wb") as f:
+                f.write(golden_contents)
+        except Exception as e:
+            logger.error(f"Failed to save golden image standard: {str(e)}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to save golden reference image standard on server: {str(e)}"
+            )
+
+        # Auto-classify the commodity of the golden standard
+        detected_commodity = services.classify_part_commodity(golden_file_path)
+        logger.info(f"Part commodity dynamically classified as: '{detected_commodity}'")
+
+        # Set up default ROI configuration based on the detected commodity
+        if detected_commodity == "label":
+            roi_json = { "label_roi": { "x": 420, "y": 50, "width": 420, "height": 220 } }
+        elif detected_commodity == "motherboard":
+            roi_json = { "label_roi": { "x": 200, "y": 620, "width": 150, "height": 80 } }
+        elif detected_commodity == "microchip":
+            roi_json = { "label_roi": { "x": 250, "y": 250, "width": 200, "height": 100 } }
+        else:
+            roi_json = { "label_roi": { "x": 100, "y": 100, "width": 300, "height": 200 } }
+
+        # Dynamically register Product in Database
+        custom_part_num = f"AUTO-{uuid.uuid4().hex[:6].upper()}"
+        custom_name = component_name.strip() if component_name else f"Auto-detected {detected_commodity.title()} ({file.filename})"
+        
+        db_product = models.Product(
+            part_number=custom_part_num,
+            name=custom_name,
+            commodity=detected_commodity
+        )
+        db.add(db_product)
+        db.commit()
+        db.refresh(db_product)
+        
+        # Register Golden Reference in Database
+        db_golden = models.GoldenReference(
+            product_id=db_product.id,
+            image_path=f"data/golden/{golden_filename}",
+            expected_serial=expected_serial,
+            angle=capture_angle,
+            roi_config=roi_json
+        )
+        db.add(db_golden)
+        db.commit()
+        db.refresh(db_golden)
 
     # 6. Save uploaded target defect scan
     case_id = str(uuid.uuid4())

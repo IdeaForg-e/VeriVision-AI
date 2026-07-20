@@ -441,3 +441,27 @@ class TestDecisionVerdicts:
         })
         assert decision["verdict"] == "missing"
         assert decision["recommended_action"] == "Quarantine & Escalate"
+
+
+class TestCatalogWorkflow:
+    def test_mismatched_images_raise_catalog_warning(self):
+        from app.services.agent_1_selector import verify_comparison_viability
+        # Create two completely different images (one dark, one test image with text)
+        src = create_dark_image()
+        ref = create_test_image(text_region=True)
+        
+        # Save temporary files
+        src_path = "temp_src_mismatch.png"
+        ref_path = "temp_ref_mismatch.png"
+        cv2.imwrite(src_path, src)
+        cv2.imwrite(ref_path, ref)
+        
+        try:
+            viability = verify_comparison_viability(src_path, ref_path)
+            assert not viability["viable"]
+            assert viability["detail"] == "This part's golden image was not available in our database. Please contact your admin."
+        finally:
+            if os.path.exists(src_path):
+                os.remove(src_path)
+            if os.path.exists(ref_path):
+                os.remove(ref_path)

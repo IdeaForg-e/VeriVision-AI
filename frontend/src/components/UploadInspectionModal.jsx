@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Modal } from "./common.jsx";
-import { createInspection } from "../services/caseService.js";
+import { createInspection, getCatalog } from "../services/caseService.js";
 import { Upload, AlertCircle, AlertTriangle, RefreshCw, Sparkles, X, Scan, Camera, Cpu, ChevronDown, Video, ZapOff, Circle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { ROUTES } from "../utils/constants.js";
@@ -16,6 +16,11 @@ export default function UploadInspectionModal({ open, onClose, onSuccess }) {
   const [expectedSerial, setExpectedSerial] = useState("");
   const [componentName, setComponentName] = useState("");
   const [vendor, setVendor] = useState("");
+
+  // Catalog Reference states
+  const [catalogMode, setCatalogMode] = useState("catalog"); // "catalog" | "custom"
+  const [catalogList, setCatalogList] = useState([]);
+  const [selectedCatalogPart, setSelectedCatalogPart] = useState("");
 
   // Webcam states
   const [targetMode, setTargetMode] = useState("upload"); // "upload" | "webcam"
@@ -36,6 +41,15 @@ export default function UploadInspectionModal({ open, onClose, onSuccess }) {
   const [errorMsg, setErrorMsg] = useState(null);
   const [viabilityWarning, setViabilityWarning] = useState(null);
   const [webcamScanResult, setWebcamScanResult] = useState(null); // null | { status, checks }
+
+  const handleCatalogPartChange = useCallback((partNum, list = catalogList) => {
+    setSelectedCatalogPart(partNum);
+    const selected = list.find(c => c.part_number === partNum);
+    if (selected) {
+      setComponentName(selected.name);
+      setExpectedSerial(selected.golden_references?.[0]?.expected_serial || "");
+    }
+  }, [catalogList]);
 
   useEffect(() => {
     if (!open) {
@@ -61,7 +75,22 @@ export default function UploadInspectionModal({ open, onClose, onSuccess }) {
     setWebcamReady(false);
     setWebcamScanResult(null);
     setDate("");
-  }, [open]);
+    setCatalogMode("catalog");
+
+    // Fetch pre-registered references
+    const loadCatalog = async () => {
+      try {
+        const list = await getCatalog();
+        setCatalogList(list || []);
+        if (list && list.length > 0) {
+          handleCatalogPartChange(list[0].part_number, list);
+        }
+      } catch (err) {
+        console.error("Failed to load parts catalog:", err);
+      }
+    };
+    loadCatalog();
+  }, [open, handleCatalogPartChange]);
 
   useEffect(() => {
     return () => {
@@ -271,7 +300,7 @@ export default function UploadInspectionModal({ open, onClose, onSuccess }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!goldenFile) { setErrorMsg("Please upload an OEM Golden Reference standard image."); return; }
+    if (catalogMode === "custom" && !goldenFile) { setErrorMsg("Please upload an OEM Golden Reference standard image."); return; }
     if (!customFile) { setErrorMsg("Please upload a target Part Image Scan to inspect."); return; }
     setProcessing(true);
     setErrorMsg(null);
@@ -281,7 +310,11 @@ export default function UploadInspectionModal({ open, onClose, onSuccess }) {
       formData.append("capture_site", captureSite);
       formData.append("capture_angle", captureAngle);
       formData.append("file", customFile);
-      formData.append("golden_file", goldenFile);
+      if (catalogMode === "catalog") {
+        formData.append("catalog_part_number", selectedCatalogPart);
+      } else {
+        formData.append("golden_file", goldenFile);
+      }
       if (expectedSerial) formData.append("expected_serial", expectedSerial.trim());
       if (vendor) formData.append("vendor", vendor.trim());
       if (componentName) formData.append("component_name", componentName.trim());
@@ -294,8 +327,10 @@ export default function UploadInspectionModal({ open, onClose, onSuccess }) {
     } catch (err) {
       setProcessing(false);
       let errMsg = err.message || "Failed to process parts inspection.";
-      if (err.body && err.body.detail) {
-        errMsg = typeof err.body.detail === "object" && err.body.detail.message ? `Triage Rejection: ${err.body.detail.message}` : err.body.detail;
+      if (err.response && err.response.data && err.response.data.detail) {
+        errMsg = typeof err.response.data.detail === "object" && err.response.data.detail.message 
+          ? `Triage Rejection: ${err.response.data.detail.message}` 
+          : err.response.data.detail;
       }
       setErrorMsg(errMsg);
     }
@@ -318,13 +353,14 @@ export default function UploadInspectionModal({ open, onClose, onSuccess }) {
   );
 
   // Footer buttons
+  const isSubmitDisabled = !customFile || (catalogMode === "custom" && !goldenFile) || (catalogMode === "catalog" && !selectedCatalogPart);
   const modalFooter = !processing && (
     <div className="flex items-center justify-end gap-3 w-full">
       <button type="button" onClick={onClose}
         className="px-5 py-2.5 rounded-lg border border-slate-700/50 bg-slate-900/60 text-slate-400 hover:text-slate-200 hover:bg-slate-800/80 hover:border-slate-600/50 transition-all text-xs font-bold uppercase tracking-wider active:scale-95">
         Cancel
       </button>
-      <button type="button" onClick={handleSubmit} disabled={!goldenFile || !customFile}
+      <button type="button" onClick={handleSubmit} disabled={isSubmitDisabled}
         className="group relative inline-flex items-center gap-2.5 px-6 py-2.5 rounded-lg bg-gradient-to-r from-cyan-500 via-blue-600 to-indigo-600 text-white font-extrabold text-xs uppercase tracking-wider shadow-[0_0_20px_rgba(6,182,212,0.25)] hover:shadow-[0_0_35px_rgba(6,182,212,0.45)] hover:scale-[1.02] active:scale-95 transition-all duration-300 disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:hover:shadow-none">
         <span className="absolute inset-0 rounded-lg bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity disabled:hidden" />
         <Scan size={14} className="relative" />
@@ -387,39 +423,99 @@ export default function UploadInspectionModal({ open, onClose, onSuccess }) {
           <div className="grid grid-cols-2 gap-5">
             {/* Golden Reference */}
             <div className="flex flex-col gap-2">
-              <label className="text-[10px] font-bold tracking-wider text-slate-400 uppercase flex items-center gap-1.5">
-                <Sparkles size={12} className="text-cyan-400" />
-                OEM Golden Reference
-              </label>
+              <div className="flex items-center justify-between">
+                <label className="text-[10px] font-bold tracking-wider text-slate-400 uppercase flex items-center gap-1.5">
+                  <Sparkles size={12} className="text-cyan-400" />
+                  OEM Golden Reference
+                </label>
+                {/* Catalog / Custom upload toggle */}
+                <div className="flex items-center gap-0.5 bg-slate-900/80 border border-slate-800/80 rounded-lg p-0.5">
+                  <button
+                    type="button"
+                    onClick={() => setCatalogMode("catalog")}
+                    className={`flex items-center gap-1 px-2 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider transition-all ${
+                      catalogMode === "catalog"
+                        ? "bg-gradient-to-r from-cyan-600/80 to-blue-700/80 text-white shadow-[0_0_10px_rgba(6,182,212,0.3)]"
+                        : "text-slate-500 hover:text-slate-350"
+                    }`}
+                  >
+                    Catalog
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setCatalogMode("custom")}
+                    className={`flex items-center gap-1 px-2 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider transition-all ${
+                      catalogMode === "custom"
+                        ? "bg-gradient-to-r from-blue-600/80 to-indigo-700/80 text-white shadow-[0_0_10px_rgba(99,102,241,0.3)]"
+                        : "text-slate-500 hover:text-slate-350"
+                    }`}
+                  >
+                    Custom File
+                  </button>
+                </div>
+              </div>
+
               <div className="relative">
-                <div className="absolute -inset-0.5 bg-gradient-to-br from-cyan-500/10 to-purple-600/10 rounded-xl blur opacity-0 hover:opacity-100 pointer-events-none transition duration-500" />
-                {goldenPreview ? (
-                  <div className="relative bg-slate-900/80 border border-slate-700/80 rounded-xl overflow-hidden hover:border-cyan-500/40 transition-all">
-                    <div className="relative h-36 bg-slate-950/80 flex items-center justify-center overflow-hidden">
-                      <img src={goldenPreview} className="w-full h-full object-contain" alt="Golden" />
+                {catalogMode === "catalog" ? (
+                  <div className="space-y-3">
+                    <div className="relative">
+                      <select
+                        value={selectedCatalogPart}
+                        onChange={(e) => handleCatalogPartChange(e.target.value)}
+                        className="w-full h-10 px-3.5 pr-8 rounded-xl bg-slate-900/80 border border-slate-700/60 text-slate-200 text-xs appearance-none cursor-pointer focus:border-cyan-500/40 focus:shadow-[0_0_15px_rgba(6,182,212,0.1)] transition-all"
+                      >
+                        {catalogList.length === 0 ? (
+                          <option value="">No catalog references loaded</option>
+                        ) : (
+                          catalogList.map((item) => (
+                            <option key={item.part_number} value={item.part_number}>
+                              {item.name} ({item.part_number})
+                            </option>
+                          ))
+                        )}
+                      </select>
+                      <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
                     </div>
-                    <div className="px-3 py-2.5 flex items-center justify-between border-t border-slate-800/60">
-                      <div className="min-w-0">
-                        <p className="text-[10px] font-bold text-slate-200 truncate">{goldenFile.name}</p>
-                        <p className="text-[8px] text-slate-500">{(goldenFile.size / 1024).toFixed(0)} KB</p>
+                    <div className="p-3 rounded-lg border border-emerald-500/20 bg-emerald-950/10 text-emerald-450 text-[10px] flex items-start gap-2 leading-relaxed shadow-[0_0_15px_rgba(16,185,129,0.02)]">
+                      <Cpu size={12} className="shrink-0 mt-0.5" />
+                      <div>
+                        <p className="font-bold">Catalog Reference Standard Selected</p>
+                        <p className="text-slate-400 mt-0.5">Golden image, expected text, and default regions of interest are pre-loaded from backend storage.</p>
                       </div>
-                      <button onClick={() => { setGoldenFile(null); setGoldenPreview(null); }}
-                        className="h-6 w-6 rounded flex items-center justify-center border border-slate-700/60 text-slate-500 hover:text-red-400 hover:border-red-500/30 transition-all">
-                        <X size={11} />
-                      </button>
                     </div>
                   </div>
                 ) : (
-                  <label className="flex flex-col items-center justify-center gap-2.5 h-36 rounded-xl border-2 border-dashed border-slate-700/50 bg-slate-900/40 hover:bg-cyan-950/10 hover:border-cyan-500/50 cursor-pointer transition-all z-10">
-                    <input type="file" accept="image/*" onChange={handleGoldenChange} className="hidden" />
-                    <div className="h-10 w-10 rounded-full bg-slate-950 border border-slate-700/60 flex items-center justify-center hover:scale-110 hover:border-cyan-500/30 transition-all">
-                      <Sparkles size={16} className="text-slate-500 hover:text-cyan-400 transition-colors" />
-                    </div>
-                    <div className="text-center">
-                      <p className="text-[11px] font-bold text-slate-300 hover:text-cyan-400 transition-colors">Select OEM Golden</p>
-                      <p className="text-[9px] text-slate-500">Clean baseline reference</p>
-                    </div>
-                  </label>
+                  <>
+                    <div className="absolute -inset-0.5 bg-gradient-to-br from-cyan-500/10 to-purple-600/10 rounded-xl blur opacity-0 hover:opacity-100 pointer-events-none transition duration-500" />
+                    {goldenPreview ? (
+                      <div className="relative bg-slate-900/80 border border-slate-700/80 rounded-xl overflow-hidden hover:border-cyan-500/40 transition-all">
+                        <div className="relative h-36 bg-slate-950/80 flex items-center justify-center overflow-hidden">
+                          <img src={goldenPreview} className="w-full h-full object-contain" alt="Golden" />
+                        </div>
+                        <div className="px-3 py-2.5 flex items-center justify-between border-t border-slate-800/60">
+                          <div className="min-w-0">
+                            <p className="text-[10px] font-bold text-slate-200 truncate">{goldenFile?.name}</p>
+                            <p className="text-[8px] text-slate-500">{goldenFile ? (goldenFile.size / 1024).toFixed(0) + " KB" : ""}</p>
+                          </div>
+                          <button onClick={() => { setGoldenFile(null); setGoldenPreview(null); }}
+                            className="h-6 w-6 rounded flex items-center justify-center border border-slate-700/60 text-slate-500 hover:text-red-400 hover:border-red-500/30 transition-all">
+                            <X size={11} />
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <label className="flex flex-col items-center justify-center gap-2.5 h-36 rounded-xl border-2 border-dashed border-slate-700/50 bg-slate-900/40 hover:bg-cyan-950/10 hover:border-cyan-500/50 cursor-pointer transition-all z-10">
+                        <input type="file" accept="image/*" onChange={handleGoldenChange} className="hidden" />
+                        <div className="h-10 w-10 rounded-full bg-slate-950 border border-slate-700/60 flex items-center justify-center hover:scale-110 hover:border-cyan-500/30 transition-all">
+                          <Sparkles size={16} className="text-slate-500 hover:text-cyan-400 transition-colors" />
+                        </div>
+                        <div className="text-center">
+                          <p className="text-[11px] font-bold text-slate-300 hover:text-cyan-400 transition-colors">Select OEM Golden</p>
+                          <p className="text-[9px] text-slate-500">Clean baseline reference</p>
+                        </div>
+                      </label>
+                    )}
+                  </>
                 )}
               </div>
             </div>
@@ -636,15 +732,35 @@ export default function UploadInspectionModal({ open, onClose, onSuccess }) {
             <div className="grid grid-cols-3 gap-4">
               <div>
                 <label className="text-[9px] font-bold tracking-wider text-slate-500 uppercase mb-1.5 block">Component Name</label>
-                <input type="text" value={componentName} onChange={(e) => setComponentName(e.target.value)}
-                  placeholder="e.g. Brake Disc"
-                  className="w-full h-10 px-3.5 rounded-xl bg-slate-900/80 border border-slate-700/60 text-slate-200 text-xs placeholder:text-slate-700 focus:border-cyan-500/40 focus:shadow-[0_0_15px_rgba(6,182,212,0.1)] transition-all" />
+                <div className="relative">
+                  <input type="text" value={componentName} onChange={(e) => setComponentName(e.target.value)}
+                    disabled={catalogMode === "catalog"}
+                    placeholder="e.g. Brake Disc"
+                    className={`w-full h-10 px-3.5 rounded-xl border text-xs focus:border-cyan-500/40 focus:shadow-[0_0_15px_rgba(6,182,212,0.1)] transition-all ${
+                      catalogMode === "catalog"
+                        ? "bg-slate-950/60 border-slate-850/80 text-slate-400 cursor-not-allowed font-semibold"
+                        : "bg-slate-900/80 border-slate-700/60 text-slate-200 placeholder:text-slate-700"
+                    }`} />
+                  {catalogMode === "catalog" && (
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[8px] bg-slate-900 border border-slate-850 text-slate-500 px-1.5 py-0.5 rounded font-black tracking-widest uppercase">Catalog</span>
+                  )}
+                </div>
               </div>
               <div>
                 <label className="text-[9px] font-bold tracking-wider text-slate-500 uppercase mb-1.5 block">Component ID / Serial (Optional)</label>
-                <input type="text" value={expectedSerial} onChange={(e) => setExpectedSerial(e.target.value)}
-                  placeholder="e.g. BD-001"
-                  className="w-full h-10 px-3.5 rounded-xl bg-slate-900/80 border border-slate-700/60 text-slate-200 text-xs placeholder:text-slate-700 focus:border-cyan-500/40 focus:shadow-[0_0_15px_rgba(6,182,212,0.1)] transition-all" />
+                <div className="relative">
+                  <input type="text" value={expectedSerial} onChange={(e) => setExpectedSerial(e.target.value)}
+                    disabled={catalogMode === "catalog"}
+                    placeholder="e.g. BD-001"
+                    className={`w-full h-10 px-3.5 rounded-xl border text-xs focus:border-cyan-500/40 focus:shadow-[0_0_15px_rgba(6,182,212,0.1)] transition-all ${
+                      catalogMode === "catalog"
+                        ? "bg-slate-950/60 border-slate-850/80 text-slate-400 cursor-not-allowed font-tech-code"
+                        : "bg-slate-900/80 border-slate-700/60 text-slate-200 placeholder:text-slate-700"
+                    }`} />
+                  {catalogMode === "catalog" && (
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[8px] bg-slate-900 border border-slate-850 text-slate-500 px-1.5 py-0.5 rounded font-black tracking-widest uppercase">Catalog</span>
+                  )}
+                </div>
               </div>
               <div>
                 <label className="text-[9px] font-bold tracking-wider text-slate-500 uppercase mb-1.5 block">Vendor</label>

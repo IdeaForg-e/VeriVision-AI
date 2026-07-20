@@ -47,6 +47,10 @@ export async function createInspection(formData) {
   return await api.post("/inspections", formData);
 }
 
+export async function getCatalog() {
+  return await api.get("/inspections/catalog");
+}
+
 export async function deleteCase(caseId) {
   return await api.delete(`/inspections/${caseId}`);
 }
