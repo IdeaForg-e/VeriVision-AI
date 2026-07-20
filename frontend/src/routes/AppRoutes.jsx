@@ -4,7 +4,6 @@ import LoginPage from "../pages/LoginPage.jsx";
 import AIInspectionPage from "../pages/AIInspectionPage.jsx";
 import InspectionDetailPage from "../pages/InspectionDetailPage.jsx";
 import HumanReviewPage from "../pages/HumanReviewPage.jsx";
-import FeedbackPanelPage from "../pages/FeedbackPanelPage.jsx";
 import AdminConsolePage from "../pages/AdminConsolePage.jsx";
 import AnalyticsDashboardPage from "../pages/AnalyticsDashboardPage.jsx";
 import NotFoundPage from "../pages/NotFoundPage.jsx";
@@ -25,7 +24,6 @@ export default function AppRoutes() {
       <Route path="/review" element={<WorkspaceRoute><HumanReviewPage /></WorkspaceRoute>} />
       <Route path="/catalog" element={<WorkspaceRoute><AdminConsolePage /></WorkspaceRoute>} />
       <Route path="/analytics" element={<WorkspaceRoute><AnalyticsDashboardPage /></WorkspaceRoute>} />
-      <Route path="/feedback" element={<WorkspaceRoute><FeedbackPanelPage /></WorkspaceRoute>} />
       <Route path="*" element={<NotFoundPage />} />
     </Routes>
   );

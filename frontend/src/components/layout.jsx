@@ -11,7 +11,6 @@ const NAV_ITEMS = [
   { to: ROUTES.CASE_DETAIL, icon: FileText, label: "Reports", desc: "Case history" },
   { to: ROUTES.HUMAN_REVIEW, icon: ShieldCheck, label: "Review", desc: "QA approvals" },
   { to: ROUTES.ANALYTICS, icon: Activity, label: "Analytics", desc: "Fraud insights" },
-  { to: ROUTES.FEEDBACK, icon: Sliders, label: "Tuning", desc: "Config & rules" },
 ];
 
 function BrandMark({ compact = false }) {
