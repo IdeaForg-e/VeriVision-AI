@@ -34,3 +34,11 @@ export async function getRepeatOffenders() {
     return [];
   }
 }
+
+export async function getMonthlyTrend() {
+  try {
+    return await api.get("/analytics/monthly-trend");
+  } catch {
+    return [];
+  }
+}

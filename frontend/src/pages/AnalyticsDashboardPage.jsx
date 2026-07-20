@@ -7,11 +7,12 @@ import {
     getVendorAnalytics,
     getVendorDetail,
     getSiteAnalytics,
-    getRepeatOffenders
+    getRepeatOffenders,
+    getMonthlyTrend
 } from "../services/analyticsService.js";
 import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
-    PieChart, Pie, Cell
+    PieChart, Pie, Cell, AreaChart, Area
 } from "recharts";
 import {
     TrendingUp, AlertTriangle, CheckCircle, Activity, BarChart3,
@@ -110,6 +111,7 @@ export default function AnalyticsDashboardPage() {
     const [vendors, setVendors] = useState([]);
     const [sites, setSites] = useState([]);
     const [repeatOffenders, setRepeatOffenders] = useState([]);
+    const [monthlyTrend, setMonthlyTrend] = useState([]);
 
     // Interactive selected vendor details state
     const [selectedVendor, setSelectedVendor] = useState(null);
@@ -125,14 +127,16 @@ export default function AnalyticsDashboardPage() {
                 casesData,
                 vendorData,
                 siteData,
-                offendersData
+                offendersData,
+                trendData
             ] = await Promise.all([
                 getTriageQueue({ page: 1, pageSize: 1000, filters: {} }),
                 getTriageStats(),
                 getCases(),
                 getVendorAnalytics(),
                 getSiteAnalytics(),
-                getRepeatOffenders()
+                getRepeatOffenders(),
+                getMonthlyTrend()
             ]);
             setQueueItems(Array.isArray(queueResult?.items) ? queueResult.items : []);
             setCases(casesData || []);
@@ -140,6 +144,7 @@ export default function AnalyticsDashboardPage() {
             setVendors(vendorData || []);
             setSites(siteData || []);
             setRepeatOffenders(offendersData || []);
+            setMonthlyTrend(trendData || []);
         } catch (err) {
             console.error("Failed to load analytics data:", err);
         } finally {
@@ -406,6 +411,52 @@ export default function AnalyticsDashboardPage() {
                 </ChartCard>
             </div>
 
+            {/* Charts Row 2 — Month-on-Month Compliance Trend */}
+            <div className="grid grid-cols-1 gap-6 mb-8">
+                <ChartCard
+                    title="Month-on-Month Compliance & Fraud Timeline"
+                    icon={TrendingUp}
+                    iconColor="bg-emerald-950/20 border-emerald-500/20 text-emerald-400"
+                    badge="LIVE TIMELINE"
+                    badgeColor="bg-cyan-950/20 border-cyan-500/20 text-cyan-400"
+                >
+                    {monthlyTrend.length > 0 ? (
+                        <ResponsiveContainer width="100%" height={300}>
+                            <AreaChart data={monthlyTrend}>
+                                <defs>
+                                    <linearGradient id="colorTotal" x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.25}/>
+                                        <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
+                                    </linearGradient>
+                                    <linearGradient id="colorFraud" x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="5%" stopColor="#ef4444" stopOpacity={0.25}/>
+                                        <stop offset="95%" stopColor="#ef4444" stopOpacity={0}/>
+                                    </linearGradient>
+                                </defs>
+                                <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" strokeOpacity={0.4} />
+                                <XAxis dataKey="month" stroke="#64748b" fontSize={11} axisLine={false} tickLine={false} />
+                                <YAxis stroke="#64748b" fontSize={11} axisLine={false} tickLine={false} />
+                                <Tooltip content={<CustomTooltip />} />
+                                <Legend
+                                    verticalAlign="bottom"
+                                    height={30}
+                                    iconType="circle"
+                                    iconSize={8}
+                                    formatter={(value) => <span className="text-xs text-slate-400">{value}</span>}
+                                />
+                                <Area type="monotone" dataKey="total_inspections" stroke="#3b82f6" strokeWidth={2} name="Total Received" fillOpacity={1} fill="url(#colorTotal)" />
+                                <Area type="monotone" dataKey="fraud_cases" stroke="#ef4444" strokeWidth={2} name="Fraud Cases" fillOpacity={1} fill="url(#colorFraud)" />
+                            </AreaChart>
+                        </ResponsiveContainer>
+                    ) : (
+                        <div className="flex flex-col items-center justify-center h-72 text-slate-500 gap-3">
+                            <Activity size={32} className="text-slate-700" />
+                            <p className="text-xs font-semibold">No historical timeline data recorded yet</p>
+                        </div>
+                    )}
+                </ChartCard>
+            </div>
+
             {/* Vendor Performance Integrity Dashboard (NEW SECTION) */}
             <div className="relative group mb-8">
                 <div className="relative bg-[#0f172a]/55 border border-slate-800/80 rounded-xl shadow-lg overflow-hidden">
@@ -607,6 +658,7 @@ export default function AnalyticsDashboardPage() {
                             <thead>
                                 <tr className="border-b border-slate-800 bg-slate-900/30">
                                     <th className="text-left px-6 py-3.5 text-[10px] font-extrabold uppercase tracking-wider text-slate-500">Case ID</th>
+                                    <th className="text-left px-6 py-3.5 text-[10px] font-extrabold uppercase tracking-wider text-slate-500">Delivery Date</th>
                                     <th className="text-left px-6 py-3.5 text-[10px] font-extrabold uppercase tracking-wider text-slate-500">Part</th>
                                     <th className="text-left px-6 py-3.5 text-[10px] font-extrabold uppercase tracking-wider text-slate-500">Commodity</th>
                                     <th className="text-left px-6 py-3.5 text-[10px] font-extrabold uppercase tracking-wider text-slate-500">Risk Score</th>
@@ -620,6 +672,7 @@ export default function AnalyticsDashboardPage() {
                                         <td className="px-6 py-4">
                                             <span className="font-tech-code text-cyan-400 font-bold">{item.caseId?.slice(0, 8)}...</span>
                                         </td>
+                                        <td className="px-6 py-4 text-slate-450 font-semibold">{item.date || "N/A"}</td>
                                         <td className="px-6 py-4 text-slate-300 font-semibold">{item.partNumber || "N/A"}</td>
                                         <td className="px-6 py-4">
                                             <span className="flex items-center gap-1.5 text-slate-400">

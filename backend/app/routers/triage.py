@@ -122,6 +122,7 @@ def get_triage_queue(
             confidence=confidence,
             reason=reason,
             status=status_label,
+            date=insp.date or (insp.created_at.strftime("%Y-%m-%d") if insp.created_at else "N/A")
         ))
 
     return items

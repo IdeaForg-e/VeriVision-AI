@@ -151,6 +151,7 @@ class CaseQueueItem(BaseModel):
     confidence: int
     reason: str
     status: str
+    date: Optional[str] = None
 
 class TriageStats(BaseModel):
     totalToday: int
@@ -247,3 +248,9 @@ class VendorDetailResponse(BaseModel):
     vendor: str
     monthly_trend: List[VendorMonthlyDetailItem]
     fraud_components: List[str]
+
+class MonthlyTrendItem(BaseModel):
+    month: str
+    total_inspections: int
+    fraud_cases: int
+    fraud_rate: float

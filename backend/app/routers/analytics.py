@@ -218,3 +218,71 @@ def get_repeat_offenders(
 
     result.sort(key=lambda x: x.fraud_cases, reverse=True)
     return result
+
+
+@router.get("/monthly-trend", response_model=List[schemas.MonthlyTrendItem])
+def get_monthly_trend(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(utils.get_current_user)
+):
+    """Retrieve month-on-month trend of inspections and fraud cases."""
+    logger.info(f"[Analytics] Monthly trend requested by {current_user.email}")
+
+    inspections = (
+        db.query(models.Inspection)
+        .join(models.InspectionResult, models.InspectionResult.inspection_id == models.Inspection.id)
+        .filter(models.Inspection.status == "completed")
+        .all()
+    )
+
+    months_map = {}
+    for insp in inspections:
+        res = insp.result
+        if not res:
+            continue
+        is_fraud = res.verdict in FRAUD_VERDICTS
+
+        # Parse month key
+        dt = None
+        if insp.date:
+            try:
+                dt = datetime.strptime(insp.date, "%Y-%m-%d")
+            except Exception:
+                try:
+                    dt = datetime.strptime(insp.date, "%d-%b-%Y")
+                except Exception:
+                    pass
+        if not dt:
+            dt = insp.created_at
+        if not dt:
+            continue
+
+        month_key = (dt.year, dt.month, dt.strftime("%b"))
+        if month_key not in months_map:
+            months_map[month_key] = {"total": 0, "fraud": 0}
+
+        months_map[month_key]["total"] += 1
+        if is_fraud:
+            months_map[month_key]["fraud"] += 1
+
+    result = []
+    for key in sorted(months_map.keys()):
+        total = months_map[key]["total"]
+        fraud = months_map[key]["fraud"]
+        rate = round((fraud / total) * 100, 1) if total > 0 else 0.0
+        result.append(schemas.MonthlyTrendItem(
+            month=key[2],
+            total_inspections=total,
+            fraud_cases=fraud,
+            fraud_rate=rate
+        ))
+
+    if not result:
+        result.append(schemas.MonthlyTrendItem(
+            month=datetime.utcnow().strftime("%b"),
+            total_inspections=0,
+            fraud_cases=0,
+            fraud_rate=0.0
+        ))
+
+    return result
