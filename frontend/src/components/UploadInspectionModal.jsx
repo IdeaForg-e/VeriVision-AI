@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
-import { Modal, Loader } from "./common.jsx";
+import { Modal } from "./common.jsx";
 import { createInspection } from "../services/caseService.js";
-import { Upload, AlertCircle, AlertTriangle, RefreshCw, Sparkles, Image as ImageIcon } from "lucide-react";
+import { Upload, AlertCircle, AlertTriangle, RefreshCw, Sparkles, Image as ImageIcon, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { ROUTES } from "../utils/constants.js";
 
@@ -14,6 +14,10 @@ export default function UploadInspectionModal({ open, onClose, onSuccess }) {
   const [customFile, setCustomFile] = useState(null); // defect target scan image
   const [goldenFile, setGoldenFile] = useState(null); // golden reference image
   const [expectedSerial, setExpectedSerial] = useState("");
+
+  // Visual thumbnail previews
+  const [goldenPreview, setGoldenPreview] = useState(null);
+  const [targetPreview, setTargetPreview] = useState(null);
 
   // Pipeline execution feedback
   const [processing, setProcessing] = useState(false);
@@ -30,8 +34,20 @@ export default function UploadInspectionModal({ open, onClose, onSuccess }) {
     setViabilityWarning(null);
     setCustomFile(null);
     setGoldenFile(null);
+    if (goldenPreview) URL.revokeObjectURL(goldenPreview);
+    if (targetPreview) URL.revokeObjectURL(targetPreview);
+    setGoldenPreview(null);
+    setTargetPreview(null);
     setExpectedSerial("");
   }, [open]);
+
+  // Clean object URL cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (goldenPreview) URL.revokeObjectURL(goldenPreview);
+      if (targetPreview) URL.revokeObjectURL(targetPreview);
+    };
+  }, [goldenPreview, targetPreview]);
 
   // Helper utility to read local image sizes
   const getImageDimensions = (file) => {
@@ -97,6 +113,32 @@ export default function UploadInspectionModal({ open, onClose, onSuccess }) {
 
     checkViability();
   }, [goldenFile, customFile]);
+
+  const handleGoldenChange = (e) => {
+    const file = e.target.files[0];
+    if (goldenPreview) {
+      URL.revokeObjectURL(goldenPreview);
+    }
+    setGoldenFile(file);
+    if (file) {
+      setGoldenPreview(URL.createObjectURL(file));
+    } else {
+      setGoldenPreview(null);
+    }
+  };
+
+  const handleTargetChange = (e) => {
+    const file = e.target.files[0];
+    if (targetPreview) {
+      URL.revokeObjectURL(targetPreview);
+    }
+    setCustomFile(file);
+    if (file) {
+      setTargetPreview(URL.createObjectURL(file));
+    } else {
+      setTargetPreview(null);
+    }
+  };
 
   const runSimulatedProgress = () => {
     setProgressLog([]);
@@ -168,7 +210,7 @@ export default function UploadInspectionModal({ open, onClose, onSuccess }) {
       <button
         type="button"
         onClick={onClose}
-        className="px-5 py-2.5 rounded-lg border border-slate-800 bg-slate-900/60 text-slate-400 hover:text-slate-100 hover:bg-slate-800 transition font-semibold text-xs"
+        className="px-5 py-2.5 rounded-lg border border-slate-800 bg-slate-900/60 text-slate-400 hover:text-slate-105 hover:bg-slate-800 hover:text-slate-100 transition font-semibold text-xs active:scale-98"
       >
         Cancel
       </button>
@@ -176,7 +218,7 @@ export default function UploadInspectionModal({ open, onClose, onSuccess }) {
         type="button"
         onClick={handleSubmit}
         disabled={!goldenFile || !customFile}
-        className="px-5 py-2.5 rounded-lg bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-extrabold text-xs shadow-[0_0_12px_rgba(6,182,212,0.2)] hover:opacity-95 transition disabled:opacity-50 disabled:cursor-not-allowed"
+        className="px-5 py-2.5 rounded-lg bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-extrabold text-xs shadow-[0_0_15px_rgba(6,182,212,0.25)] hover:opacity-95 hover:scale-101 active:scale-98 transition disabled:opacity-50 disabled:cursor-not-allowed"
       >
         Start Inspection
       </button>
@@ -204,7 +246,7 @@ export default function UploadInspectionModal({ open, onClose, onSuccess }) {
       ) : (
         <form onSubmit={handleSubmit} className="space-y-5 text-slate-300 text-body-sm">
           {errorMsg && (
-            <div className="flex gap-3 bg-red-950/20 border border-red-500/20 text-red-400 rounded-lg p-4 animate-shake">
+            <div className="flex gap-3 bg-red-950/20 border border-red-500/25 text-red-400 rounded-lg p-4 animate-shake shadow-[0_4px_15px_rgba(239,68,68,0.08)]">
               <AlertCircle className="shrink-0 text-red-500" size={18} />
               <div>
                 <p className="font-extrabold text-xs tracking-wider uppercase text-red-500">Triage Warning</p>
@@ -214,7 +256,7 @@ export default function UploadInspectionModal({ open, onClose, onSuccess }) {
           )}
 
           {viabilityWarning && (
-            <div className="flex gap-3 bg-cyan-950/20 border border-cyan-500/20 text-cyan-400 rounded-lg p-4 animate-fade-in">
+            <div className="flex gap-3 bg-cyan-950/20 border border-cyan-500/25 text-cyan-400 rounded-lg p-4 animate-fade-in shadow-[0_4px_15px_rgba(6,182,212,0.08)]">
               <AlertTriangle className="shrink-0 text-cyan-500" size={18} />
               <div>
                 <p className="font-extrabold text-xs tracking-wider uppercase text-cyan-500">Semantic AI Pipeline Fallback Active</p>
@@ -229,19 +271,45 @@ export default function UploadInspectionModal({ open, onClose, onSuccess }) {
               <Sparkles size={11} className="text-cyan-400" />
               OEM Golden Reference Standard (Clean Part)
             </label>
-            <label className="border border-dashed border-slate-800 hover:border-cyan-500/40 bg-slate-950/40 hover:bg-cyan-950/5 rounded-xl p-5 flex flex-col items-center justify-center gap-2 cursor-pointer transition-all duration-200 group relative">
-              <input
-                type="file"
-                accept="image/*"
-                onChange={(e) => setGoldenFile(e.target.files[0])}
-                className="hidden"
-              />
-              <ImageIcon className="text-slate-500 group-hover:text-cyan-400 transition" size={22} />
-              <span className="text-xs font-bold text-slate-350 group-hover:text-slate-200 mt-0.5 max-w-[340px] truncate">
-                {goldenFile ? goldenFile.name : "Select or drag OEM standard image"}
-              </span>
-              <span className="text-[9px] text-slate-550">Clean reference template for baseline comparison</span>
-            </label>
+            {goldenPreview ? (
+              <div className="relative flex items-center justify-between gap-4 p-3 bg-slate-900/60 border border-slate-800 rounded-xl shadow-[0_4px_12px_rgba(0,0,0,0.3)] animate-fade-in group hover:border-cyan-500/20 transition-all duration-200">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="relative w-14 h-14 rounded-lg overflow-hidden border border-slate-700 bg-slate-950 flex-shrink-0 shadow-inner">
+                    <img src={goldenPreview} className="w-full h-full object-cover" alt="Golden Preview" />
+                  </div>
+                  <div className="min-w-0 text-left">
+                    <p className="text-xs font-bold text-slate-200 truncate">{goldenFile.name}</p>
+                    <p className="text-[10px] text-slate-500 mt-0.5 font-medium">
+                      {(goldenFile.size / 1024).toFixed(0)} KB • Reference Standard
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setGoldenFile(null);
+                    setGoldenPreview(null);
+                  }}
+                  className="h-8 w-8 rounded-lg flex items-center justify-center border border-slate-800 text-slate-500 hover:text-red-400 hover:border-red-500/30 hover:bg-red-500/5 transition-all flex-shrink-0 active:scale-90"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+            ) : (
+              <label className="border border-dashed border-slate-800 hover:border-cyan-500/40 bg-slate-950/40 hover:bg-cyan-950/5 rounded-xl p-5 flex flex-col items-center justify-center gap-2 cursor-pointer transition-all duration-200 group relative">
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleGoldenChange}
+                  className="hidden"
+                />
+                <ImageIcon className="text-slate-500 group-hover:text-cyan-400 transition" size={22} />
+                <span className="text-xs font-bold text-slate-350 group-hover:text-slate-200 mt-0.5 max-w-[340px] truncate">
+                  Select or drag OEM standard image
+                </span>
+                <span className="text-[9px] text-slate-550">Clean reference template for baseline comparison</span>
+              </label>
+            )}
           </div>
 
           {/* Defect Scan Upload */}
@@ -250,19 +318,45 @@ export default function UploadInspectionModal({ open, onClose, onSuccess }) {
               <Upload size={11} className="text-blue-400" />
               Part Image Scan (Inspection Target)
             </label>
-            <label className="border border-dashed border-slate-800 hover:border-blue-500/40 bg-slate-950/40 hover:bg-blue-950/5 rounded-xl p-5 flex flex-col items-center justify-center gap-2 cursor-pointer transition-all duration-200 group relative">
-              <input
-                type="file"
-                accept="image/*"
-                onChange={(e) => setCustomFile(e.target.files[0])}
-                className="hidden"
-              />
-              <Upload className="text-slate-500 group-hover:text-blue-500 transition" size={22} />
-              <span className="text-xs font-bold text-slate-350 group-hover:text-slate-200 mt-0.5 max-w-[340px] truncate">
-                {customFile ? customFile.name : "Select or drag inspection scan image"}
-              </span>
-              <span className="text-[9px] text-slate-550">Captured photo of the part to run compliance rules against</span>
-            </label>
+            {targetPreview ? (
+              <div className="relative flex items-center justify-between gap-4 p-3 bg-slate-900/60 border border-slate-800 rounded-xl shadow-[0_4px_12px_rgba(0,0,0,0.3)] animate-fade-in group hover:border-blue-500/20 transition-all duration-200">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="relative w-14 h-14 rounded-lg overflow-hidden border border-slate-700 bg-slate-950 flex-shrink-0 shadow-inner">
+                    <img src={targetPreview} className="w-full h-full object-cover" alt="Target Preview" />
+                  </div>
+                  <div className="min-w-0 text-left">
+                    <p className="text-xs font-bold text-slate-200 truncate">{customFile.name}</p>
+                    <p className="text-[10px] text-slate-500 mt-0.5 font-medium">
+                      {(customFile.size / 1024).toFixed(0)} KB • Target Scan
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCustomFile(null);
+                    setTargetPreview(null);
+                  }}
+                  className="h-8 w-8 rounded-lg flex items-center justify-center border border-slate-800 text-slate-500 hover:text-red-400 hover:border-red-500/30 hover:bg-red-500/5 transition-all flex-shrink-0 active:scale-90"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+            ) : (
+              <label className="border border-dashed border-slate-800 hover:border-blue-500/40 bg-slate-950/40 hover:bg-blue-950/5 rounded-xl p-5 flex flex-col items-center justify-center gap-2 cursor-pointer transition-all duration-200 group relative">
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleTargetChange}
+                  className="hidden"
+                />
+                <Upload className="text-slate-500 group-hover:text-blue-500 transition" size={22} />
+                <span className="text-xs font-bold text-slate-350 group-hover:text-slate-200 mt-0.5 max-w-[340px] truncate">
+                  Select or drag inspection scan image
+                </span>
+                <span className="text-[9px] text-slate-550">Captured photo of the part to run compliance rules against</span>
+              </label>
+            )}
           </div>
 
           {/* Barcode details */}
@@ -273,12 +367,12 @@ export default function UploadInspectionModal({ open, onClose, onSuccess }) {
               value={expectedSerial}
               onChange={(e) => setExpectedSerial(e.target.value)}
               placeholder="e.g. 91165LUS0DDD (Checks label character mismatches)"
-              className="cyber-input rounded-lg text-sm bg-slate-900 border border-slate-800 text-slate-200 px-3.5"
+              className="cyber-input rounded-lg text-sm bg-slate-900 border border-slate-800 text-slate-200 px-3.5 py-2.5 h-10 shadow-sm"
             />
           </div>
 
           {/* Camera Info */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 gap-4 pb-2">
             <div className="flex flex-col gap-1.5">
               <label className="font-label-caps text-[10px] tracking-wider text-slate-500 uppercase font-semibold">Capture Site</label>
               <input
@@ -286,7 +380,7 @@ export default function UploadInspectionModal({ open, onClose, onSuccess }) {
                 value={captureSite}
                 onChange={(e) => setCaptureSite(e.target.value)}
                 placeholder="e.g. Line-1"
-                className="cyber-input rounded-lg text-sm bg-slate-900 border border-slate-800 text-slate-200 px-3.5"
+                className="cyber-input rounded-lg text-sm bg-slate-900 border border-slate-800 text-slate-200 px-3.5 py-2.5 h-10 shadow-sm"
               />
             </div>
             <div className="flex flex-col gap-1.5">
@@ -294,7 +388,7 @@ export default function UploadInspectionModal({ open, onClose, onSuccess }) {
               <select
                 value={captureAngle}
                 onChange={(e) => setCaptureAngle(e.target.value)}
-                className="cyber-input rounded-lg text-sm bg-slate-900 border border-slate-800 text-slate-200"
+                className="cyber-input rounded-lg text-sm bg-slate-900 border border-slate-800 text-slate-200 px-3.5 py-2 h-10 cursor-pointer shadow-sm"
               >
                 <option value="top">Top Down (Default)</option>
                 <option value="angled">Angled Perspective</option>
