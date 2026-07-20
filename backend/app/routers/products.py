@@ -56,6 +56,8 @@ async def upload_golden_reference(
     file_ext = os.path.splitext(file.filename)[1]
     filename = f"golden_{product_id}_{angle}{file_ext}"
     file_path = os.path.join(settings.GOLDEN_DIR, filename)
+    # Store relative path for frontend URL resolution (matches seed_db pattern)
+    relative_path = f"data/golden/{filename}"
 
     try:
         with open(file_path, "wb") as f:
@@ -80,13 +82,13 @@ async def upload_golden_reference(
     ).first()
 
     if db_golden:
-        db_golden.image_path = file_path
+        db_golden.image_path = relative_path
         db_golden.expected_serial = expected_serial
         db_golden.roi_config = roi_json
     else:
         db_golden = models.GoldenReference(
             product_id=product_id,
-            image_path=file_path,
+            image_path=relative_path,
             expected_serial=expected_serial,
             roi_config=roi_json,
             angle=angle

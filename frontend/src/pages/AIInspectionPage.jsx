@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
-import { Layout } from "../components/layout.jsx";
-import { StatsCards, QueueFilters, QueueTable, PipelineStatus } from "../components/triage.jsx";
+import { Layout } from "../components/Layout.jsx";
+import { StatsCards, QueueFilters, QueueTable, PipelineStatus } from "../components/Triage.jsx";
 import { getTriageQueue, getTriageStats, getPipelineStatus } from "../services/triageService.js";
 
 

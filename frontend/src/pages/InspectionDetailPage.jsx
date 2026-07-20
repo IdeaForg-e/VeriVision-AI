@@ -2,8 +2,8 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 
-import { Layout } from "../components/layout.jsx";
-import { Loader } from "../components/common.jsx";
+import { Layout } from "../components/Layout.jsx";
+import { Loader } from "../components/Common.jsx";
 import { 
   MetadataCard, 
   FraudScore, 
@@ -13,7 +13,7 @@ import {
   DetectorMetrics, 
   EvidenceTimeline, 
   RecommendationCard 
-} from "../components/case.jsx";
+} from "../components/Case.jsx";
 
 import { getCaseById, deleteCase } from "../services/caseService.js";
 import { fetchCaseForReview } from "../services/reviewService.js";

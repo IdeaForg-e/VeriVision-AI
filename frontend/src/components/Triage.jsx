@@ -1,5 +1,5 @@
 // Consolidated components for triage
-import { Pagination, SearchBar } from "./common.jsx";
+import { Pagination, SearchBar } from "./Common.jsx";
 import { ROUTES } from "../utils/constants.js";
 import { Search, Filter, RefreshCw, Download, AlertTriangle, ShieldAlert, CheckCircle2, Clock3, Activity, ChevronRight, ClipboardCheck, BrainCircuit, TrendingUp } from "lucide-react";
 import { useMemo, useState, useEffect } from "react";

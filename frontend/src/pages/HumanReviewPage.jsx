@@ -1,5 +1,5 @@
-import { Layout } from "../components/layout.jsx";
-import { EvidencePanel, ConfidenceBadge, CaseVelocity, CaseStatusTracker, ReviewerComment, ReviewDecision } from "../components/review.jsx";
+import { Layout } from "../components/Layout.jsx";
+import { EvidencePanel, ConfidenceBadge, CaseVelocity, CaseStatusTracker, ReviewerComment, ReviewDecision } from "../components/Review.jsx";
 import { useReview } from "../hooks/useReview.js";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { ROUTES } from "../utils/constants.js";

@@ -63,14 +63,8 @@ def compute_ssim_diff(src_img: np.ndarray, ref_img: np.ndarray) -> tuple[float, 
     # Threshold diff: values below 100 in diff_u8 (meaning high difference) become 255 in thresh
     _, thresh = cv2.threshold(diff_u8, 100, 255, cv2.THRESH_BINARY_INV)
 
-    # 1. Create a glowing colored JET heatmap background overlay
-    # Blur the inverted difference to create a smooth, glowing thermal gradient
-    blurred_diff = cv2.GaussianBlur(inv_diff, (21, 21), 0)
-    color_heatmap = cv2.applyColorMap(blurred_diff, cv2.COLORMAP_JET)
-
-    # Blend the color heatmap with the original image (65% original scan, 35% thermal heatmap)
-    # This creates a high-tech glowing background representing difference density
-    glowing_base = cv2.addWeighted(src_img, 0.65, color_heatmap, 0.35, 0)
+    # 1. Use the original real image scan directly as the base (without thermal colormap filter)
+    glowing_base = src_img.copy()
 
     # 2. Group nearby small points (like pin connections) into unified contiguous regions
     kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (25, 25))

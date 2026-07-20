@@ -1,9 +1,10 @@
-import { useState, useEffect, useRef, useCallback } from "react";
-import { Modal } from "./common.jsx";
+import { useState, useEffect } from "react";
+import { Modal } from "./Common.jsx";
 import { createInspection, getCatalog } from "../services/caseService.js";
-import { Upload, AlertCircle, AlertTriangle, RefreshCw, Sparkles, X, Scan, Camera, Cpu, ChevronDown, Video, ZapOff, Circle } from "lucide-react";
+import { AlertCircle, RefreshCw, Sparkles, Scan, Cpu, ChevronDown } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { ROUTES } from "../utils/constants.js";
+import TargetScanCaptureZone from "./TargetScanCaptureZone.jsx";
 
 export default function UploadInspectionModal({ open, onClose, onSuccess }) {
   const navigate = useNavigate();
@@ -12,275 +13,79 @@ export default function UploadInspectionModal({ open, onClose, onSuccess }) {
   const [captureSite, setCaptureSite] = useState("Line-1");
   const [captureAngle, setCaptureAngle] = useState("top");
   const [customFile, setCustomFile] = useState(null);
-  const [goldenFile, setGoldenFile] = useState(null);
   const [expectedSerial, setExpectedSerial] = useState("");
   const [componentName, setComponentName] = useState("");
   const [vendor, setVendor] = useState("");
+  const [date, setDate] = useState("");
 
   // Catalog Reference states
-  const [catalogMode, setCatalogMode] = useState("catalog"); // "catalog" | "custom"
   const [catalogList, setCatalogList] = useState([]);
   const [selectedCatalogPart, setSelectedCatalogPart] = useState("");
 
-  // Webcam states
-  const [targetMode, setTargetMode] = useState("upload"); // "upload" | "webcam"
-  const [webcamStream, setWebcamStream] = useState(null);
-  const [webcamError, setWebcamError] = useState(null);
-  const [webcamReady, setWebcamReady] = useState(false);
-  const videoRef = useRef(null);
-  const canvasRef = useRef(null);
-  const [date, setDate] = useState("");
+
 
   // Visual thumbnail previews
-  const [goldenPreview, setGoldenPreview] = useState(null);
   const [targetPreview, setTargetPreview] = useState(null);
 
   // Pipeline execution feedback
   const [processing, setProcessing] = useState(false);
   const [progressLog, setProgressLog] = useState([]);
   const [errorMsg, setErrorMsg] = useState(null);
-  const [viabilityWarning, setViabilityWarning] = useState(null);
-  const [webcamScanResult, setWebcamScanResult] = useState(null); // null | { status, checks }
 
-  const handleCatalogPartChange = useCallback((partNum, list = catalogList) => {
+  const handleCatalogPartChange = (partNum) => {
     setSelectedCatalogPart(partNum);
-    const selected = list.find(c => c.part_number === partNum);
-    if (selected) {
-      setComponentName(selected.name);
-      setExpectedSerial(selected.golden_references?.[0]?.expected_serial || "");
-    }
-  }, [catalogList]);
+    setCatalogList(prev => {
+      const selected = prev.find(c => c.part_number === partNum);
+      if (selected) {
+        setComponentName(selected.name);
+        setExpectedSerial(selected.golden_references?.[0]?.expected_serial || "");
+      }
+      return prev;
+    });
+  };
 
   useEffect(() => {
-    if (!open) {
-      // Stop webcam whenever modal closes
-      stopWebcam();
-      return;
-    }
+    if (!open) return;
     setProcessing(false);
     setProgressLog([]);
     setErrorMsg(null);
-    setViabilityWarning(null);
     setCustomFile(null);
-    setGoldenFile(null);
-    if (goldenPreview) URL.revokeObjectURL(goldenPreview);
     if (targetPreview) URL.revokeObjectURL(targetPreview);
-    setGoldenPreview(null);
     setTargetPreview(null);
     setExpectedSerial("");
     setComponentName("");
     setVendor("");
-    setTargetMode("upload");
-    setWebcamError(null);
-    setWebcamReady(false);
-    setWebcamScanResult(null);
     setDate("");
-    setCatalogMode("catalog");
 
     // Fetch pre-registered references
+    let cancelled = false;
     const loadCatalog = async () => {
       try {
         const list = await getCatalog();
+        if (cancelled) return;
         setCatalogList(list || []);
         if (list && list.length > 0) {
-          handleCatalogPartChange(list[0].part_number, list);
+          setSelectedCatalogPart(list[0].part_number);
+          setComponentName(list[0].name);
+          setExpectedSerial(list[0].golden_references?.[0]?.expected_serial || "");
         }
       } catch (err) {
         console.error("Failed to load parts catalog:", err);
       }
     };
     loadCatalog();
-  }, [open, handleCatalogPartChange]);
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
 
   useEffect(() => {
     return () => {
-      if (goldenPreview) URL.revokeObjectURL(goldenPreview);
       if (targetPreview) URL.revokeObjectURL(targetPreview);
     };
-  }, [goldenPreview, targetPreview]);
+  }, [targetPreview]);
 
-  // ── Webcam helpers ──────────────────────────────────────────────────────────
-  const stopWebcam = useCallback(() => {
-    setWebcamStream(prev => {
-      if (prev) prev.getTracks().forEach(t => t.stop());
-      return null;
-    });
-    setWebcamReady(false);
-  }, []);
 
-  const startWebcam = useCallback(async () => {
-    setWebcamError(null);
-    setWebcamReady(false);
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "environment", width: { ideal: 1280 }, height: { ideal: 720 } },
-        audio: false,
-      });
-      setWebcamStream(stream);
-      // Attach stream to video element once it mounts
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-      }
-    } catch (err) {
-      const msg =
-        err.name === "NotAllowedError"
-          ? "Camera access was denied. Please allow camera permission and try again."
-          : err.name === "NotFoundError"
-          ? "No camera found on this device."
-          : `Camera error: ${err.message}`;
-      setWebcamError(msg);
-    }
-  }, []);
 
-  // Attach stream to <video> whenever the stream or ref changes
-  useEffect(() => {
-    if (videoRef.current && webcamStream) {
-      videoRef.current.srcObject = webcamStream;
-      videoRef.current.play().catch(() => {});
-    }
-  }, [webcamStream]);
-
-  // Agent 1 single-image integrity scan (mirrors the checks done on uploaded files)
-  const runWebcamIntegrityScan = useCallback((file, width, height) => {
-    const checks = [];
-    let overallOk = true;
-
-    // 1. File integrity / readability
-    checks.push({ label: "File Integrity", ok: true, detail: `JPEG blob — ${(file.size / 1024).toFixed(0)} KB` });
-
-    // 2. Minimum resolution
-    const minRes = width >= 150 && height >= 150;
-    if (!minRes) overallOk = false;
-    checks.push({
-      label: "Minimum Resolution",
-      ok: minRes,
-      detail: minRes
-        ? `${width}×${height} px — Sufficient`
-        : `${width}×${height} px — Below 150×150 minimum`,
-    });
-
-    // 3. Aspect ratio classification
-    const ar = width / height;
-    const arLabel = ar > 1.2 ? "Landscape" : ar < 0.8 ? "Portrait" : "Square";
-    checks.push({ label: "Aspect Ratio", ok: true, detail: `${ar.toFixed(2)} — ${arLabel}` });
-
-    // 4. Relative resolution info
-    const megapixels = ((width * height) / 1_000_000).toFixed(2);
-    const resSufficient = width * height >= 150 * 150;
-    checks.push({
-      label: "Relative Resolution",
-      ok: resSufficient,
-      detail: `${megapixels} MP (${width}×${height})`,
-    });
-
-    setWebcamScanResult({ status: overallOk ? "pass" : "fail", checks });
-  }, []);
-
-  const captureFrame = useCallback(() => {
-    const video = videoRef.current;
-    const canvas = canvasRef.current;
-    if (!video || !canvas) return;
-    const w = video.videoWidth || 1280;
-    const h = video.videoHeight || 720;
-    canvas.width = w;
-    canvas.height = h;
-    const ctx = canvas.getContext("2d");
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-    canvas.toBlob((blob) => {
-      if (!blob) return;
-      const file = new File([blob], `webcam-capture-${Date.now()}.jpg`, { type: "image/jpeg" });
-      if (targetPreview) URL.revokeObjectURL(targetPreview);
-      setCustomFile(file);
-      setTargetPreview(URL.createObjectURL(file));
-      // Stop live feed after capture
-      stopWebcam();
-      // ── Agent 1 integrity scan on the captured image ──
-      runWebcamIntegrityScan(file, w, h);
-    }, "image/jpeg", 0.92);
-  }, [targetPreview, stopWebcam, runWebcamIntegrityScan]);
-
-  const handleRetake = useCallback(() => {
-    if (targetPreview) URL.revokeObjectURL(targetPreview);
-    setCustomFile(null);
-    setTargetPreview(null);
-    setWebcamScanResult(null);
-    startWebcam();
-  }, [targetPreview, startWebcam]);
-
-  const handleTabSwitch = useCallback((mode) => {
-    if (mode === targetMode) return;
-    // Clean up opposite mode
-    if (mode === "webcam") {
-      startWebcam();
-    } else {
-      stopWebcam();
-    }
-    // Clear any captured image when switching tabs
-    if (targetPreview) URL.revokeObjectURL(targetPreview);
-    setCustomFile(null);
-    setTargetPreview(null);
-    setTargetMode(mode);
-  }, [targetMode, targetPreview, startWebcam, stopWebcam]);
-
-  const getImageDimensions = (file) => {
-    return new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const img = new Image();
-        img.onload = () => resolve({ width: img.width, height: img.height });
-        img.src = e.target.result;
-      };
-      reader.readAsDataURL(file);
-    });
-  };
-
-  // Pre-scan client-side viability hook
-  useEffect(() => {
-    if (!goldenFile || !customFile) {
-      setViabilityWarning(null);
-      return;
-    }
-    const checkViability = async () => {
-      try {
-        const dimGolden = await getImageDimensions(goldenFile);
-        const dimTarget = await getImageDimensions(customFile);
-        const arGolden = dimGolden.width / dimGolden.height;
-        const arTarget = dimTarget.width / dimTarget.height;
-        if (Math.abs(arGolden - arTarget) > 0.4) {
-          setViabilityWarning("Layout Mismatch: One image is portrait and the other is landscape. Local pixel alignment will be bypassed in favor of semantic Multimodal Vision AI comparison.");
-          return;
-        }
-        if (dimGolden.width < 150 || dimGolden.height < 150 || dimTarget.width < 150 || dimTarget.height < 150) {
-          setViabilityWarning("Resolution too low: Images must be at least 150x150 pixels for compliance processing.");
-          return;
-        }
-        const wRatio = dimTarget.width / dimGolden.width;
-        const hRatio = dimTarget.height / dimGolden.height;
-        if (wRatio < 0.25 || wRatio > 4.0 || hRatio < 0.25 || hRatio > 4.0) {
-          setViabilityWarning("Scale Mismatch: A close-up crop vs wide shot discrepancy was detected. Local pixel subtraction will be bypassed in favor of semantic Multimodal Vision AI comparison.");
-          return;
-        }
-        setViabilityWarning(null);
-      } catch (err) {
-        console.error("Client viability check failed:", err);
-      }
-    };
-    checkViability();
-  }, [goldenFile, customFile]);
-
-  const handleGoldenChange = (e) => {
-    const file = e.target.files[0];
-    if (goldenPreview) URL.revokeObjectURL(goldenPreview);
-    setGoldenFile(file);
-    setGoldenPreview(file ? URL.createObjectURL(file) : null);
-  };
-
-  const handleTargetChange = (e) => {
-    const file = e.target.files[0];
-    if (targetPreview) URL.revokeObjectURL(targetPreview);
-    setCustomFile(file);
-    setTargetPreview(file ? URL.createObjectURL(file) : null);
-  };
 
   const runSimulatedProgress = () => {
     setProgressLog([]);
@@ -300,8 +105,9 @@ export default function UploadInspectionModal({ open, onClose, onSuccess }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (catalogMode === "custom" && !goldenFile) { setErrorMsg("Please upload an OEM Golden Reference standard image."); return; }
     if (!customFile) { setErrorMsg("Please upload a target Part Image Scan to inspect."); return; }
+    if (!selectedCatalogPart) { setErrorMsg("Please select a standard Golden Reference part from the catalog."); return; }
+    
     setProcessing(true);
     setErrorMsg(null);
     runSimulatedProgress();
@@ -310,15 +116,13 @@ export default function UploadInspectionModal({ open, onClose, onSuccess }) {
       formData.append("capture_site", captureSite);
       formData.append("capture_angle", captureAngle);
       formData.append("file", customFile);
-      if (catalogMode === "catalog") {
-        formData.append("catalog_part_number", selectedCatalogPart);
-      } else {
-        formData.append("golden_file", goldenFile);
-      }
+      formData.append("catalog_part_number", selectedCatalogPart);
+      
       if (expectedSerial) formData.append("expected_serial", expectedSerial.trim());
       if (vendor) formData.append("vendor", vendor.trim());
       if (componentName) formData.append("component_name", componentName.trim());
       if (date) formData.append("date", date);
+      
       const result = await createInspection(formData);
       setProcessing(false);
       onClose();
@@ -334,6 +138,14 @@ export default function UploadInspectionModal({ open, onClose, onSuccess }) {
       }
       setErrorMsg(errMsg);
     }
+  };
+
+  // Resolve golden image URL from backend's image_path
+  const getGoldenImageUrl = (goldenRef) => {
+    if (!goldenRef?.image_path) return null;
+    // image_path from DB is like "data/golden/filename.png" or "/dataset/golden_xxx.png"
+    const path = goldenRef.image_path;
+    return path.startsWith("/") ? path : `/${path}`;
   };
 
   // Header title for modal
@@ -352,8 +164,8 @@ export default function UploadInspectionModal({ open, onClose, onSuccess }) {
     </div>
   );
 
-  // Footer buttons
-  const isSubmitDisabled = !customFile || (catalogMode === "custom" && !goldenFile) || (catalogMode === "catalog" && !selectedCatalogPart);
+  // Footer buttons — fixed: removed undefined catalogMode/goldenFile references
+  const isSubmitDisabled = !customFile || !selectedCatalogPart;
   const modalFooter = !processing && (
     <div className="flex items-center justify-end gap-3 w-full">
       <button type="button" onClick={onClose}
@@ -368,6 +180,11 @@ export default function UploadInspectionModal({ open, onClose, onSuccess }) {
       </button>
     </div>
   );
+
+  // Get the selected catalog item and golden reference data
+  const selectedCatalogItem = catalogList.find(c => c.part_number === selectedCatalogPart);
+  const selectedGoldenRef = selectedCatalogItem?.golden_references?.[0];
+  const goldenImageUrl = getGoldenImageUrl(selectedGoldenRef);
 
   return (
     <Modal open={open} onClose={processing ? undefined : onClose} title={customTitle} size="xl" footer={modalFooter}>
@@ -406,392 +223,126 @@ export default function UploadInspectionModal({ open, onClose, onSuccess }) {
             </div>
           )}
 
-          {/* Viability Banner */}
-          {viabilityWarning && (
-            <div className="flex gap-3 bg-gradient-to-r from-cyan-950/40 to-cyan-950/10 border border-cyan-500/20 rounded-xl p-4">
-              <div className="h-9 w-9 rounded-lg bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center shrink-0">
-                <AlertTriangle className="text-cyan-400" size={18} />
-              </div>
-              <div className="min-w-0 pt-0.5">
-                <p className="font-extrabold text-[10px] tracking-wider uppercase text-cyan-400/80">Semantic AI Fallback Active</p>
-                <p className="text-xs mt-0.5 leading-relaxed text-cyan-300/80">{viabilityWarning}</p>
-              </div>
-            </div>
-          )}
+          {/* ═══════ Top Section: Golden Ref + Target Scan side by side ═══════ */}
+          <div className="grid grid-cols-[1fr_1fr] gap-5 items-stretch">
 
-          {/* Upload Section */}
-          <div className="grid grid-cols-2 gap-5">
-            {/* Golden Reference */}
-            <div className="flex flex-col gap-2">
-              <div className="flex items-center justify-between">
-                <label className="text-[10px] font-bold tracking-wider text-slate-400 uppercase flex items-center gap-1.5">
-                  <Sparkles size={12} className="text-cyan-400" />
-                  OEM Golden Reference
-                </label>
-                {/* Catalog / Custom upload toggle */}
-                <div className="flex items-center gap-0.5 bg-slate-900/80 border border-slate-800/80 rounded-lg p-0.5">
-                  <button
-                    type="button"
-                    onClick={() => setCatalogMode("catalog")}
-                    className={`flex items-center gap-1 px-2 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider transition-all ${
-                      catalogMode === "catalog"
-                        ? "bg-gradient-to-r from-cyan-600/80 to-blue-700/80 text-white shadow-[0_0_10px_rgba(6,182,212,0.3)]"
-                        : "text-slate-500 hover:text-slate-350"
-                    }`}
-                  >
-                    Catalog
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setCatalogMode("custom")}
-                    className={`flex items-center gap-1 px-2 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider transition-all ${
-                      catalogMode === "custom"
-                        ? "bg-gradient-to-r from-blue-600/80 to-indigo-700/80 text-white shadow-[0_0_10px_rgba(99,102,241,0.3)]"
-                        : "text-slate-500 hover:text-slate-350"
-                    }`}
-                  >
-                    Custom File
-                  </button>
-                </div>
-              </div>
-
+            {/* ── LEFT: Golden Reference Catalog ── */}
+            <div className="flex flex-col gap-2.5 min-w-0">
+              <label className="text-[10px] font-bold tracking-wider text-slate-400 uppercase flex items-center gap-1.5">
+                <Sparkles size={12} className="text-cyan-400" />
+                OEM Golden Reference Catalog
+              </label>
+              
               <div className="relative">
-                {catalogMode === "catalog" ? (
-                  <div className="space-y-3">
-                    <div className="relative">
-                      <select
-                        value={selectedCatalogPart}
-                        onChange={(e) => handleCatalogPartChange(e.target.value)}
-                        className="w-full h-10 px-3.5 pr-8 rounded-xl bg-slate-900/80 border border-slate-700/60 text-slate-200 text-xs appearance-none cursor-pointer focus:border-cyan-500/40 focus:shadow-[0_0_15px_rgba(6,182,212,0.1)] transition-all"
-                      >
-                        {catalogList.length === 0 ? (
-                          <option value="">No catalog references loaded</option>
-                        ) : (
-                          catalogList.map((item) => (
-                            <option key={item.part_number} value={item.part_number}>
-                              {item.name} ({item.part_number})
-                            </option>
-                          ))
-                        )}
-                      </select>
-                      <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
+                <select
+                  value={selectedCatalogPart}
+                  onChange={(e) => handleCatalogPartChange(e.target.value)}
+                  className="w-full h-11 px-3.5 pr-9 rounded-xl bg-slate-900/80 border border-slate-700/60 text-slate-200 text-xs appearance-none cursor-pointer hover:border-cyan-500/30 focus:border-cyan-500/40 focus:shadow-[0_0_15px_rgba(6,182,212,0.1)] transition-all font-bold tracking-wide outline-none"
+                  style={{ colorScheme: 'dark' }}
+                >
+                  {catalogList.length === 0 ? (
+                    <option value="">No catalog references loaded</option>
+                  ) : (
+                    catalogList.map((item) => (
+                      <option key={item.part_number} value={item.part_number}>
+                        {item.name} ({item.part_number})
+                      </option>
+                    ))
+                  )}
+                </select>
+                <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
+              </div>
+
+              {/* Golden Reference Preview Card */}
+              {selectedCatalogItem && (
+                <div className="relative bg-slate-950/40 border border-slate-800/80 rounded-xl overflow-hidden hover:border-cyan-500/20 transition-all flex gap-4 p-3.5 items-center shadow-inner flex-1 min-h-[9rem]">
+                  {/* Golden image thumbnail */}
+                  {goldenImageUrl ? (
+                    <div className="h-[8rem] w-[8rem] rounded-lg bg-slate-950 border border-slate-800/80 flex items-center justify-center overflow-hidden shrink-0 shadow-inner">
+                      <img
+                        src={goldenImageUrl}
+                        className="w-full h-full object-contain hover:scale-110 transition-transform duration-300"
+                        alt="Golden Standard Preview"
+                        onError={(e) => { e.target.style.display = 'none'; }}
+                      />
                     </div>
-                    <div className="p-3 rounded-lg border border-emerald-500/20 bg-emerald-950/10 text-emerald-450 text-[10px] flex items-start gap-2 leading-relaxed shadow-[0_0_15px_rgba(16,185,129,0.02)]">
-                      <Cpu size={12} className="shrink-0 mt-0.5" />
+                  ) : (
+                    <div className="h-[8rem] w-[8rem] rounded-lg bg-slate-900 border border-slate-800 flex items-center justify-center shrink-0">
+                      <Cpu size={24} className="text-slate-600" />
+                    </div>
+                  )}
+                  
+                  <div className="min-w-0 flex-1 flex flex-col justify-center text-[10px] space-y-1.5">
+                    <p className="font-extrabold text-[11px] text-cyan-400 tracking-wide truncate">{selectedCatalogItem.name}</p>
+                    <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-slate-400">
                       <div>
-                        <p className="font-bold">Catalog Reference Standard Selected</p>
-                        <p className="text-slate-400 mt-0.5">Golden image, expected text, and default regions of interest are pre-loaded from backend storage.</p>
+                        <span className="text-slate-600 block text-[8px] uppercase tracking-wider font-semibold">Commodity</span>
+                        <span className="font-bold uppercase text-[9px] text-slate-350">{selectedCatalogItem.commodity}</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-600 block text-[8px] uppercase tracking-wider font-semibold">Part Code</span>
+                        <span className="font-tech-code text-slate-350 font-bold text-[9px]">{selectedCatalogItem.part_number}</span>
+                      </div>
+                      <div className="col-span-2">
+                        <span className="text-slate-600 block text-[8px] uppercase tracking-wider font-semibold">Expected Serial ID</span>
+                        <span className="font-tech-code text-slate-400 truncate block text-[9px]">{selectedGoldenRef?.expected_serial || "OEM STANDARD REFERENCE"}</span>
                       </div>
                     </div>
                   </div>
-                ) : (
-                  <>
-                    <div className="absolute -inset-0.5 bg-gradient-to-br from-cyan-500/10 to-purple-600/10 rounded-xl blur opacity-0 hover:opacity-100 pointer-events-none transition duration-500" />
-                    {goldenPreview ? (
-                      <div className="relative bg-slate-900/80 border border-slate-700/80 rounded-xl overflow-hidden hover:border-cyan-500/40 transition-all">
-                        <div className="relative h-36 bg-slate-950/80 flex items-center justify-center overflow-hidden">
-                          <img src={goldenPreview} className="w-full h-full object-contain" alt="Golden" />
-                        </div>
-                        <div className="px-3 py-2.5 flex items-center justify-between border-t border-slate-800/60">
-                          <div className="min-w-0">
-                            <p className="text-[10px] font-bold text-slate-200 truncate">{goldenFile?.name}</p>
-                            <p className="text-[8px] text-slate-500">{goldenFile ? (goldenFile.size / 1024).toFixed(0) + " KB" : ""}</p>
-                          </div>
-                          <button onClick={() => { setGoldenFile(null); setGoldenPreview(null); }}
-                            className="h-6 w-6 rounded flex items-center justify-center border border-slate-700/60 text-slate-500 hover:text-red-400 hover:border-red-500/30 transition-all">
-                            <X size={11} />
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
-                      <label className="flex flex-col items-center justify-center gap-2.5 h-36 rounded-xl border-2 border-dashed border-slate-700/50 bg-slate-900/40 hover:bg-cyan-950/10 hover:border-cyan-500/50 cursor-pointer transition-all z-10">
-                        <input type="file" accept="image/*" onChange={handleGoldenChange} className="hidden" />
-                        <div className="h-10 w-10 rounded-full bg-slate-950 border border-slate-700/60 flex items-center justify-center hover:scale-110 hover:border-cyan-500/30 transition-all">
-                          <Sparkles size={16} className="text-slate-500 hover:text-cyan-400 transition-colors" />
-                        </div>
-                        <div className="text-center">
-                          <p className="text-[11px] font-bold text-slate-300 hover:text-cyan-400 transition-colors">Select OEM Golden</p>
-                          <p className="text-[9px] text-slate-500">Clean baseline reference</p>
-                        </div>
-                      </label>
-                    )}
-                  </>
-                )}
+                </div>
+              )}
+
+              <div className="p-2.5 rounded-lg border border-emerald-500/10 bg-emerald-950/5 text-[9px] flex items-start gap-2 leading-relaxed">
+                <Cpu size={11} className="shrink-0 mt-0.5 text-emerald-500/40" />
+                <p className="text-slate-500">Auto-alignment parameters loaded automatically from database.</p>
               </div>
             </div>
 
-            {/* Target Scan */}
-            <div className="flex flex-col gap-2">
-              {/* Tab header row */}
-              <div className="flex items-center justify-between">
-                <label className="text-[10px] font-bold tracking-wider text-slate-400 uppercase flex items-center gap-1.5">
-                  <Camera size={12} className="text-blue-400" />
-                  Target Part Scan
-                </label>
-                {/* Upload / Camera toggle */}
-                <div className="flex items-center gap-0.5 bg-slate-900/80 border border-slate-800/80 rounded-lg p-0.5">
-                  <button
-                    type="button"
-                    onClick={() => handleTabSwitch("upload")}
-                    className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-[9px] font-bold uppercase tracking-wider transition-all ${
-                      targetMode === "upload"
-                        ? "bg-gradient-to-r from-blue-600/80 to-indigo-700/80 text-white shadow-[0_0_10px_rgba(99,102,241,0.3)]"
-                        : "text-slate-500 hover:text-slate-300"
-                    }`}
-                  >
-                    <Upload size={9} /> Upload
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleTabSwitch("webcam")}
-                    className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-[9px] font-bold uppercase tracking-wider transition-all ${
-                      targetMode === "webcam"
-                        ? "bg-gradient-to-r from-cyan-600/80 to-blue-700/80 text-white shadow-[0_0_10px_rgba(6,182,212,0.3)]"
-                        : "text-slate-500 hover:text-slate-300"
-                    }`}
-                  >
-                    <Video size={9} /> Camera
-                  </button>
-                </div>
-              </div>
-
-              {/* ── UPLOAD MODE ── */}
-              {targetMode === "upload" && (
-                <div className="relative">
-                  <div className="absolute -inset-0.5 bg-gradient-to-br from-blue-500/10 to-indigo-600/10 rounded-xl blur opacity-0 hover:opacity-100 pointer-events-none transition duration-500" />
-                  {targetPreview ? (
-                    <div className="relative bg-slate-900/80 border border-slate-700/80 rounded-xl overflow-hidden hover:border-blue-500/40 transition-all">
-                      <div className="relative h-36 bg-slate-950/80 flex items-center justify-center overflow-hidden">
-                        <img src={targetPreview} className="w-full h-full object-contain" alt="Target" />
-                      </div>
-                      <div className="px-3 py-2.5 flex items-center justify-between border-t border-slate-800/60">
-                        <div className="min-w-0">
-                          <p className="text-[10px] font-bold text-slate-200 truncate">{customFile.name}</p>
-                          <p className="text-[8px] text-slate-500">{(customFile.size / 1024).toFixed(0)} KB</p>
-                        </div>
-                        <button onClick={() => { setCustomFile(null); setTargetPreview(null); }}
-                          className="h-6 w-6 rounded flex items-center justify-center border border-slate-700/60 text-slate-500 hover:text-red-400 hover:border-red-500/30 transition-all">
-                          <X size={11} />
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    <label className="flex flex-col items-center justify-center gap-2.5 h-36 rounded-xl border-2 border-dashed border-slate-700/50 bg-slate-900/40 hover:bg-blue-950/10 hover:border-blue-500/50 cursor-pointer transition-all z-10">
-                      <input type="file" accept="image/*" onChange={handleTargetChange} className="hidden" />
-                      <div className="h-10 w-10 rounded-full bg-slate-950 border border-slate-700/60 flex items-center justify-center hover:scale-110 hover:border-blue-500/30 transition-all">
-                        <Camera size={16} className="text-slate-500 hover:text-blue-400 transition-colors" />
-                      </div>
-                      <div className="text-center">
-                        <p className="text-[11px] font-bold text-slate-300 hover:text-blue-400 transition-colors">Select Target Scan</p>
-                        <p className="text-[9px] text-slate-500">Captured part photo</p>
-                      </div>
-                    </label>
-                  )}
-                </div>
-              )}
-
-              {/* ── WEBCAM MODE ── */}
-              {targetMode === "webcam" && (
-                <div className="flex flex-col gap-2">
-                  {/* Captured preview */}
-                  {targetPreview ? (
-                    <div className="flex flex-col gap-1.5">
-                      <div className="relative bg-slate-900/80 border border-cyan-500/30 rounded-xl overflow-hidden shadow-[0_0_20px_rgba(6,182,212,0.1)]">
-                        <div className="relative h-36 bg-slate-950/80 flex items-center justify-center overflow-hidden">
-                          <img src={targetPreview} className="w-full h-full object-contain" alt="Webcam capture" />
-                          <div className="absolute top-2 left-2 flex items-center gap-1 bg-emerald-900/70 border border-emerald-500/30 rounded px-1.5 py-0.5">
-                            <div className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                            <span className="text-[8px] font-bold text-emerald-400 uppercase tracking-wider">Captured</span>
-                          </div>
-                        </div>
-                        <div className="px-3 py-2 flex items-center justify-between border-t border-slate-800/60">
-                          <div className="min-w-0">
-                            <p className="text-[10px] font-bold text-slate-200 truncate">{customFile?.name}</p>
-                            <p className="text-[8px] text-slate-500">{customFile ? (customFile.size / 1024).toFixed(0) + " KB" : ""}</p>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={handleRetake}
-                            className="flex items-center gap-1 h-6 px-2 rounded border border-cyan-700/50 text-cyan-400 hover:bg-cyan-900/30 text-[9px] font-bold uppercase tracking-wider transition-all"
-                          >
-                            <RefreshCw size={9} /> Retake
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* ── Agent 1 Scan Result Panel ── */}
-                      {webcamScanResult && (
-                        <div className={`rounded-xl border px-3 py-2.5 ${
-                          webcamScanResult.status === "pass"
-                            ? "bg-emerald-950/30 border-emerald-500/20"
-                            : "bg-red-950/30 border-red-500/20"
-                        }`}>
-                          <p className={`text-[9px] font-black tracking-[0.15em] uppercase mb-1.5 flex items-center gap-1 ${
-                            webcamScanResult.status === "pass" ? "text-emerald-400" : "text-red-400"
-                          }`}>
-                            <Cpu size={9} />
-                            Agent 1 — Image Integrity Scan
-                            <span className={`ml-auto px-1.5 py-0.5 rounded text-[7px] font-extrabold tracking-widest border ${
-                              webcamScanResult.status === "pass"
-                                ? "bg-emerald-900/50 border-emerald-500/30 text-emerald-300"
-                                : "bg-red-900/50 border-red-500/30 text-red-300"
-                            }`}>
-                              {webcamScanResult.status === "pass" ? "PASS" : "FAIL"}
-                            </span>
-                          </p>
-                          <div className="space-y-1">
-                            {webcamScanResult.checks.map((chk, i) => (
-                              <div key={i} className="flex items-center gap-2">
-                                <span className={`shrink-0 text-[8px] font-black ${
-                                  chk.ok ? "text-emerald-400" : "text-red-400"
-                                }`}>{chk.ok ? "✓" : "✗"}</span>
-                                <span className="text-[9px] text-slate-400 font-semibold shrink-0 w-28">{chk.label}:</span>
-                                <span className={`text-[9px] truncate ${
-                                  chk.ok ? "text-slate-300" : "text-red-300 font-semibold"
-                                }`}>{chk.detail}</span>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    /* Live feed or error */
-                    <div className="relative rounded-xl overflow-hidden border border-cyan-500/25 bg-slate-950 shadow-[0_0_25px_rgba(6,182,212,0.08)]">
-                      {/* Error state */}
-                      {webcamError ? (
-                        <div className="h-36 flex flex-col items-center justify-center gap-2 px-4">
-                          <ZapOff size={22} className="text-red-400/70" />
-                          <p className="text-[10px] text-red-400/80 text-center leading-relaxed">{webcamError}</p>
-                          <button
-                            type="button"
-                            onClick={startWebcam}
-                            className="mt-1 flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 border border-slate-700 text-slate-300 hover:text-white hover:border-cyan-500/40 text-[9px] font-bold uppercase tracking-wider transition-all"
-                          >
-                            <RefreshCw size={9} /> Retry
-                          </button>
-                        </div>
-                      ) : (
-                        /* Video feed */
-                        <div className="relative">
-                          {/* Animated scanning border */}
-                          <div className="absolute inset-0 rounded-xl pointer-events-none z-10">
-                            <div className="absolute top-0 left-0 w-4 h-4 border-t-2 border-l-2 border-cyan-400/70 rounded-tl-lg" />
-                            <div className="absolute top-0 right-0 w-4 h-4 border-t-2 border-r-2 border-cyan-400/70 rounded-tr-lg" />
-                            <div className="absolute bottom-0 left-0 w-4 h-4 border-b-2 border-l-2 border-cyan-400/70 rounded-bl-lg" />
-                            <div className="absolute bottom-0 right-0 w-4 h-4 border-b-2 border-r-2 border-cyan-400/70 rounded-br-lg" />
-                          </div>
-                          {/* REC badge */}
-                          {webcamStream && (
-                            <div className="absolute top-2 left-2 z-20 flex items-center gap-1 bg-black/60 border border-red-500/40 rounded px-1.5 py-0.5 backdrop-blur-sm">
-                              <Circle size={6} className="text-red-500 fill-red-500 animate-pulse" />
-                              <span className="text-[8px] font-black text-red-400 uppercase tracking-widest">Live</span>
-                            </div>
-                          )}
-                          <video
-                            ref={videoRef}
-                            autoPlay
-                            playsInline
-                            muted
-                            onCanPlay={() => setWebcamReady(true)}
-                            className="w-full h-36 object-cover bg-slate-950"
-                          />
-                          {/* Hidden canvas for frame capture */}
-                          <canvas ref={canvasRef} className="hidden" />
-                          {/* Loading overlay */}
-                          {!webcamReady && !webcamError && (
-                            <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-slate-950/90">
-                              <RefreshCw size={18} className="text-cyan-400 animate-spin" />
-                              <p className="text-[9px] text-cyan-400/70 uppercase tracking-wider font-bold">Initializing camera...</p>
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Capture button — only shown when live feed is active */}
-                  {!targetPreview && !webcamError && (
-                    <button
-                      type="button"
-                      onClick={captureFrame}
-                      disabled={!webcamReady}
-                      className="w-full flex items-center justify-center gap-2 py-2 rounded-xl bg-gradient-to-r from-cyan-600/80 to-blue-700/80 border border-cyan-500/30 text-white text-[10px] font-extrabold uppercase tracking-wider shadow-[0_0_15px_rgba(6,182,212,0.2)] hover:shadow-[0_0_25px_rgba(6,182,212,0.35)] hover:scale-[1.01] active:scale-95 transition-all disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:scale-100"
-                    >
-                      <Camera size={12} />
-                      Capture Frame
-                    </button>
-                  )}
-                </div>
-              )}
+            {/* ── RIGHT: Target Part Scan ── */}
+            <div className="flex flex-col min-w-0">
+              <TargetScanCaptureZone
+                customFile={customFile}
+                setCustomFile={setCustomFile}
+                targetPreview={targetPreview}
+                setTargetPreview={setTargetPreview}
+                disabled={processing}
+              />
             </div>
           </div>
 
-          {/* Form Fields */}
+          {/* ═══════ Bottom Section: Form Fields ═══════ */}
           <div className="space-y-4 pt-1">
-            <div className="grid grid-cols-3 gap-4">
-              <div>
-                <label className="text-[9px] font-bold tracking-wider text-slate-500 uppercase mb-1.5 block">Component Name</label>
-                <div className="relative">
-                  <input type="text" value={componentName} onChange={(e) => setComponentName(e.target.value)}
-                    disabled={catalogMode === "catalog"}
-                    placeholder="e.g. Brake Disc"
-                    className={`w-full h-10 px-3.5 rounded-xl border text-xs focus:border-cyan-500/40 focus:shadow-[0_0_15px_rgba(6,182,212,0.1)] transition-all ${
-                      catalogMode === "catalog"
-                        ? "bg-slate-950/60 border-slate-850/80 text-slate-400 cursor-not-allowed font-semibold"
-                        : "bg-slate-900/80 border-slate-700/60 text-slate-200 placeholder:text-slate-700"
-                    }`} />
-                  {catalogMode === "catalog" && (
-                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[8px] bg-slate-900 border border-slate-850 text-slate-500 px-1.5 py-0.5 rounded font-black tracking-widest uppercase">Catalog</span>
-                  )}
-                </div>
-              </div>
-              <div>
-                <label className="text-[9px] font-bold tracking-wider text-slate-500 uppercase mb-1.5 block">Component ID / Serial (Optional)</label>
-                <div className="relative">
-                  <input type="text" value={expectedSerial} onChange={(e) => setExpectedSerial(e.target.value)}
-                    disabled={catalogMode === "catalog"}
-                    placeholder="e.g. BD-001"
-                    className={`w-full h-10 px-3.5 rounded-xl border text-xs focus:border-cyan-500/40 focus:shadow-[0_0_15px_rgba(6,182,212,0.1)] transition-all ${
-                      catalogMode === "catalog"
-                        ? "bg-slate-950/60 border-slate-850/80 text-slate-400 cursor-not-allowed font-tech-code"
-                        : "bg-slate-900/80 border-slate-700/60 text-slate-200 placeholder:text-slate-700"
-                    }`} />
-                  {catalogMode === "catalog" && (
-                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[8px] bg-slate-900 border border-slate-850 text-slate-500 px-1.5 py-0.5 rounded font-black tracking-widest uppercase">Catalog</span>
-                  )}
-                </div>
-              </div>
+            <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="text-[9px] font-bold tracking-wider text-slate-500 uppercase mb-1.5 block">Vendor</label>
                 <input type="text" value={vendor} onChange={(e) => setVendor(e.target.value)}
                   placeholder="e.g. Vendor A"
-                  className="w-full h-10 px-3.5 rounded-xl bg-slate-900/80 border border-slate-700/60 text-slate-200 text-xs placeholder:text-slate-700 focus:border-cyan-500/40 focus:shadow-[0_0_15px_rgba(6,182,212,0.1)] transition-all" />
+                  className="w-full h-11 px-3.5 rounded-xl bg-slate-900/80 border border-slate-700/60 text-slate-200 text-xs placeholder:text-slate-700 focus:border-cyan-500/40 focus:shadow-[0_0_15px_rgba(6,182,212,0.1)] transition-all outline-none" />
+              </div>
+              <div>
+                <label className="text-[9px] font-bold tracking-wider text-slate-500 uppercase mb-1.5 block">Delivery / Received Date</label>
+                <input type="date" value={date} onChange={(e) => setDate(e.target.value)}
+                  className="w-full h-11 px-3.5 rounded-xl bg-slate-900/80 border border-slate-700/60 text-slate-200 text-xs focus:border-cyan-500/40 focus:shadow-[0_0_15px_rgba(6,182,212,0.1)] transition-all [color-scheme:dark] outline-none" />
               </div>
             </div>
 
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="text-[9px] font-bold tracking-wider text-slate-500 uppercase mb-1.5 block">Capture Site</label>
                 <input type="text" value={captureSite} onChange={(e) => setCaptureSite(e.target.value)}
                   placeholder="e.g. Line-1"
-                  className="w-full h-10 px-3.5 rounded-xl bg-slate-900/80 border border-slate-700/60 text-slate-200 text-xs placeholder:text-slate-700 focus:border-cyan-500/40 focus:shadow-[0_0_15px_rgba(6,182,212,0.1)] transition-all" />
+                  className="w-full h-11 px-3.5 rounded-xl bg-slate-900/80 border border-slate-700/60 text-slate-200 text-xs placeholder:text-slate-700 focus:border-cyan-500/40 focus:shadow-[0_0_15px_rgba(6,182,212,0.1)] transition-all outline-none" />
               </div>
               <div>
                 <label className="text-[9px] font-bold tracking-wider text-slate-500 uppercase mb-1.5 block">Camera Angle</label>
                 <div className="relative">
                   <select value={captureAngle} onChange={(e) => setCaptureAngle(e.target.value)}
-                    className="w-full h-10 px-3.5 rounded-xl bg-slate-900/80 border border-slate-700/60 text-slate-200 text-xs appearance-none cursor-pointer focus:border-cyan-500/40 focus:shadow-[0_0_15px_rgba(6,182,212,0.1)] transition-all">
+                    className="w-full h-11 px-3.5 pr-9 rounded-xl bg-slate-900/80 border border-slate-700/60 text-slate-200 text-xs appearance-none cursor-pointer focus:border-cyan-500/40 focus:shadow-[0_0_15px_rgba(6,182,212,0.1)] transition-all outline-none">
                     <option value="top">Top Down (Default)</option>
                     <option value="angled">Angled Perspective</option>
                   </select>
                   <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
                 </div>
-              </div>
-              <div>
-                <label className="text-[9px] font-bold tracking-wider text-slate-500 uppercase mb-1.5 block">Delivery / Received Date</label>
-                <input type="date" value={date} onChange={(e) => setDate(e.target.value)}
-                  className="w-full h-10 px-3.5 rounded-xl bg-slate-900/80 border border-slate-700/60 text-slate-200 text-xs focus:border-cyan-500/40 focus:shadow-[0_0_15px_rgba(6,182,212,0.1)] transition-all [color-scheme:dark]" />
               </div>
             </div>
           </div>

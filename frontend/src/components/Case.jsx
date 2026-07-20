@@ -326,12 +326,12 @@ export function HeatmapViewer({
         </button>
       </div>
 
-      <div className="relative aspect-square bg-surface-container-lowest rounded-lg overflow-hidden border border-slate-800 select-none">
+      <div className="relative aspect-square bg-slate-950/80 rounded-lg overflow-hidden border border-slate-800 select-none">
         {/* Base image: dynamically swaps to heatmapUrl if overlay is enabled */}
         <img
           src={showOverlay && heatmapUrl ? heatmapUrl : imageUrl}
           alt={alt}
-          className="w-full h-full object-cover"
+          className="w-full h-full object-contain"
         />
 
         {/* Overlay: fallback bounding box region if separate heatmapUrl is not used */}
@@ -352,8 +352,36 @@ export function HeatmapViewer({
       </div>
 
       {label && (
-        <p className="text-center text-body-sm text-slate-450 italic mt-3">{label}</p>
+        <p className="text-center text-body-sm text-slate-400 font-semibold mt-3">{label}</p>
       )}
+
+      {/* Visual Legend / Key Guide */}
+      <div className="mt-4 pt-4 border-t border-slate-800/80 space-y-3">
+        <div className="bg-slate-900/40 border border-slate-850 p-3 rounded-lg text-[11px] leading-relaxed text-slate-400">
+          <span className="font-extrabold text-slate-200 block mb-1 uppercase tracking-wider text-[9px] text-cyan-400">What is this showing?</span>
+          This viewer highlights the deviations between the uploaded part and the OEM Golden Standard using an AI SSIM comparison.
+        </div>
+
+        <div className="grid grid-cols-2 gap-2 text-[10px]">
+          {/* Neon Box */}
+          <div className="flex items-start gap-2.5 p-2 bg-[#090d16]/60 border border-slate-850 rounded-lg">
+            <span className="h-3 w-3 rounded border-2 border-red-500 bg-red-500/20 shrink-0 mt-0.5" />
+            <div>
+              <span className="block font-bold text-slate-250">Red Alert Boxes</span>
+              <span className="text-slate-500 leading-normal block mt-0.5">High-probability anomaly candidate zones (missing parts, text mismatches, modified layouts).</span>
+            </div>
+          </div>
+
+          {/* Heat scale */}
+          <div className="flex items-start gap-2.5 p-2 bg-[#090d16]/60 border border-slate-850 rounded-lg">
+            <div className="w-1.5 h-10 rounded-full bg-gradient-to-t from-blue-600 via-green-500 via-yellow-400 to-red-600 shrink-0" />
+            <div>
+              <span className="block font-bold text-slate-250">Thermal Heat Intensity</span>
+              <span className="text-slate-500 leading-normal block mt-0.5">Shows structural difference weights. Red indicates heavy mismatch; green/yellow is minor; transparent/blue represents perfect alignment.</span>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -400,13 +428,13 @@ export function ImageComparison({
             Golden Reference (OEM)
           </span>
           <div
-            className="relative aspect-square rounded-lg overflow-hidden border border-slate-800 bg-surface-container-lowest cursor-zoom-in group"
+            className="relative aspect-square rounded-lg overflow-hidden border border-slate-800 bg-slate-950/80 cursor-zoom-in group"
             onClick={() => setZoom(zoom === "golden" ? null : "golden")}
           >
             <img
               src={goldenUrl}
               alt={altGolden}
-              className="w-full h-full object-cover transition-all duration-300"
+              className="w-full h-full object-contain transition-all duration-300"
             />
             <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
               <span className="material-symbols-outlined text-white text-3xl drop-shadow-lg">zoom_in</span>
@@ -423,13 +451,13 @@ export function ImageComparison({
             Uploaded (Review Required)
           </span>
           <div
-            className="relative aspect-square rounded-lg overflow-hidden border border-slate-800 bg-surface-container-lowest cursor-zoom-in group"
+            className="relative aspect-square rounded-lg overflow-hidden border border-slate-800 bg-slate-950/80 cursor-zoom-in group"
             onClick={() => setZoom(zoom === "uploaded" ? null : "uploaded")}
           >
             <img
               src={uploadedUrl}
               alt={altUploaded}
-              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+              className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-300"
             />
             <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
               <span className="material-symbols-outlined text-white text-3xl drop-shadow-lg">zoom_in</span>

@@ -1,5 +1,5 @@
 // Consolidated components for pipeline feedback tuning
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { 
   Shield, 
   Key, 
@@ -18,8 +18,14 @@ import {
   Activity,
   History,
   Lock,
-  LockKeyhole
+  LockKeyhole,
+  UploadCloud,
+  Sparkles,
+  Image as ImageIcon,
+  ChevronDown
 } from "lucide-react";
+import { createProduct, uploadGoldenReference } from "../services/productService.js";
+
 
 const PRIVACY_ITEMS = [
   { key: "storeImageHashOnly", icon: Shield, label: "Store image hash only", desc: "Prevents writing raw images to permanent database logs" },
@@ -321,3 +327,249 @@ export function SavePipelineButton({ state, onSave }) {
     </button>
   );
 }
+
+export function RegisterProductCard({ onProductAdded }) {
+  const [partSuffix, setPartSuffix] = useState("");
+  const [name, setName] = useState("");
+  const [commodity, setCommodity] = useState("");
+  const [expectedSerial, setExpectedSerial] = useState("");
+  const [file, setFile] = useState(null);
+  const [preview, setPreview] = useState(null);
+  const [registering, setRegistering] = useState(false);
+  const [errorMsg, setErrorMsg] = useState("");
+  const [successMsg, setSuccessMsg] = useState("");
+
+  const handleFileChange = (e) => {
+    const selected = e.target.files[0];
+    if (!selected) return;
+    setFile(selected);
+    const url = URL.createObjectURL(selected);
+    setPreview(url);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (preview) URL.revokeObjectURL(preview);
+    };
+  }, [preview]);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setErrorMsg("");
+    setSuccessMsg("");
+
+    if (!partSuffix.trim()) {
+      setErrorMsg("Part code suffix is required.");
+      return;
+    }
+    if (!name.trim()) {
+      setErrorMsg("Product name is required.");
+      return;
+    }
+    if (!commodity.trim()) {
+      setErrorMsg("Commodity category is required.");
+      return;
+    }
+    if (!file) {
+      setErrorMsg("OEM Golden reference image is required.");
+      return;
+    }
+
+    const fullPartNumber = `GOLD-${partSuffix.trim().toUpperCase()}`;
+
+    setRegistering(true);
+    try {
+      // 1. Create the product record
+      const product = await createProduct({
+        part_number: fullPartNumber,
+        name: name.trim(),
+        commodity,
+      });
+
+      // 2. Determine default ROI based on commodity type
+      let roi_json = { "label_roi": { "x": 100, "y": 100, "width": 300, "height": 200 } };
+      if (commodity === "label") {
+        roi_json = { "label_roi": { "x": 420, "y": 50, "width": 420, "height": 220 } };
+      } else if (commodity === "motherboard") {
+        roi_json = { "label_roi": { "x": 200, "y": 620, "width": 150, "height": 80 } };
+      } else if (commodity === "microchip") {
+        roi_json = { "label_roi": { "x": 250, "y": 250, "width": 200, "height": 100 } };
+      }
+
+      // 3. Upload the golden image reference
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("roi_config", JSON.stringify(roi_json));
+      formData.append("angle", "top");
+      if (expectedSerial.trim()) {
+        formData.append("expected_serial", expectedSerial.trim());
+      }
+
+      await uploadGoldenReference(product.id, formData);
+
+      setSuccessMsg(`Reference standard '${name}' registered successfully under Code '${fullPartNumber}'.`);
+      setPartSuffix("");
+      setName("");
+      setCommodity("");
+      setExpectedSerial("");
+      setFile(null);
+      setPreview(null);
+
+      if (onProductAdded) {
+        onProductAdded();
+      }
+    } catch (err) {
+      console.error(err);
+      setErrorMsg(err.message || "Failed to register standard reference product.");
+    } finally {
+      setRegistering(false);
+    }
+  };
+
+  return (
+    <div className="col-span-12">
+      <div className="cyber-card bg-[#0f172a]/55 border border-slate-800/80 p-6 shadow-lg relative overflow-hidden group">
+        <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-cyan-500/25 to-transparent"></div>
+        
+        <div className="flex items-center gap-3 mb-6">
+          <div className="h-8 w-8 rounded-lg bg-cyan-950/20 border border-cyan-500/20 flex items-center justify-center text-cyan-400">
+            <Sparkles size={16} />
+          </div>
+          <div>
+            <h2 className="text-xs font-extrabold uppercase tracking-wider text-slate-200">Register New Parts Reference standard (Golden Image)</h2>
+            <p className="text-[10px] text-slate-500 font-semibold leading-normal mt-0.5">
+              Add a new part code specification and upload its golden standard picture to seed comparison database.
+            </p>
+          </div>
+        </div>
+
+        {errorMsg && (
+          <div className="flex gap-2.5 bg-red-950/30 border border-red-500/20 rounded-xl p-3.5 mb-5 animate-fade-in text-[11px] leading-relaxed text-red-300">
+            <AlertCircle size={15} className="shrink-0 mt-0.5" />
+            <span>{errorMsg}</span>
+          </div>
+        )}
+
+        {successMsg && (
+          <div className="flex gap-2.5 bg-emerald-950/30 border border-emerald-500/20 rounded-xl p-3.5 mb-5 animate-fade-in text-[11px] leading-relaxed text-emerald-300">
+            <CheckCircle2 size={15} className="shrink-0 mt-0.5" />
+            <span>{successMsg}</span>
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} className="grid grid-cols-12 gap-5">
+          <div className="col-span-12 md:col-span-4 space-y-4">
+            <div>
+              <label className="text-[9px] font-bold tracking-wider text-slate-500 uppercase mb-1.5 block">Part Number Code</label>
+              <div className="relative flex items-center">
+                <span className="absolute left-3.5 text-xs text-slate-500 font-black tracking-wider uppercase">GOLD-</span>
+                <input
+                  type="text"
+                  value={partSuffix}
+                  onChange={(e) => setPartSuffix(e.target.value.replace(/[^a-zA-Z0-9_-]/g, "").toUpperCase())}
+                  placeholder="RAM-DELL-8G"
+                  className="w-full h-11 pl-16 pr-3.5 rounded-xl bg-slate-900/80 border border-slate-700/60 text-slate-200 text-xs placeholder:text-slate-700 focus:border-cyan-500/40 focus:shadow-[0_0_15px_rgba(6,182,212,0.1)] transition-all outline-none uppercase font-bold"
+                  disabled={registering}
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="text-[9px] font-bold tracking-wider text-slate-500 uppercase mb-1.5 block">Product Name / Title</label>
+              <input
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="e.g. Dell DDR4 8GB RAM Module"
+                className="w-full h-11 px-3.5 rounded-xl bg-slate-900/80 border border-slate-700/60 text-slate-200 text-xs placeholder:text-slate-700 focus:border-cyan-500/40 focus:shadow-[0_0_15px_rgba(6,182,212,0.1)] transition-all outline-none font-bold"
+                disabled={registering}
+              />
+            </div>
+          </div>
+
+          <div className="col-span-12 md:col-span-4 space-y-4">
+            <div>
+              <label className="text-[9px] font-bold tracking-wider text-slate-500 uppercase mb-1.5 block">Commodity Category</label>
+              <input
+                type="text"
+                value={commodity}
+                onChange={(e) => setCommodity(e.target.value.toLowerCase())}
+                placeholder="e.g. ram, motherboard, storage..."
+                className="w-full h-11 px-3.5 rounded-xl bg-slate-900/80 border border-slate-700/60 text-slate-200 text-xs placeholder:text-slate-700 focus:border-cyan-500/40 focus:shadow-[0_0_15px_rgba(6,182,212,0.1)] transition-all outline-none font-bold"
+                disabled={registering}
+              />
+            </div>
+
+            <div>
+              <label className="text-[9px] font-bold tracking-wider text-slate-500 uppercase mb-1.5 block">Expected Serial format/ID (Optional)</label>
+              <input
+                type="text"
+                value={expectedSerial}
+                onChange={(e) => setExpectedSerial(e.target.value)}
+                placeholder="e.g. DELL-RAM-DDR4-001"
+                className="w-full h-11 px-3.5 rounded-xl bg-slate-900/80 border border-slate-700/60 text-slate-200 text-xs placeholder:text-slate-700 focus:border-cyan-500/40 focus:shadow-[0_0_15px_rgba(6,182,212,0.1)] transition-all outline-none font-bold"
+                disabled={registering}
+              />
+            </div>
+          </div>
+
+          <div className="col-span-12 md:col-span-4 flex flex-col justify-end">
+            <label className="text-[9px] font-bold tracking-wider text-slate-500 uppercase mb-1.5 block">OEM Golden Standard Image</label>
+            {preview ? (
+              <div className="relative rounded-xl border border-slate-700/60 bg-slate-900/40 overflow-hidden h-[6.5rem] flex items-center p-2 justify-between">
+                <div className="h-full w-24 rounded-lg bg-slate-950 border border-slate-800 flex items-center justify-center overflow-hidden shrink-0">
+                  <img src={preview} className="w-full h-full object-contain" alt="Golden standard preview" />
+                </div>
+                <div className="min-w-0 flex-1 px-3">
+                  <p className="text-[10px] font-bold text-slate-250 truncate leading-snug">{file?.name}</p>
+                  <p className="text-[9px] text-slate-500 font-semibold mt-0.5">{(file?.size / 1024).toFixed(0)} KB</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => { setFile(null); setPreview(null); }}
+                  className="h-7 w-7 rounded-lg flex items-center justify-center border border-slate-800 bg-slate-900 text-slate-500 hover:text-red-400 hover:border-red-500/30 transition-all shrink-0 active:scale-95"
+                  disabled={registering}
+                >
+                  <X size={13} />
+                </button>
+              </div>
+            ) : (
+              <label className="flex flex-col items-center justify-center gap-1.5 h-[6.5rem] rounded-xl border-2 border-dashed border-slate-700/50 bg-slate-900/40 hover:bg-cyan-950/5 hover:border-cyan-500/50 cursor-pointer transition-all">
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleFileChange}
+                  className="hidden"
+                  disabled={registering}
+                />
+                <UploadCloud size={18} className="text-slate-500 hover:text-cyan-400 transition" />
+                <span className="text-[10px] font-bold text-slate-350 hover:text-cyan-400 transition">Select Image standard</span>
+              </label>
+            )}
+          </div>
+
+          <div className="col-span-12 flex justify-end pt-2 border-t border-slate-850/60 mt-1">
+            <button
+              type="submit"
+              disabled={registering || !partSuffix || !name || !file}
+              className="group relative inline-flex items-center gap-2 px-6 py-2.5 rounded-lg bg-gradient-to-r from-cyan-500 via-blue-600 to-indigo-600 text-white font-extrabold text-xs uppercase tracking-wider shadow-[0_0_15px_rgba(6,182,212,0.2)] hover:shadow-[0_0_25px_rgba(6,182,212,0.35)] hover:scale-[1.01] active:scale-95 transition-all duration-300 disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:hover:shadow-none"
+            >
+              {registering ? (
+                <>
+                  <RefreshCw size={13} className="animate-spin" />
+                  <span>Registering...</span>
+                </>
+              ) : (
+                <>
+                  <Plus size={13} />
+                  <span>Register Golden Standard</span>
+                </>
+              )}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+

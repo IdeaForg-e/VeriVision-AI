@@ -94,6 +94,21 @@ export default {
         card: "0 1px 3px 0 rgba(0,0,0,0.07), 0 1px 2px -1px rgba(0,0,0,0.07)",
         "card-hover": "0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -2px rgba(0,0,0,0.1)",
       },
+
+      keyframes: {
+        "slide-up": {
+          "0%": { opacity: "0", transform: "translateY(12px) scale(0.97)" },
+          "100%": { opacity: "1", transform: "translateY(0) scale(1)" },
+        },
+        "fade-in": {
+          "0%": { opacity: "0" },
+          "100%": { opacity: "1" },
+        },
+      },
+      animation: {
+        "slide-up": "slide-up 0.25s cubic-bezier(0.16, 1, 0.3, 1)",
+        "fade-in": "fade-in 0.2s ease-out",
+      },
     },
   },
   plugins: [],

@@ -1,6 +1,6 @@
 // AnalyticsDashboardPage.jsx — Pure backend data, zero mock/simulation data
 import { useState, useEffect } from "react";
-import { Layout } from "../components/layout.jsx";
+import { Layout } from "../components/Layout.jsx";
 import { getTriageStats, getTriageQueue } from "../services/triageService.js";
 import { getCases } from "../services/caseService.js";
 import {

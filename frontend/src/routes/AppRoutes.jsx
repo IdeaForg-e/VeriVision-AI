@@ -7,7 +7,7 @@ import HumanReviewPage from "../pages/HumanReviewPage.jsx";
 import AdminConsolePage from "../pages/AdminConsolePage.jsx";
 import AnalyticsDashboardPage from "../pages/AnalyticsDashboardPage.jsx";
 import NotFoundPage from "../pages/NotFoundPage.jsx";
-import { ProtectedRoute } from "../components/layout.jsx";
+import { ProtectedRoute } from "../components/Layout.jsx";
 
 function WorkspaceRoute({ children }) {
   return <ProtectedRoute>{children}</ProtectedRoute>;

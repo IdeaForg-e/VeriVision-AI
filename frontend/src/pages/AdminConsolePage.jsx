@@ -1,6 +1,6 @@
 // AdminConsolePage.jsx — REDESIGNED: Now hosts the Admin tuning panel and pipeline calibration console.
-import { Layout } from "../components/layout.jsx";
-import { PerceptionThresholds, BusinessPolicyRouting, PrivacySecurity, AdjustmentHistory, SavePipelineButton } from "../components/feedback.jsx";
+import { Layout } from "../components/Layout.jsx";
+import { PerceptionThresholds, BusinessPolicyRouting, PrivacySecurity, AdjustmentHistory, SavePipelineButton, RegisterProductCard } from "../components/Feedback.jsx";
 import { useFeedbackConfig } from "../hooks/useFeedbackConfig.js";
 
 export default function AdminConsolePage() {
@@ -28,6 +28,7 @@ export default function AdminConsolePage() {
       </div>
 
       <div className="grid grid-cols-12 gap-gutter">
+        <RegisterProductCard />
         <PerceptionThresholds thresholds={config.thresholds} onChange={updateThreshold} />
         <BusinessPolicyRouting rules={config.routingRules} onAddRule={addRoutingRule} />
         <PrivacySecurity privacy={config.privacy} onToggle={togglePrivacy} />

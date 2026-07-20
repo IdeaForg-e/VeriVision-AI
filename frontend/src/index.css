@@ -97,6 +97,21 @@
   .space-y-stack-gap > * + * { margin-top: 16px; }
 }
 
+/* ── Native select dark styling ───────────────────────────────────────────── */
+select option {
+  background-color: #0d1527;
+  color: #e2e8f0;
+  padding: 8px 12px;
+}
+select option:checked {
+  background-color: #164e63;
+  color: #22d3ee;
+}
+select option:hover {
+  background-color: #1e293b;
+}
+
+
 /* ── Range input styling ───────────────────────────────────────────────────── */
 input[type="range"] {
   -webkit-appearance: none;

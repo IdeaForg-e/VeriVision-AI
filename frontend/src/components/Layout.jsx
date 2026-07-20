@@ -2,7 +2,7 @@ import { Link, NavLink, Navigate, useLocation } from "react-router-dom";
 import { Bell, Fingerprint, LogOut, Menu, Search, UploadCloud, BarChart3, LayoutDashboard, FileText, ShieldCheck, Settings, Sliders, Activity } from "lucide-react";
 import { ROUTES } from "../utils/constants.js";
 import { useAuth } from "../hooks/useAuth.js";
-import { Loader } from "./common.jsx";
+import { Loader } from "./Common.jsx";
 import { useState, useEffect, useRef } from "react";
 import UploadInspectionModal from "./UploadInspectionModal.jsx";
 

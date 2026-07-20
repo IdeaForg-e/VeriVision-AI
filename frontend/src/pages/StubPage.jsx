@@ -1,4 +1,4 @@
-import Layout from "../components/layout/Layout.jsx";
+import { Layout } from "../components/Layout.jsx";
 
 /** Placeholder for pages owned by Jagruti / joint Case Detail work, so nav links don't 404 during local dev. */
 export default function StubPage({ title }) {
