@@ -254,3 +254,11 @@ class MonthlyTrendItem(BaseModel):
     total_inspections: int
     fraud_cases: int
     fraud_rate: float
+
+class MonthlyBreakdownItem(BaseModel):
+    month: str
+    vendor: str
+    location: str
+    total_inspections: int
+    fraud_cases: int
+    fraud_rate: float

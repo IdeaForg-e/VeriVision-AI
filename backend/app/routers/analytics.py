@@ -286,3 +286,70 @@ def get_monthly_trend(
         ))
 
     return result
+
+
+@router.get("/monthly-breakdown", response_model=List[schemas.MonthlyBreakdownItem])
+def get_monthly_breakdown(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(utils.get_current_user)
+):
+    """Retrieve detailed breakdown of inspections/frauds by month, vendor, and location."""
+    logger.info(f"[Analytics] Monthly breakdown requested by {current_user.email}")
+
+    inspections = (
+        db.query(models.Inspection)
+        .join(models.InspectionResult, models.InspectionResult.inspection_id == models.Inspection.id)
+        .filter(models.Inspection.status == "completed")
+        .all()
+    )
+
+    breakdown_map = {}
+    for insp in inspections:
+        res = insp.result
+        if not res:
+            continue
+        is_fraud = res.verdict in FRAUD_VERDICTS
+
+        # Parse month key
+        dt = None
+        if insp.date:
+            try:
+                dt = datetime.strptime(insp.date, "%Y-%m-%d")
+            except Exception:
+                try:
+                    dt = datetime.strptime(insp.date, "%d-%b-%Y")
+                except Exception:
+                    pass
+        if not dt:
+            dt = insp.created_at
+        if not dt:
+            continue
+
+        month_key = (dt.year, dt.month, dt.strftime("%b"))
+        vendor_name = insp.vendor or "Unknown Vendor"
+        location_name = insp.capture_site or "Unknown Site"
+
+        group_key = (month_key, vendor_name, location_name)
+        if group_key not in breakdown_map:
+            breakdown_map[group_key] = {"total": 0, "fraud": 0}
+
+        breakdown_map[group_key]["total"] += 1
+        if is_fraud:
+            breakdown_map[group_key]["fraud"] += 1
+
+    result = []
+    for key in sorted(breakdown_map.keys()):
+        month_key, vendor_name, location_name = key
+        total = breakdown_map[key]["total"]
+        fraud = breakdown_map[key]["fraud"]
+        rate = round((fraud / total) * 100, 1) if total > 0 else 0.0
+        result.append(schemas.MonthlyBreakdownItem(
+            month=month_key[2],
+            vendor=vendor_name,
+            location=location_name,
+            total_inspections=total,
+            fraud_cases=fraud,
+            fraud_rate=rate
+        ))
+
+    return result

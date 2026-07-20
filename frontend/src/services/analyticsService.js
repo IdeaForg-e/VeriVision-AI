@@ -42,3 +42,11 @@ export async function getMonthlyTrend() {
     return [];
   }
 }
+
+export async function getMonthlyBreakdown() {
+  try {
+    return await api.get("/analytics/monthly-breakdown");
+  } catch {
+    return [];
+  }
+}

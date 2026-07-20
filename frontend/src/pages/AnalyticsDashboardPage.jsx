@@ -8,7 +8,8 @@ import {
     getVendorDetail,
     getSiteAnalytics,
     getRepeatOffenders,
-    getMonthlyTrend
+    getMonthlyTrend,
+    getMonthlyBreakdown
 } from "../services/analyticsService.js";
 import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
@@ -112,6 +113,7 @@ export default function AnalyticsDashboardPage() {
     const [sites, setSites] = useState([]);
     const [repeatOffenders, setRepeatOffenders] = useState([]);
     const [monthlyTrend, setMonthlyTrend] = useState([]);
+    const [monthlyBreakdown, setMonthlyBreakdown] = useState([]);
 
     // Interactive selected vendor details state
     const [selectedVendor, setSelectedVendor] = useState(null);
@@ -128,7 +130,8 @@ export default function AnalyticsDashboardPage() {
                 vendorData,
                 siteData,
                 offendersData,
-                trendData
+                trendData,
+                breakdownData
             ] = await Promise.all([
                 getTriageQueue({ page: 1, pageSize: 1000, filters: {} }),
                 getTriageStats(),
@@ -136,7 +139,8 @@ export default function AnalyticsDashboardPage() {
                 getVendorAnalytics(),
                 getSiteAnalytics(),
                 getRepeatOffenders(),
-                getMonthlyTrend()
+                getMonthlyTrend(),
+                getMonthlyBreakdown()
             ]);
             setQueueItems(Array.isArray(queueResult?.items) ? queueResult.items : []);
             setCases(casesData || []);
@@ -145,6 +149,7 @@ export default function AnalyticsDashboardPage() {
             setSites(siteData || []);
             setRepeatOffenders(offendersData || []);
             setMonthlyTrend(trendData || []);
+            setMonthlyBreakdown(breakdownData || []);
         } catch (err) {
             console.error("Failed to load analytics data:", err);
         } finally {
@@ -411,7 +416,7 @@ export default function AnalyticsDashboardPage() {
                 </ChartCard>
             </div>
 
-            {/* Charts Row 2 — Month-on-Month Compliance Trend */}
+            {/* Charts Row 2 — Month-on-Month Compliance Trend & Granular Table */}
             <div className="grid grid-cols-1 gap-6 mb-8">
                 <ChartCard
                     title="Month-on-Month Compliance & Fraud Timeline"
@@ -421,33 +426,73 @@ export default function AnalyticsDashboardPage() {
                     badgeColor="bg-cyan-950/20 border-cyan-500/20 text-cyan-400"
                 >
                     {monthlyTrend.length > 0 ? (
-                        <ResponsiveContainer width="100%" height={300}>
-                            <AreaChart data={monthlyTrend}>
-                                <defs>
-                                    <linearGradient id="colorTotal" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.25}/>
-                                        <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
-                                    </linearGradient>
-                                    <linearGradient id="colorFraud" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="5%" stopColor="#ef4444" stopOpacity={0.25}/>
-                                        <stop offset="95%" stopColor="#ef4444" stopOpacity={0}/>
-                                    </linearGradient>
-                                </defs>
-                                <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" strokeOpacity={0.4} />
-                                <XAxis dataKey="month" stroke="#64748b" fontSize={11} axisLine={false} tickLine={false} />
-                                <YAxis stroke="#64748b" fontSize={11} axisLine={false} tickLine={false} />
-                                <Tooltip content={<CustomTooltip />} />
-                                <Legend
-                                    verticalAlign="bottom"
-                                    height={30}
-                                    iconType="circle"
-                                    iconSize={8}
-                                    formatter={(value) => <span className="text-xs text-slate-400">{value}</span>}
-                                />
-                                <Area type="monotone" dataKey="total_inspections" stroke="#3b82f6" strokeWidth={2} name="Total Received" fillOpacity={1} fill="url(#colorTotal)" />
-                                <Area type="monotone" dataKey="fraud_cases" stroke="#ef4444" strokeWidth={2} name="Fraud Cases" fillOpacity={1} fill="url(#colorFraud)" />
-                            </AreaChart>
-                        </ResponsiveContainer>
+                        <div className="space-y-6">
+                            <ResponsiveContainer width="100%" height={260}>
+                                <AreaChart data={monthlyTrend}>
+                                    <defs>
+                                        <linearGradient id="colorTotal" x1="0" y1="0" x2="0" y2="1">
+                                            <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.25}/>
+                                            <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
+                                        </linearGradient>
+                                        <linearGradient id="colorFraud" x1="0" y1="0" x2="0" y2="1">
+                                            <stop offset="5%" stopColor="#ef4444" stopOpacity={0.25}/>
+                                            <stop offset="95%" stopColor="#ef4444" stopOpacity={0}/>
+                                        </linearGradient>
+                                    </defs>
+                                    <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" strokeOpacity={0.4} />
+                                    <XAxis dataKey="month" stroke="#64748b" fontSize={11} axisLine={false} tickLine={false} />
+                                    <YAxis stroke="#64748b" fontSize={11} axisLine={false} tickLine={false} />
+                                    <Tooltip content={<CustomTooltip />} />
+                                    <Legend
+                                        verticalAlign="bottom"
+                                        height={30}
+                                        iconType="circle"
+                                        iconSize={8}
+                                        formatter={(value) => <span className="text-xs text-slate-400">{value}</span>}
+                                    />
+                                    <Area type="monotone" dataKey="total_inspections" stroke="#3b82f6" strokeWidth={2} name="Total Received" fillOpacity={1} fill="url(#colorTotal)" />
+                                    <Area type="monotone" dataKey="fraud_cases" stroke="#ef4444" strokeWidth={2} name="Fraud Cases" fillOpacity={1} fill="url(#colorFraud)" />
+                                </AreaChart>
+                            </ResponsiveContainer>
+
+                            {/* Granular Monthly Performance Table */}
+                            <div className="border-t border-slate-800/80 pt-5">
+                                <div className="flex items-center gap-2 mb-3 px-1">
+                                    <div className="h-2 w-2 rounded-full bg-cyan-400 shadow-[0_0_8px_rgba(6,182,212,0.5)]" />
+                                    <h3 className="text-[10px] font-black uppercase tracking-wider text-slate-400">Monthly Vendor & Site Integrity Ledger</h3>
+                                </div>
+                                <div className="overflow-x-auto rounded-lg border border-slate-800/80 bg-slate-950/40">
+                                    <table className="w-full text-xs">
+                                        <thead>
+                                            <tr className="border-b border-slate-850 bg-slate-900/40 text-slate-500 uppercase text-[9px] tracking-wider">
+                                                <th className="text-left px-5 py-2.5">Month</th>
+                                                <th className="text-left px-5 py-2.5">Vendor</th>
+                                                <th className="text-left px-5 py-2.5">Received At / Site</th>
+                                                <th className="text-center px-5 py-2.5">Total Supplied</th>
+                                                <th className="text-center px-5 py-2.5">Fraud Cases</th>
+                                                <th className="text-right px-5 py-2.5 pr-6">Fraud Rate</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-850">
+                                            {monthlyBreakdown.map((row, idx) => (
+                                                <tr key={idx} className="hover:bg-slate-900/25 transition-colors">
+                                                    <td className="px-5 py-3 font-extrabold text-cyan-400 font-tech-code">{row.month}</td>
+                                                    <td className="px-5 py-3 font-semibold text-slate-200">{row.vendor}</td>
+                                                    <td className="px-5 py-3 text-slate-400">{row.location}</td>
+                                                    <td className="px-5 py-3 text-center text-slate-300 font-tech-code">{row.total_inspections}</td>
+                                                    <td className="px-5 py-3 text-center text-red-400 font-bold font-tech-code">{row.fraud_cases}</td>
+                                                    <td className="px-5 py-3 text-right pr-6 font-tech-code">
+                                                        <span className={row.fraud_cases > 0 ? "text-red-400 font-extrabold" : "text-emerald-400"}>
+                                                            {row.fraud_rate}%
+                                                        </span>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
                     ) : (
                         <div className="flex flex-col items-center justify-center h-72 text-slate-500 gap-3">
                             <Activity size={32} className="text-slate-700" />
