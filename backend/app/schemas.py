@@ -100,6 +100,7 @@ class InspectionResponse(BaseModel):
     capture_angle: str
     vendor: Optional[str] = None
     component_name: Optional[str] = None
+    date: Optional[str] = None
     status: str
     created_at: datetime
     result: Optional[InspectionResultResponse] = None

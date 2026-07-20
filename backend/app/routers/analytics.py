@@ -91,9 +91,22 @@ def get_vendor_detail(
             continue
         is_fraud = res.verdict in FRAUD_VERDICTS
 
-        dt = insp.created_at
+        dt = None
+        if insp.date:
+            try:
+                dt = datetime.strptime(insp.date, "%Y-%m-%d")
+            except Exception:
+                try:
+                    dt = datetime.strptime(insp.date, "%d-%b-%Y")
+                except Exception:
+                    pass
+
+        if not dt:
+            dt = insp.created_at
+
         if not dt:
             continue
+
         month_key = (dt.year, dt.month, dt.strftime("%b"))
         if month_key not in months_map:
             months_map[month_key] = {"fraud": 0, "genuine": 0}

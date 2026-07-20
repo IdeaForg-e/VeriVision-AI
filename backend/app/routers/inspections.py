@@ -25,6 +25,7 @@ async def create_inspection(
     expected_serial: Optional[str] = Form(None),
     vendor: Optional[str] = Form(None),
     component_name: Optional[str] = Form(None),
+    date: Optional[str] = Form(None),
     db: Session = Depends(get_db),
     current_user: models.User = Depends(utils.get_current_user)
 ):
@@ -146,6 +147,7 @@ async def create_inspection(
         capture_angle=capture_angle,
         vendor=vendor.strip() if vendor else None,
         component_name=component_name.strip() if component_name else None,
+        date=date.strip() if date else None,
         status="pending"
     )
     db.add(db_inspection)

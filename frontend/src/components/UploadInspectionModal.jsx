@@ -16,6 +16,7 @@ export default function UploadInspectionModal({ open, onClose, onSuccess }) {
   const [expectedSerial, setExpectedSerial] = useState("");
   const [componentName, setComponentName] = useState("");
   const [vendor, setVendor] = useState("");
+  const [date, setDate] = useState("");
 
   // Visual thumbnail previews
   const [goldenPreview, setGoldenPreview] = useState(null);
@@ -42,6 +43,7 @@ export default function UploadInspectionModal({ open, onClose, onSuccess }) {
     setExpectedSerial("");
     setComponentName("");
     setVendor("");
+    setDate("");
   }, [open]);
 
   useEffect(() => {
@@ -143,6 +145,7 @@ export default function UploadInspectionModal({ open, onClose, onSuccess }) {
       if (expectedSerial) formData.append("expected_serial", expectedSerial.trim());
       if (vendor) formData.append("vendor", vendor.trim());
       if (componentName) formData.append("component_name", componentName.trim());
+      if (date) formData.append("date", date);
       const result = await createInspection(formData);
       setProcessing(false);
       onClose();
@@ -362,8 +365,10 @@ export default function UploadInspectionModal({ open, onClose, onSuccess }) {
                   <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
                 </div>
               </div>
-              <div className="flex items-end justify-start pb-2">
-                <span className="text-[8px] text-slate-600 font-semibold tracking-wider uppercase">ALL SCAN DATA INTEGRATED TO DB</span>
+              <div>
+                <label className="text-[9px] font-bold tracking-wider text-slate-500 uppercase mb-1.5 block">Delivery / Received Date</label>
+                <input type="date" value={date} onChange={(e) => setDate(e.target.value)}
+                  className="w-full h-10 px-3.5 rounded-xl bg-slate-900/80 border border-slate-700/60 text-slate-200 text-xs focus:border-cyan-500/40 focus:shadow-[0_0_15px_rgba(6,182,212,0.1)] transition-all [color-scheme:dark]" />
               </div>
             </div>
           </div>

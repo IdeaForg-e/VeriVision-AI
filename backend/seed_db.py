@@ -36,6 +36,7 @@ def migrate_db():
     migrations = [
         ("vendor", "TEXT"),
         ("component_name", "TEXT"),
+        ("date", "TEXT"),
     ]
 
     for col_name, col_type in migrations:

@@ -57,6 +57,7 @@ class Inspection(Base):
     capture_angle = Column(String, default="top")
     vendor = Column(String, nullable=True)          # e.g. "Vendor A"
     component_name = Column(String, nullable=True)  # e.g. "Brake Disc"
+    date = Column(String, nullable=True)            # e.g. "2026-07-20"
     status = Column(String, default="pending")  # pending, completed, retake_needed
     created_at = Column(DateTime, default=datetime.utcnow)
 
