@@ -42,7 +42,7 @@ if not exist "%FRONTEND_DIR%\node_modules" (
   exit /b 1
 )
 
-echo [0/2] Checking and cleaning up port conflicts (8000 / 5173)...
+echo [0/3] Checking and cleaning up port conflicts (8000 / 5173)...
 rem Kill backend processes on 8000
 for /f "tokens=5" %%a in ('netstat -aon ^| findstr :8000') do (
     taskkill /f /pid %%a >nul 2>nul
@@ -52,11 +52,15 @@ for /f "tokens=5" %%a in ('netstat -aon ^| findstr :5173') do (
     taskkill /f /pid %%a >nul 2>nul
 )
 
-echo [1/2] Starting backend on http://localhost:8000
+echo [1/3] Seeding default admin and user accounts (skipped if already exist)...
+"%BACKEND_PY%" "%BACKEND_DIR%\seed_db.py"
+echo.
+
+echo [2/3] Starting backend on http://localhost:8000
 start "VERIVISION-AI Backend" cmd /k "cd /d "%BACKEND_DIR%" && "%BACKEND_PY%" -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000"
 
 
-echo [2/2] Starting frontend on http://localhost:5173
+echo [3/3] Starting frontend on http://localhost:5173
 start "VERIVISION-AI Frontend" cmd /k "cd /d "%FRONTEND_DIR%" && npm run dev -- --host 127.0.0.1 --port 5173"
 
 echo.
