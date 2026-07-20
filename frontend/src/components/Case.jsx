@@ -661,9 +661,6 @@ export function RecommendationCard({
               </span>
             )}
           </div>
-          {reasoning && (
-            <p className="text-body-sm text-slate-450 mt-1 leading-relaxed">{reasoning}</p>
-          )}
         </div>
       </div>
 

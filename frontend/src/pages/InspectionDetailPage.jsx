@@ -350,11 +350,30 @@ export default function InspectionDetailPage() {
               imageHash={merged.imageHash}
             />
 
-            <HeatmapViewer
-              imageUrl={merged.uploadedImageUrl}
-              heatmapUrl={heatmapUrl}
-              label={heatmapUrl ? "SSIM Anomaly Heatmap — red bounding boxes highlight detected physical discrepancies" : "AI Attention Region"}
-            />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-stretch">
+              <div className="flex flex-col">
+                <HeatmapViewer
+                  imageUrl={merged.uploadedImageUrl}
+                  heatmapUrl={heatmapUrl}
+                  label={heatmapUrl ? "SSIM Anomaly Heatmap — red bounding boxes highlight detected physical discrepancies" : "AI Attention Region"}
+                />
+              </div>
+              <div className="flex flex-col">
+                <div className="cyber-card bg-[#0f172a]/55 border border-slate-800 p-5 shadow-lg h-full flex flex-col justify-start">
+                  <h3 className="font-headline-sm text-headline-sm text-cyan-400 flex items-center gap-2 mb-3.5">
+                    <FileText size={16} className="text-cyan-400" />
+                    Detailed AI Explanation
+                  </h3>
+                  <p className="text-xs text-slate-300 leading-relaxed font-semibold mb-4 bg-slate-950/60 border border-slate-850 p-4 rounded-xl shadow-inner flex-1">
+                    {recommendation.reasoning || "AI confidence is below the auto-decide threshold. Manual review required."}
+                  </p>
+                  <div className="text-[10px] text-slate-500 bg-slate-900/30 p-3 rounded-lg border border-slate-850/60 leading-normal">
+                    <span className="font-black text-slate-400 uppercase tracking-wider block mb-1">Visual Audit Assessment</span>
+                    This analysis combines structural similarity index deviations, template alignments, and character string matching to evaluate parts compliance.
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
 
           {/* Monospace Execution Telemetry Log */}
