@@ -85,16 +85,58 @@ export function Modal({ open = false, onClose, title, children, footer, size = "
   const sizes = { sm: "max-w-sm", md: "max-w-lg", lg: "max-w-2xl", xl: "max-w-4xl" };
 
   return createPortal(
-    <div ref={overlayRef} className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fade-in" onClick={(e) => { if (e.target === overlayRef.current) onClose?.(); }} role="dialog" aria-modal="true" aria-labelledby="modal-title">
-      <div className={`${sizes[size] ?? sizes.md} w-full cyber-card bg-[#0f172a]/95 border-slate-800 flex flex-col max-h-[90vh] animate-slide-up`}>
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800 flex-shrink-0">
-          <h2 id="modal-title" className="font-headline-sm text-headline-sm text-slate-100">{title}</h2>
-          <button onClick={onClose} className="p-1 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition-colors" aria-label="Close modal">
-            <span className="material-symbols-outlined text-[20px]">close</span>
+    <div
+      ref={overlayRef}
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in"
+      onClick={(e) => { if (e.target === overlayRef.current) onClose?.(); }}
+      role="dialog" aria-modal="true" aria-labelledby="modal-title"
+    >
+      {/* Outer glow ring */}
+      <div className="absolute pointer-events-none" style={{ width: 'calc(100% - 2rem)', maxWidth: sizes[size] || sizes.md, top: '50%', left: '50%', transform: 'translate(-50%, -50%)' }}>
+        <div className="absolute -inset-6 bg-gradient-to-r from-cyan-500/5 via-purple-500/5 to-blue-500/5 rounded-[2rem] blur-2xl" />
+      </div>
+
+      <div className={`${sizes[size] ?? sizes.md} relative w-full bg-gradient-to-b from-[#0f172a] to-[#0a0f1d] border border-slate-800/70 shadow-[0_0_60px_rgba(0,0,0,0.6),0_0_30px_rgba(6,182,212,0.06)] flex flex-col max-h-[90vh] animate-slide-up rounded-xl overflow-hidden`}>
+        {/* Top gradient line */}
+        <div className="absolute top-0 left-0 right-0 h-[1.5px] bg-gradient-to-r from-transparent via-cyan-500/30 to-transparent" />
+
+        {/* Header */}
+        <div className="relative flex items-center justify-between px-6 py-4 border-b border-slate-800/60 flex-shrink-0 bg-[#0d1527]/60">
+          <div className="flex items-center gap-3 min-w-0">
+            {typeof title === "string" ? (
+              <>
+                <div className="h-8 w-1 rounded-full bg-gradient-to-b from-cyan-400 to-purple-500 shrink-0" />
+                <h2 id="modal-title" className="text-sm font-extrabold tracking-wide text-slate-100 truncate">
+                  {title}
+                </h2>
+              </>
+            ) : (
+              <h2 id="modal-title" className="min-w-0">{title}</h2>
+            )}
+          </div>
+          <button
+            onClick={onClose}
+            className="relative h-8 w-8 rounded-lg flex items-center justify-center border border-slate-800/80 bg-slate-900/50 text-slate-400 hover:text-slate-200 hover:border-slate-700 hover:bg-slate-800/80 transition-all active:scale-90"
+            aria-label="Close modal"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
           </button>
         </div>
-        <div className="flex-1 overflow-y-auto px-6 py-5 text-slate-300">{children}</div>
-        {footer && <div className="flex-shrink-0 px-6 py-4 border-t border-slate-800 flex justify-end gap-3">{footer}</div>}
+
+        {/* Body */}
+        <div className="flex-1 overflow-y-auto px-6 py-5 text-slate-300 scrollbar-thin">
+          {children}
+        </div>
+
+        {/* Footer */}
+        {footer && (
+          <div className="relative flex-shrink-0 px-6 py-4 border-t border-slate-800/60 bg-[#0d1527]/40 flex justify-end gap-3">
+            <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-slate-700/30 to-transparent" />
+            {footer}
+          </div>
+        )}
       </div>
     </div>,
     document.body
