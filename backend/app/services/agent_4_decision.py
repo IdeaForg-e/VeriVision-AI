@@ -170,7 +170,27 @@ def make_decision(ensemble_results: dict) -> dict:
         reason_note = f"SSIM ({ssim:.2f}) is below the tuning target ({ssim_target:.2f}) but no other anomaly triggered; likely background noise — confidence lowered for review."
         logger.info(f"Local Decision: High background noise/reflection (ssim {ssim:.2f} < target {ssim_target:.2f}). Confidence index set to low (0.60).")
 
+    # 5. Multimodal vision report integration
+    multimodal_report = ensemble_results.get("multimodal_report", "")
+    if multimodal_report and "visual comparison failed" not in multimodal_report.lower() and "visual comparison skipped" not in multimodal_report.lower():
+        if "no anomalies detected" in multimodal_report.lower():
+            logger.info("Multimodal Vision check confirmed: No anomalies detected.")
+            if verdict == "clean":
+                confidence = min(1.0, confidence + 0.05)
+        else:
+            logger.info(f"Multimodal Vision check flagged defects: {multimodal_report}")
+            if verdict == "clean":
+                verdict = "reused"
+                recommended_action = "Request Vendor Verification"
+                confidence = 0.50
+                fraud_score = max(fraud_score, 45)
+                reason_note = f"Mathematical checks passed, but Visual AI flagged discrepancies: {multimodal_report}"
+            else:
+                reason_note += f" Visual AI confirmation: {multimodal_report}"
+                fraud_score = min(100, fraud_score + 10)
+
     if 40 <= fraud_score <= 70:
+
         confidence = 0.45
         reason_note += " Fraud score falls in the borderline 40-70 range, forcing human-in-the-loop review."
         logger.info("Local Decision: Borderline fraud score (40-70). Confidence forced to 0.45 to trigger human-in-the-loop review.")

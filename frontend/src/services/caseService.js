@@ -25,6 +25,7 @@ export async function getCaseById(caseId) {
     updatedAt: data.metadata.updatedAt,
     imageHash: data.metadata.imageHash,
     neuralModel: data.metadata.neuralModel,
+    heatmapUrl: data.metadata.heatmapUrl,
     title: `Case detail for ${data.metadata.partCode}`,
     ocrResults: data.ocrResults,
     metrics: data.metrics,

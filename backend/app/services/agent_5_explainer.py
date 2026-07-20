@@ -11,10 +11,15 @@ MAX_LLM_ATTEMPTS = 2  # 1 initial attempt + 1 retry before falling back to the t
 
 def _build_prompt(ssim, verdict, fraud_score, detected_text, expected_text,
                    ocr_mismatches, recommended_action, temp_score, temp_found,
-                   color_sim, decision_reasoning) -> str:
+                   color_sim, decision_reasoning, multimodal_report) -> str:
     grounding = (
         f"- Decision Agent's reasoning: \"{decision_reasoning}\"\n"
         if decision_reasoning else ""
+    )
+    visual_ai_finding = (
+        f"- Multimodal Visual AI inspection report: \"{multimodal_report}\"\n"
+        if multimodal_report and "skipped" not in multimodal_report.lower() and "failed" not in multimodal_report.lower()
+        else ""
     )
     return (
         f"You are an AI Explainer Agent for an enterprise manufacturing QC audit platform.\n"
@@ -32,9 +37,10 @@ def _build_prompt(ssim, verdict, fraud_score, detected_text, expected_text,
         f"- Verdict Category: {verdict.upper()}\n"
         f"- Recommended Action: {recommended_action}\n"
         f"{grounding}\n"
+        f"{visual_ai_finding}\n"
         f"Write a concise 2-3 sentence technical justification summarizing what visual abnormalities were found "
-        f"and why this verdict/action was chosen. Keep it formal and audit-ready. Reference only the metrics "
-        f"and reasoning given above — do not speculate beyond them."
+        f"and why this verdict/action was chosen. Keep it formal and audit-ready. Reference only the metrics, "
+        f"reasoning, and Visual AI report details given above — do not speculate beyond them."
     )
 
 
@@ -58,6 +64,7 @@ def generate_explanation(metrics: dict) -> str:
     ocr_mismatches = metrics.get("ocr_mismatches", [])
     recommended_action = metrics.get("recommended_action", "Accept")
     decision_reasoning = metrics.get("reasoning", "")
+    multimodal_report = metrics.get("multimodal_report", "")
 
     temp_score = metrics.get("template_match_score", 1.0)
     temp_found = metrics.get("template_match_found", True)
@@ -72,7 +79,7 @@ def generate_explanation(metrics: dict) -> str:
         prompt = _build_prompt(
             ssim, verdict, fraud_score, detected_text, expected_text,
             ocr_mismatches, recommended_action, temp_score, temp_found,
-            color_sim, decision_reasoning,
+            color_sim, decision_reasoning, multimodal_report,
         )
         url = "https://openrouter.ai/api/v1/chat/completions"
         headers = {
@@ -143,6 +150,10 @@ def generate_explanation(metrics: dict) -> str:
             f"Reused hardware indicators found. The surface registration reveals minor wear, adhesive residue, "
             f"or trace scratches mismatching the golden reference board."
         )
+
+    # Include the Visual AI anomalies list if available
+    if multimodal_report and "skipped" not in multimodal_report.lower() and "failed" not in multimodal_report.lower() and "no anomalies" not in multimodal_report.lower():
+        reasons.append(f"Visual AI details: {multimodal_report}")
 
     # Ground the template in Agent 4's own reasoning when available, so the
     # fallback path stays consistent with why the decision was actually made,

@@ -327,38 +327,27 @@ export function HeatmapViewer({
       </div>
 
       <div className="relative aspect-square bg-surface-container-lowest rounded-lg overflow-hidden border border-slate-800 select-none">
-        {/* Base image */}
+        {/* Base image: dynamically swaps to heatmapUrl if overlay is enabled */}
         <img
-          src={imageUrl}
+          src={showOverlay && heatmapUrl ? heatmapUrl : imageUrl}
           alt={alt}
           className="w-full h-full object-cover"
         />
 
-        {/* Overlay: separate heatmap image OR box region */}
-        {showOverlay && (
-          <>
-            {heatmapUrl ? (
-              <img
-                src={heatmapUrl}
-                alt="Heatmap overlay"
-                className="absolute inset-0 w-full h-full object-cover mix-blend-multiply opacity-70 transition-opacity duration-300"
-              />
-            ) : region ? (
-              /* Bounding-box overlay derived from ROI region percentages */
-              <div
-                className="absolute border-2 border-red-500 rounded shadow-lg"
-                style={{
-                  left: `${region.x}%`,
-                  top: `${region.y}%`,
-                  width: `${region.w}%`,
-                  height: `${region.h}%`,
-                  background: "rgba(239, 68, 68, 0.15)",
-                  boxShadow: "0 0 0 9999px rgba(0,0,0,0.25), 0 0 8px rgba(239, 68, 68, 0.5)",
-                  pointerEvents: "none",
-                }}
-              />
-            ) : null}
-          </>
+        {/* Overlay: fallback bounding box region if separate heatmapUrl is not used */}
+        {showOverlay && !heatmapUrl && region && (
+          <div
+            className="absolute border-2 border-red-500 rounded shadow-lg"
+            style={{
+              left: `${region.x}%`,
+              top: `${region.y}%`,
+              width: `${region.w}%`,
+              height: `${region.h}%`,
+              background: "rgba(239, 68, 68, 0.15)",
+              boxShadow: "0 0 0 9999px rgba(0,0,0,0.25), 0 0 8px rgba(239, 68, 68, 0.5)",
+              pointerEvents: "none",
+            }}
+          />
         )}
       </div>
 

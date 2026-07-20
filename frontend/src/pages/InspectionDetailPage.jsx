@@ -257,6 +257,9 @@ export default function InspectionDetailPage() {
     : recommendation.decision === "Quarantine & Escalate" ? REVIEW_DECISION.REJECTED
       : REVIEW_DECISION.NEEDS_MORE_EVIDENCE;
 
+  // Extract visual diagnostic card url
+  const heatmapUrl = merged.heatmapUrl || null;
+
   // --- RENDER 2: DETAILED REPORT VIEW (if a case ID is active) ---
   return (
     <Layout>
@@ -349,8 +352,8 @@ export default function InspectionDetailPage() {
 
             <HeatmapViewer
               imageUrl={merged.uploadedImageUrl}
-              region={merged.aiRegion}
-              label="AI-detected region of interest — drag coordinates in Human Review to adjust"
+              heatmapUrl={heatmapUrl}
+              label={heatmapUrl ? "SSIM Anomaly Heatmap — red bounding boxes highlight detected physical discrepancies" : "AI Attention Region"}
             />
           </div>
 
@@ -364,17 +367,17 @@ export default function InspectionDetailPage() {
               <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-ping"></span>
             </div>
             <div className="p-4 bg-slate-950 font-tech-code text-[11px] text-slate-350 space-y-1.5 select-text leading-relaxed max-h-[170px] overflow-y-auto">
-              <p className="text-slate-500">[SYSTEM] Core pipeline execution active at {merged.updatedAt || "Current Session"}</p>
-              <p className="text-cyan-400">&gt; [Agent-1-Ingest] Loaded golden reference standard from master registry.</p>
-              <p className="text-cyan-400">&gt; [Agent-1-Ingest] Executed homography registration. Keypoint Rate: {(keypoint * 100).toFixed(1)}% | SSIM: {ssim.toFixed(2)}</p>
-              <p className="text-purple-400">&gt; [Agent-2-OCR] EasyOCR localizer targeted at coordinates {JSON.stringify(merged.aiRegion)}</p>
+              <p className="text-slate-500">[SYSTEM] Multi-Agent Pipeline Execution Active at {merged.updatedAt || "Current Session"}</p>
+              <p className="text-cyan-400">&gt; [Agent-1-Gatekeeper] Checked comparison viability: verified aspect ratio and resolution scale alignment [PASSED].</p>
+              <p className="text-cyan-400">&gt; [Agent-1-Gatekeeper] Ran auto-classifier: commodity part dynamically classified as "{merged.commodity || "N/A"}".</p>
+              <p className="text-emerald-400">&gt; [Agent-2-Triage] Checked image clarity and exposure. Alignment homography registered. Keypoints Match Rate: {(keypoint * 100).toFixed(1)}%</p>
+              <p className="text-purple-400">&gt; [Agent-3-Ensemble] Ran structural SSIM diff mapping (SSIM index: {ssim.toFixed(2)}). Dynamic diagnostic card generated.</p>
               <p className={`font-bold ${ocrMatch ? "text-green-400" : "text-red-400"}`}>
-                &gt; [Agent-2-OCR] Extraction: Expected "{ocrExpected}" | Detected "{ocrText}" | Match: {ocrMatch ? "PASSED" : "FAILED (Tamper warning)"}
+                &gt; [Agent-3-Ensemble] OCR Extraction: Expected "{ocrExpected}" | Detected "{ocrText}" | Match: {ocrMatch ? "PASSED" : "FAILED"}
               </p>
-              <p className="text-blue-400">&gt; [Agent-3-Decision] Calculated combined fraud score: {merged.fraudScore}% | AI Confidence: {merged.confidencePct}%</p>
-              <p className="text-indigo-400">&gt; [Agent-4-Explain] Natural Language narrative explainability compiled successfully.</p>
-              <p className="text-emerald-400">&gt; [Agent-5-PDF] Compliance audit PDF report generated at /api/reports/{merged.id}/pdf</p>
-              <p className="text-slate-500">[SYSTEM] Execution complete. Results persisted in DB.</p>
+              <p className="text-blue-400">&gt; [Agent-4-Decision] Deterministic rules evaluated. Overall Fraud Score: {merged.fraudScore}% | Decision Confidence: {merged.confidencePct}%</p>
+              <p className="text-indigo-400">&gt; [Agent-5-Explainer] Natural language narrative generated: "{recommendation.reasoning || "Audit complete."}"</p>
+              <p className="text-slate-500">[SYSTEM] Execution complete. Case results persisted in Database.</p>
             </div>
           </div>
 

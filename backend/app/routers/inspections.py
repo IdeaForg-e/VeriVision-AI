@@ -18,87 +18,108 @@ router = APIRouter(prefix="/inspections", tags=["Inspections"])
 
 @router.post("", response_model=schemas.InspectionResponse, status_code=status.HTTP_201_CREATED)
 async def create_inspection(
-    product_id: Optional[int] = Form(None),
     capture_site: str = Form(...),
     capture_angle: str = Form("top"),
     file: UploadFile = File(...),
+    golden_file: UploadFile = File(...),
+    expected_serial: Optional[str] = Form(None),
     db: Session = Depends(get_db),
     current_user: models.User = Depends(utils.get_current_user)
 ):
-    logger.info(f"Incoming inspection request. Product ID: {product_id}, Site: {capture_site}, Angle: {capture_angle}")
+    logger.info(f"Incoming inspection request. Site: {capture_site}, Angle: {capture_angle}")
     
-    # Read file content into memory
+    # 1. Read files and validate decoding
     contents = await file.read()
     nparr = np.frombuffer(contents, np.uint8)
     src_img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
     
+    golden_contents = await golden_file.read()
+    nparr_golden = np.frombuffer(golden_contents, np.uint8)
+    ref_img = cv2.imdecode(nparr_golden, cv2.IMREAD_COLOR)
+    
     if src_img is None:
-        raise HTTPException(status_code=400, detail="Invalid uploaded image file.")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Unable to decode uploaded captured/defective image scan. Please upload a valid JPG or PNG photo."
+        )
+    if ref_img is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Unable to decode uploaded golden reference standard image. Please upload a valid JPG or PNG photo."
+        )
 
-    if product_id is None:
-        logger.info("Product ID not provided. Running layout matching against all template golden references...")
-        # Auto-detect product
-        products = db.query(models.Product).all()
-        best_product = None
-        best_rate = -1.0
-        
-        try:
-            gray_src = cv2.cvtColor(src_img, cv2.COLOR_BGR2GRAY)
-            orb = cv2.ORB_create(nfeatures=1000)
-            kp_src, des_src = orb.detectAndCompute(gray_src, None)
-            
-            if des_src is not None:
-                bf = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
-                for prod in products:
-                    for ref in prod.golden_references:
-                        ref_image_path = ref.image_path
-                        if not os.path.isabs(ref_image_path):
-                            ref_image_path = os.path.join(settings.BASE_DIR, ref_image_path)
-                        ref_img = cv2.imread(ref_image_path)
-                        if ref_img is None:
-                            continue
-                        gray_ref = cv2.cvtColor(ref_img, cv2.COLOR_BGR2GRAY)
-                        kp_ref, des_ref = orb.detectAndCompute(gray_ref, None)
-                        if des_ref is None:
-                            continue
-                        
-                        matches = bf.match(des_src, des_ref)
-                        good_matches = [m for m in matches if m.distance < 50]
-                        match_rate = len(good_matches) / max(len(kp_src), len(kp_ref), 1)
-                        logger.info(f"Layout matching template '{prod.part_number}': match rate = {match_rate:.3f}")
-                        
-                        if match_rate > best_rate:
-                            best_rate = match_rate
-                            best_product = prod
-        except Exception as e:
-            logger.error(f"Error during layout auto-detection: {e}")
-            
-        if best_product and best_rate >= 0.10:
-            product = best_product
-            product_id = product.id
-            logger.info(f"Layout recognized: Product {product.part_number} (ID: {product_id}) matched with {best_rate*100:.1f}% rate")
-        else:
-            logger.warning("Unrecognized image layout. Match rate below threshold.")
-            raise HTTPException(
-                status_code=400,
-                detail="Golden reference image not found for this product. Please contact your administrator to upload the golden image of the part or product."
-            )
+    # Validate resolution (min 150x150)
+    if src_img.shape[0] < 150 or src_img.shape[1] < 150:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Uploaded captured image resolution is too low (minimum 150x150 pixels required)."
+        )
+    if ref_img.shape[0] < 150 or ref_img.shape[1] < 150:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Uploaded golden reference image resolution is too low (minimum 150x150 pixels required)."
+        )
+
+    # 2. Save dynamic Golden Reference file to settings.GOLDEN_DIR
+    golden_id = str(uuid.uuid4())
+    golden_ext = os.path.splitext(golden_file.filename)[1] or ".png"
+    golden_filename = f"golden_{golden_id}{golden_ext}"
+    golden_file_path = os.path.join(settings.GOLDEN_DIR, golden_filename)
+    
+    logger.info(f"Saving uploaded golden reference standard image to {golden_file_path}")
+    try:
+        with open(golden_file_path, "wb") as f:
+            f.write(golden_contents)
+    except Exception as e:
+        logger.error(f"Failed to save golden image standard: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to save golden reference image standard on server: {str(e)}"
+        )
+
+    # 3. Auto-classify the commodity of the golden standard
+    detected_commodity = services.classify_part_commodity(golden_file_path)
+    logger.info(f"Part commodity dynamically classified as: '{detected_commodity}'")
+
+
+    # Set up default ROI configuration based on the detected commodity
+    if detected_commodity == "label":
+        roi_json = { "label_roi": { "x": 420, "y": 50, "width": 420, "height": 220 } }
+    elif detected_commodity == "motherboard":
+        roi_json = { "label_roi": { "x": 200, "y": 620, "width": 150, "height": 80 } }
+    elif detected_commodity == "microchip":
+        roi_json = { "label_roi": { "x": 250, "y": 250, "width": 200, "height": 100 } }
     else:
-        # 1. Verify product exists
-        product = db.query(models.Product).filter(models.Product.id == product_id).first()
-        if not product:
-            logger.warning(f"Inspection failed: Product ID {product_id} not found")
-            raise HTTPException(status_code=404, detail="Product not found")
+        roi_json = { "label_roi": { "x": 100, "y": 100, "width": 300, "height": 200 } }
 
-    # 2. Verify Golden Reference exists for this product and angle
-    golden_ref = services.select_golden_reference(product_id, capture_angle, db)
-    if not golden_ref:
-        logger.warning(f"Inspection failed: Golden reference not found for product {product_id} and angle {capture_angle}")
-        raise HTTPException(status_code=400, detail="Golden reference image not found for this product. Please contact your system administrator to upload the OEM golden reference standard.")
+    # 4. Dynamically register Product in Database
+    custom_part_num = f"AUTO-{uuid.uuid4().hex[:6].upper()}"
+    custom_name = f"Auto-detected {detected_commodity.title()} ({file.filename})"
+    
+    db_product = models.Product(
+        part_number=custom_part_num,
+        name=custom_name,
+        commodity=detected_commodity
+    )
+    db.add(db_product)
+    db.commit()
+    db.refresh(db_product)
+    
+    # 5. Register Golden Reference in Database
+    db_golden = models.GoldenReference(
+        product_id=db_product.id,
+        image_path=f"data/golden/{golden_filename}",
+        expected_serial=expected_serial,
+        angle=capture_angle,
+        roi_config=roi_json
+    )
+    db.add(db_golden)
+    db.commit()
+    db.refresh(db_golden)
 
-    # 3. Create case folder & Save uploaded file
+    # 6. Save uploaded target defect scan
     case_id = str(uuid.uuid4())
-    file_ext = os.path.splitext(file.filename)[1]
+    file_ext = os.path.splitext(file.filename)[1] or ".png"
     filename = f"{case_id}_captured{file_ext}"
     file_path = os.path.join(settings.UPLOAD_DIR, filename)
 
@@ -108,12 +129,15 @@ async def create_inspection(
             f.write(contents)
     except Exception as e:
         logger.error(f"Failed to save image for Case {case_id}: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Failed to save uploaded image: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, 
+            detail=f"Failed to save uploaded target image: {str(e)}"
+        )
 
-    # 4. Initialize Database Inspection record as pending
+    # 7. Initialize Database Inspection record as pending
     db_inspection = models.Inspection(
         case_id=case_id,
-        product_id=product_id,
+        product_id=db_product.id,
         user_id=current_user.id,
         captured_image_path=file_path,
         capture_site=capture_site,
@@ -124,14 +148,16 @@ async def create_inspection(
     db.commit()
     db.refresh(db_inspection)
 
-    # 5. Run Ingestion, Alignment & Anomaly Detection using the LangGraph Workflow
+    # 8. Run Ingestion, Alignment & Anomaly Detection using the LangGraph Workflow
     initial_state = {
         "case_id": case_id,
         "image_path": file_path,
-        "golden_path": golden_ref.image_path,
-        "expected_serial": golden_ref.expected_serial,
-        "roi_config": golden_ref.roi_config
+        "golden_path": golden_file_path,
+        "expected_serial": expected_serial,
+        "roi_config": roi_json,
+        "commodity": detected_commodity
     }
+
     
     logger.info(f"Triggering LangGraph Multi-Agent pipeline for Case {case_id}")
     try:
@@ -162,12 +188,20 @@ async def create_inspection(
         logger.error(f"Pipeline status reported failure for Case {case_id}")
         db_inspection.status = "failed"
         db.commit()
+        detail_msg = pipeline_result.get("triage_detail", "Internal engine failure during inspection processing.")
+        if any(k in detail_msg.lower() for k in ["mismatch", "ratio", "scale", "orientation", "comparison"]):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=detail_msg
+            )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=pipeline_result.get("triage_detail", "Internal engine failure during inspection processing.")
+            detail=detail_msg
         )
 
+
     logger.info(f"Pipeline succeeded. Verdict: {pipeline_result['verdict']}, Fraud Score: {pipeline_result['fraud_score']}")
+
 
     # 6. Commit results to Database
     db_result = models.InspectionResult(

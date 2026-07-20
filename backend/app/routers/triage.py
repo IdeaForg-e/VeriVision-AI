@@ -138,7 +138,7 @@ def get_triage_stats(
         query = query.filter(models.Inspection.user_id == current_user.id)
 
     total_today = query.count()
-    pending = query.filter(models.Inspection.status == "pending").count()
+    pending = query.filter(models.Inspection.status.in_(["pending", "failed"])).count()
     auto_approved = query.filter(
         models.Inspection.status == "completed",
         models.Inspection.result != None,
@@ -249,6 +249,10 @@ def get_case_detail(
             {"id": "e1", "type": "created", "label": "Case Opened", "user": "System", "timestamp": inspection.created_at.isoformat() if inspection.created_at else "", "description": "Automatically created by the Perception Engine."},
         ]
 
+    heatmap_url = None
+    if result and result.heatmap_path:
+        heatmap_url = f"/data/cases/{os.path.basename(result.heatmap_path)}"
+
     return {
         "metadata": {
             "id": inspection.case_id,
@@ -260,6 +264,7 @@ def get_case_detail(
             "imageHash": f"0x{abs(hash(inspection.case_id)):08X}",
             "neuralModel": "FraudSense v4.2",
             "updatedAt": inspection.created_at.isoformat() if inspection.created_at else "",
+            "heatmapUrl": heatmap_url,
         },
         "ocrResults": ocr_results,
         "metrics": metrics,
@@ -305,11 +310,11 @@ def get_case_review_detail(
         else:
             golden_image_url = f"/data/golden/{os.path.basename(golden_ref.image_path)}" if golden_ref.image_path else None
 
-    # Use example images from dataset if no real images
+    # Fallback to empty if not found
     if not golden_image_url:
-        golden_image_url = "/dataset/golden_motherboard.png"
+        golden_image_url = ""
     if not uploaded_image_url:
-        uploaded_image_url = "/dataset/defect_motherboard_burn.png"
+        uploaded_image_url = ""
 
     return schemas.ReviewDetailResponse(
         id=inspection.case_id,
