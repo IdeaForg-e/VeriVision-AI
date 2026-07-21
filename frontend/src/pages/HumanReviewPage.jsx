@@ -35,7 +35,7 @@ export default function HumanReviewPage() {
     );
   }
 
-  const { caseData, loading, notes, setNotes, region, handleRegionChange, handleRegionCommit, decisionState, submitDecision } =
+  const { caseData, loading, notes, setNotes, region, handleRegionChange, handleRegionCommit, decisionState, submitDecision, learningStatus } =
     useReview(caseId);
 
   if (loading || !caseData) {
@@ -66,6 +66,7 @@ export default function HumanReviewPage() {
           region={region}
           onRegionChange={handleRegionChange}
           onRegionCommit={handleRegionCommit}
+          learningStatus={learningStatus}
         />
 
         <div className="lg:col-span-4 flex flex-col gap-gutter">
