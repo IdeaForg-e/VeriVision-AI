@@ -405,83 +405,49 @@ export default function AnalyticsDashboardPage() {
                 </div>
             </div>
 
-            {/* Site and Vendor Summaries */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-                {/* Site Performance Table */}
-                <div className="relative group">
-                    <div className="relative bg-[#0f172a]/55 border border-slate-800/80 rounded-xl shadow-lg overflow-hidden h-full">
-                        <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-cyan-500/20 to-transparent" />
-                        <div className="px-6 py-4 border-b border-slate-800 bg-[#0d1527]/50 flex items-center gap-2.5">
-                            <div className="h-7 w-7 rounded-lg bg-cyan-950/20 border border-cyan-500/20 flex items-center justify-center text-cyan-400">
-                                <Activity size={14} />
-                            </div>
-                            <h2 className="text-xs font-extrabold uppercase tracking-wider text-slate-200">Site Performance</h2>
+            {/* Site Performance Table — full width like Vendor */}
+            <div className="mb-8 relative group">
+                <div className="relative bg-[#0f172a]/55 border border-slate-800/80 rounded-xl shadow-lg overflow-hidden">
+                    <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-cyan-500/20 to-transparent" />
+                    <div className="px-6 py-4 border-b border-slate-800 bg-[#0d1527]/50 flex items-center gap-2.5">
+                        <div className="h-7 w-7 rounded-lg bg-cyan-950/20 border border-cyan-500/20 flex items-center justify-center text-cyan-400">
+                            <Activity size={14} />
                         </div>
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-xs">
-                                <thead>
-                                    <tr className="border-b border-slate-800 bg-slate-900/30">
-                                        <th className="text-left px-6 py-3.5 text-[10px] font-extrabold uppercase tracking-wider text-slate-500">Site</th>
-                                        <th className="text-center px-6 py-3.5 text-[10px] font-extrabold uppercase tracking-wider text-slate-500">Inspections</th>
-                                        <th className="text-center px-6 py-3.5 text-[10px] font-extrabold uppercase tracking-wider text-slate-500">Fraud Cases</th>
-                                        <th className="text-right px-6 py-3.5 text-[10px] font-extrabold uppercase tracking-wider text-slate-500">Fraud Rate</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-slate-800/60">
-                                    {sites.map((site, i) => (
-                                        <tr key={i} onClick={() => handleSiteClick(site.site, site.fraud_cases)} className="group hover:bg-blue-950/20 transition-all duration-300 cursor-pointer border-l-2 border-l-transparent hover:border-l-blue-500">
-                                            <td className="px-6 py-4 flex items-center gap-2">
-                                                <span className="text-blue-400 font-bold text-xs underline underline-offset-4 decoration-blue-500/40 group-hover:decoration-blue-400 group-hover:text-blue-300 transition-all duration-300">
-                                                    {site.site}
-                                                </span>
-                                                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 translate-x-[-8px] group-hover:translate-x-0 transition-all duration-300">
-                                                    <span className="text-[8px] font-bold text-blue-400/80 uppercase tracking-wider">View</span>
-                                                    <ChevronRight size={12} className="text-blue-400" />
-                                                </div>
-                                            </td>
-                                            <td className="px-6 py-4 text-center text-slate-300 font-tech-code">{site.inspections}</td>
-                                            <td className="px-6 py-4 text-center text-red-400 font-bold font-tech-code">{site.fraud_cases}</td>
-                                            <td className="px-6 py-4 text-right font-tech-code">
-                                                <span className={parseFloat(site.fraud_rate) > 5 ? "text-red-400 font-extrabold" : "text-emerald-400 font-bold"}>
-                                                    {site.fraud_rate}%
-                                                </span>
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
+                        <h2 className="text-xs font-extrabold uppercase tracking-wider text-slate-200">Site Performance Overview</h2>
                     </div>
-                </div>
-
-                {/* Vendor Fraud Summary Table */}
-                <div className="relative group">
-                    <div className="relative bg-[#0f172a]/55 border border-slate-800/80 rounded-xl shadow-lg overflow-hidden h-full">
-                        <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-purple-500/20 to-transparent" />
-                        <div className="px-6 py-4 border-b border-slate-800 bg-[#0d1527]/50 flex items-center gap-2.5">
-                            <div className="h-7 w-7 rounded-lg bg-purple-950/20 border border-purple-500/20 flex items-center justify-center text-purple-400">
-                                <AlertTriangle size={14} />
-                            </div>
-                            <h2 className="text-xs font-extrabold uppercase tracking-wider text-slate-200">Vendor Fraud Summary</h2>
-                        </div>
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-xs">
-                                <thead>
-                                    <tr className="border-b border-slate-800 bg-slate-900/30">
-                                        <th className="text-left px-6 py-3.5 text-[10px] font-extrabold uppercase tracking-wider text-slate-500">Vendor</th>
-                                        <th className="text-right px-6 py-3.5 text-[10px] font-extrabold uppercase tracking-wider text-slate-500">Fraud Cases</th>
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-xs">
+                            <thead>
+                                <tr className="border-b border-slate-800 bg-slate-900/30">
+                                    <th className="text-left px-6 py-3.5 text-[10px] font-extrabold uppercase tracking-wider text-slate-500">Site</th>
+                                    <th className="text-center px-6 py-3.5 text-[10px] font-extrabold uppercase tracking-wider text-slate-500">Inspections</th>
+                                    <th className="text-center px-6 py-3.5 text-[10px] font-extrabold uppercase tracking-wider text-slate-500">Fraud Cases</th>
+                                    <th className="text-right px-6 py-3.5 text-[10px] font-extrabold uppercase tracking-wider text-slate-500">Fraud Rate</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-800/60">
+                                {sites.map((site, i) => (
+                                    <tr key={i} onClick={() => handleSiteClick(site.site, site.fraud_cases)} className="group hover:bg-blue-950/20 transition-all duration-300 cursor-pointer border-l-2 border-l-transparent hover:border-l-blue-500">
+                                        <td className="px-6 py-4 flex items-center gap-2">
+                                            <span className="text-blue-400 font-bold text-xs underline underline-offset-4 decoration-blue-500/40 group-hover:decoration-blue-400 group-hover:text-blue-300 transition-all duration-300">
+                                                {site.site}
+                                            </span>
+                                            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 translate-x-[-8px] group-hover:translate-x-0 transition-all duration-300">
+                                                <span className="text-[8px] font-bold text-blue-400/80 uppercase tracking-wider">View</span>
+                                                <ChevronRight size={12} className="text-blue-400" />
+                                            </div>
+                                        </td>
+                                        <td className="px-6 py-4 text-center text-slate-300 font-tech-code">{site.inspections}</td>
+                                        <td className="px-6 py-4 text-center text-red-400 font-bold font-tech-code">{site.fraud_cases}</td>
+                                        <td className="px-6 py-4 text-right font-tech-code">
+                                            <span className={parseFloat(site.fraud_rate) > 5 ? "text-red-400 font-extrabold" : "text-emerald-400 font-bold"}>
+                                                {site.fraud_rate}%
+                                            </span>
+                                        </td>
                                     </tr>
-                                </thead>
-                                <tbody className="divide-y divide-slate-800/60">
-                                    {vendors.slice(0, 5).map((v, i) => (
-                                        <tr key={i} className="hover:bg-slate-900/40 transition-colors">
-                                            <td className="px-6 py-4 text-slate-200 font-semibold">{v.vendor}</td>
-                                            <td className="px-6 py-4 text-right text-red-400 font-bold font-tech-code">{v.fraud_cases}</td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
+                                ))}
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             </div>
