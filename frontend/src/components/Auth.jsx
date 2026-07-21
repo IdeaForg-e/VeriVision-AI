@@ -59,6 +59,7 @@ export function LoginForm() {
   const [googleLoading, setGoogleLoading] = useState(false);
   const [error, setError] = useState(null);
   const [message, setMessage] = useState(null);
+  const [signupRole, setSignupRole] = useState(role);
 
   const isSignup = mode === "signup";
 
@@ -85,7 +86,7 @@ export function LoginForm() {
 
     try {
       if (isSignup) {
-        await register({ name, email, password, role: "user" });
+        await register({ name, email, password, role: signupRole || "user" });
         setMessage("Account created! Please sign in using your credentials.");
         switchMode("login");
       } else {
@@ -252,17 +253,42 @@ export function LoginForm() {
 
             <form onSubmit={handleSubmit} className="mt-4 space-y-4">
               {isSignup && (
-                <label className="block">
-                  <span className="mb-1 block text-[10px] font-bold text-slate-300 uppercase tracking-wider">Full name</span>
-                  <input
-                    value={name}
-                    onChange={(event) => setName(event.target.value)}
-                    required
-                    autoComplete="name"
-                    className="w-full rounded-lg px-3 py-2 text-xs cyber-input"
-                    placeholder="Anil Kumar"
-                  />
-                </label>
+                <div>
+                  <label className="block">
+                    <span className="mb-1 block text-[10px] font-bold text-slate-300 uppercase tracking-wider">Sign up as:</span>
+                    <div className="mt-1 grid grid-cols-2 gap-1.5 rounded-xl bg-slate-900/80 border border-slate-850 p-1">
+                      {roleOptions.map((item) => {
+                        const Icon = item.icon;
+                        const selected = signupRole === item.key;
+                        return (
+                          <button
+                            key={item.key}
+                            type="button"
+                            onClick={() => setSignupRole(item.key)}
+                            className={`flex items-center justify-center gap-1.5 rounded-lg px-2 py-1.5 text-[11px] font-bold transition border border-transparent ${
+                              selected ? "bg-cyan-500/15 text-cyan-400 border-cyan-500/25 shadow-sm" : "text-slate-455 hover:text-slate-200"
+                            }`}
+                          >
+                            <Icon size={12} />
+                            {item.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </label>
+
+                  <label className="block mt-3">
+                    <span className="mb-1 block text-[10px] font-bold text-slate-300 uppercase tracking-wider">Full name</span>
+                    <input
+                      value={name}
+                      onChange={(event) => setName(event.target.value)}
+                      required
+                      autoComplete="name"
+                      className="w-full rounded-lg px-3 py-2 text-xs cyber-input"
+                      placeholder="Anil Kumar"
+                    />
+                  </label>
+                </div>
               )}
 
               <label className="block">
