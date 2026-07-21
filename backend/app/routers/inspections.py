@@ -95,7 +95,7 @@ async def create_inspection(
                 detail="This part's golden image was not available in our database. Please contact your admin."
             )
 
-        ref_img = cv2.imread(golden_file_path)
+        ref_img = utils.load_image_robust(golden_file_path)
         if ref_img is None:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,

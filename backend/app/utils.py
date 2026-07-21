@@ -79,4 +79,33 @@ def require_role(allowed_roles: list):
     return dependency
 
 
+def load_image_robust(file_path_or_bytes):
+    """
+    Safely reads an image using OpenCV, with a PIL fallback for formats 
+    like AVIF/WEBP/HEIC that OpenCV might fail to decode natively.
+    Returns BGR numpy array or None.
+    """
+    import cv2
+    import numpy as np
+    try:
+        if isinstance(file_path_or_bytes, str):
+            img = cv2.imread(file_path_or_bytes)
+        else:
+            img = cv2.imdecode(np.frombuffer(file_path_or_bytes, np.uint8), cv2.IMREAD_COLOR)
+        if img is not None:
+            return img
+    except Exception:
+        pass
+
+    try:
+        from PIL import Image, ImageOps
+        pil_img = Image.open(file_path_or_bytes)
+        pil_img = ImageOps.exif_transpose(pil_img)
+        pil_img = pil_img.convert('RGB')
+        return cv2.cvtColor(np.array(pil_img), cv2.COLOR_RGB2BGR)
+    except Exception:
+        return None
+
+
+
 
