@@ -1,9 +1,12 @@
 import { useState, useCallback, useEffect } from "react";
 import { fetchCaseForReview, updateROIRegion, submitReviewDecision } from "../services/reviewService.js";
+import { getCaseById } from "../services/caseService.js";
 
 export function useReview(caseId) {
   const [caseData, setCaseData] = useState(null);
+  const [detailData, setDetailData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [notes, setNotes] = useState("");
   const [region, setRegion] = useState({ x: 25, y: 25, w: 25, h: 25 });
   const [learningStatus, setLearningStatus] = useState("idle"); // 'idle' | 'learning' | 'success'
@@ -16,12 +19,29 @@ export function useReview(caseId) {
   useEffect(() => {
     if (!caseId) return;
     setLoading(true);
-    fetchCaseForReview(caseId)
-      .then((data) => {
-        setCaseData(data);
-        if (data.aiRegion) setRegion(data.aiRegion);
+    setError(null);
+
+    // Fetch both review data and detail data in parallel
+    Promise.all([
+      fetchCaseForReview(caseId),
+      getCaseById(caseId).catch(() => null),
+    ])
+      .then(([reviewData, detail]) => {
+        if (reviewData) {
+          setCaseData(reviewData);
+          if (reviewData.aiRegion) setRegion(reviewData.aiRegion);
+        }
+        if (detail) {
+          setDetailData(detail);
+        }
+        if (!reviewData && !detail) {
+          setError("Failed to load case data. Please try again.");
+        }
       })
-      .catch((err) => console.error("Failed to load case for review:", err))
+      .catch((err) => {
+        console.error("Failed to load case for review:", err);
+        setError(err.message || "Failed to load case data.");
+      })
       .finally(() => setLoading(false));
   }, [caseId]);
 
@@ -68,7 +88,9 @@ export function useReview(caseId) {
 
   return {
     caseData,
+    detailData,
     loading,
+    error,
     notes,
     setNotes,
     region,

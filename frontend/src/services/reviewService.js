@@ -9,21 +9,8 @@ export async function fetchCaseForReview(caseId) {
     const data = await api.get(`/triage/cases/${caseId}/review`);
     return data;
   } catch {
-    // Fallback if no case found
-    return {
-      id: caseId || "F-2026-02",
-      partCode: "BRK-442",
-      title: "Manual validation required for high-precision brake assembly fraud detection.",
-      confidencePct: 42,
-      imageHash: "0x82F...44A2",
-      goldenImageUrl: "/dataset/golden_motherboard_clean_top_down.png",
-      uploadedImageUrl: "/dataset/defect_burn_marks.png",
-      aiRegion: { x: 25, y: 25, w: 25, h: 25 },
-      neuralModel: "FraudSense v4.2",
-      targetResolutionMinutes: 15,
-      elapsedMinutes: 10.8,
-      status: "needs_evidence",
-    };
+    // Return null on error — UI handles missing data gracefully
+    return null;
   }
 }
 

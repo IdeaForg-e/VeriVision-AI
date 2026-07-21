@@ -1,5 +1,5 @@
 import { Link, NavLink, Navigate, useLocation } from "react-router-dom";
-import { Bell, Fingerprint, LogOut, Menu, Search, UploadCloud, BarChart3, LayoutDashboard, FileText, ShieldCheck, Settings, Sliders, Activity } from "lucide-react";
+import { Fingerprint, LogOut, Menu, Search, UploadCloud, BarChart3, LayoutDashboard, FileText, ShieldCheck, Settings, Sliders, Activity, Sun, Moon } from "lucide-react";
 import { ROUTES } from "../utils/constants.js";
 import { useAuth } from "../hooks/useAuth.js";
 import { Loader } from "./Common.jsx";
@@ -100,6 +100,22 @@ export function Header() {
   const { user, logout } = useAuth();
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [theme, setTheme] = useState(() => localStorage.getItem("theme") || "dark");
+
+  useEffect(() => {
+    if (theme === "light") {
+      document.body.classList.add("light-theme");
+      document.documentElement.classList.add("theme-light");
+    } else {
+      document.body.classList.remove("light-theme");
+      document.documentElement.classList.remove("theme-light");
+    }
+    localStorage.setItem("theme", theme);
+  }, [theme]);
+
+  const toggleTheme = () => {
+    setTheme((prev) => (prev === "dark" ? "light" : "dark"));
+  };
 
   const handleLogout = () => {
     setMobileMenuOpen(false);
@@ -152,7 +168,7 @@ export function Header() {
             <Menu size={18} />
           </button>
 
-          {/* Upload + Theme + Notifications */}
+          {/* Upload + Theme */}
           <button
             type="button"
             onClick={() => setIsUploadOpen(true)}
@@ -172,7 +188,16 @@ export function Header() {
             </Link>
           )}
 
-          <IconButton icon={Bell} label="Notifications" badge={0} />
+          {/* Theme Toggle Button */}
+          <button
+            type="button"
+            onClick={toggleTheme}
+            className="h-9 w-9 rounded-lg flex items-center justify-center text-slate-400 hover:text-cyan-400 hover:bg-slate-800/60 border border-slate-800/80 transition-all"
+            aria-label="Toggle Theme"
+            title={theme === "dark" ? "Switch to Light Theme" : "Switch to Dark Theme"}
+          >
+            {theme === "dark" ? <Sun size={17} className="text-amber-400" /> : <Moon size={17} className="text-cyan-400" />}
+          </button>
 
           {user && <UserAvatar user={user} />}
 

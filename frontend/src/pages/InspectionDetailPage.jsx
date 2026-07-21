@@ -211,10 +211,11 @@ export default function InspectionDetailPage() {
     }
   }, [id]);
 
-  // Derived data
+  // Derived data — ALL from backend, zero hardcoded values
   const merged = useMemo(() => ({ ...caseData, ...reviewData }), [caseData, reviewData]);
-  const ssim = merged.metrics?.find((m) => m.name.includes("SSIM"))?.score ?? 0.4;
-  const keypoint = merged.metrics?.find((m) => m.name.includes("Keypoint"))?.score ?? 0.07;
+
+  const ssim = merged.metrics?.find((m) => m.name.includes("SSIM"))?.score ?? 0;
+  const keypoint = merged.metrics?.find((m) => m.name.includes("Keypoint"))?.score ?? 0;
   const ocrResults = merged.ocrResults || [];
   const ocrMatch = ocrResults[0]?.match ?? false;
   const ocrText = ocrResults[0]?.extracted || "No text detected";
@@ -225,29 +226,18 @@ export default function InspectionDetailPage() {
       : REVIEW_DECISION.NEEDS_MORE_EVIDENCE;
   const heatmapUrl = merged.heatmapUrl || null;
   const fraudScore = merged.fraudScore ?? 0;
+  const aiConfidence = recommendation.confidence ?? merged.confidencePct ?? 0;
 
-  const reasoningText = recommendation.reasoning || "";
-  
-  let aiClassification = "UNKNOWN";
-  let aiCategory = "UNKNOWN";
+  // Classification & Category — directly from backend fields, no regex parsing
+  const aiClassification = merged.status || "UNKNOWN";
+  const aiCategory = recommendation.decision || "UNKNOWN";
 
-  const classMatch = reasoningText.match(/categorized as\s+([^.,\n]+)/i);
-  if (classMatch) {
-    aiClassification = classMatch[1].trim();
-  }
-
-  const catMatch = reasoningText.match(/pres[e]?cribed response is\s+([^.,\n]+)/i);
-  if (catMatch) {
-    aiCategory = catMatch[1].trim();
-  }
-
-  if (aiClassification === "UNKNOWN" || aiCategory === "UNKNOWN") {
-    const aiMatch = reasoningText.match(/classified as\s+(.*?)\s+with a recommended action of\s+(.*?)(?:\.|$)/i);
-    if (aiMatch) {
-      if (aiClassification === "UNKNOWN") aiClassification = aiMatch[1].trim();
-      if (aiCategory === "UNKNOWN") aiCategory = aiMatch[2].trim();
-    }
-  }
+  // Compute OCR accuracy from actual backend data
+  const ocrFieldsTotal = Math.max(ocrResults.length, 1);
+  const ocrFieldsMatched = ocrResults.filter((r) => r.match === true).length;
+  const ocrFieldsFilled = ocrResults.filter((r) => r.extracted && r.extracted !== "No text detected").length;
+  const ocrAccuracyPct = (ocrFieldsMatched / ocrFieldsTotal) * 100;
+  const ocrCompletenessPct = (ocrFieldsFilled / ocrFieldsTotal) * 100;
 
   // Filtered reports
   const filteredReports = useMemo(() => {
@@ -499,57 +489,59 @@ export default function InspectionDetailPage() {
   }
 
   /* ═══════════════════════════════════════════════════════════
-     DETAIL VIEW (ID present) — NO REPETITION
+     DETAIL VIEW (ID present) — ALL DATA FROM BACKEND
      ═══════════════════════════════════════════════════════════ */
   return (
     <Layout>
       {/* ── 1. HERO HEADER ───────────────────────────── */}
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#0c1929] via-[#0f172a] to-[#0a0f1d] border border-slate-800/80 p-6 md:p-8 mb-8">
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#0c1929] via-[#0f172a] to-[#0a0f1d] border border-slate-800/80 p-6 md:p-8 mb-6">
         <div className="absolute -top-20 -right-20 w-80 h-80 bg-cyan-500/5 blur-[120px] rounded-full" />
         <div className="absolute -bottom-20 -left-20 w-60 h-60 bg-purple-500/5 blur-[100px] rounded-full" />
         <div className="relative z-10">
           <button onClick={() => navigate(ROUTES.CASE_DETAIL)} className="flex items-center gap-1.5 text-[11px] font-bold text-slate-500 hover:text-cyan-400 transition-colors mb-4 group">
             <ArrowRight size={13} className="rotate-180 group-hover:-translate-x-1 transition-transform" /> Back to Reports
           </button>
-          <div className="flex flex-col md:flex-row md:items-start justify-between gap-6">
+          <div className="flex flex-col md:flex-row md:items-start justify-between gap-5">
             <div className="flex items-start gap-4">
-              <div className="p-3 rounded-xl bg-gradient-to-br from-cyan-500/20 to-blue-600/20 border border-cyan-500/20 hidden md:block"><FileText size={24} className="text-cyan-400" /></div>
+              <div className="p-3 rounded-xl bg-gradient-to-br from-cyan-500/20 to-blue-600/20 border border-cyan-500/20 hidden md:flex items-center justify-center">
+                <FileText size={24} className="text-cyan-400" />
+              </div>
               <div>
-                <div className="flex items-center gap-3 flex-wrap mb-2">
+                <div className="flex items-center gap-3 flex-wrap mb-1.5">
                   <h1 className="text-2xl md:text-3xl font-black text-slate-100 tracking-tight">Inspection Report</h1>
                   <span className="font-tech-code text-cyan-400 text-sm font-bold bg-cyan-950/30 px-3 py-1 border border-cyan-500/20 rounded-lg">#{merged.id}</span>
                   <StatusBadge fraudScore={fraudScore} />
                 </div>
-                <div className="flex items-center gap-4 flex-wrap">
+                <div className="flex items-center gap-4 flex-wrap mt-1">
                   {merged.partCode && <span className="flex items-center gap-1.5 text-xs text-slate-400 font-tech-code"><Hash size={11} className="text-slate-500" />{merged.partCode}</span>}
                   {merged.commodity && <span className="flex items-center gap-1.5 text-xs text-slate-400"><Cpu size={11} className="text-slate-500" />{merged.commodity}</span>}
                   {merged.updatedAt && <span className="flex items-center gap-1.5 text-xs text-slate-500"><Clock size={11} />{new Date(merged.updatedAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}</span>}
                 </div>
               </div>
             </div>
-            <div className="flex items-center gap-3 flex-shrink-0">
+            <div className="flex items-center gap-2.5 flex-shrink-0">
               <button onClick={handleDownloadPDF} className="px-4 py-2.5 bg-slate-900/80 border border-slate-800 hover:border-cyan-500/30 text-slate-300 hover:text-cyan-400 rounded-xl text-xs font-bold transition-all flex items-center gap-2"><Download size={13} /> PDF</button>
-              <button onClick={() => navigate(`${ROUTES.HUMAN_REVIEW}?caseId=${merged.id}`)} className="px-5 py-2.5 bg-gradient-to-r from-cyan-500 to-blue-600 text-white rounded-xl text-xs font-bold transition-all hover:scale-[1.02] hover:shadow-[0_0_25px_rgba(6,182,212,0.25)] flex items-center gap-2"><ShieldAlert size={13} /> Human Review <ArrowRight size={12} className="group-hover:translate-x-0.5 transition-transform" /></button>
+              <button onClick={() => navigate(`${ROUTES.HUMAN_REVIEW}?caseId=${merged.id}`)} className="px-5 py-2.5 bg-gradient-to-r from-cyan-500 to-blue-600 text-white rounded-xl text-xs font-bold transition-all hover:scale-[1.02] hover:shadow-[0_0_25px_rgba(6,182,212,0.25)] flex items-center gap-2"><ShieldAlert size={13} /> Human Review <ArrowRight size={12} /></button>
               <button onClick={() => handleDelete(merged.id)} className="p-2.5 bg-slate-900/80 border border-slate-800 hover:border-red-500/30 text-slate-500 hover:text-red-400 rounded-xl transition-all" title="Delete"><Trash2 size={14} /></button>
             </div>
           </div>
         </div>
       </div>
 
-      {/* ── 2. EXECUTIVE STATS (ONCE) ────────────────── */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+      {/* ── 2. EXECUTIVE STATS ────────────────────────── */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <StatCard icon={Gauge} label="Fraud Risk" value={`${fraudScore}/100`} sublabel={fraudScore >= 70 ? "Critical" : fraudScore >= 40 ? "Warning" : "Passed"} color={fraudScore >= 70 ? "red" : fraudScore >= 40 ? "amber" : "emerald"} />
         <StatCard icon={BarChart3} label="SSIM Score" value={`${(ssim * 100).toFixed(1)}%`} sublabel={ssim >= 0.8 ? "Within tolerance" : ssim >= 0.5 ? "Below threshold" : "Deviated"} color={ssim >= 0.8 ? "emerald" : ssim >= 0.5 ? "amber" : "red"} />
         <StatCard icon={ScanLine} label="Keypoint Match" value={`${(keypoint * 100).toFixed(1)}%`} sublabel={keypoint >= 0.5 ? "Adequate" : keypoint >= 0.3 ? "Limited" : "Poor"} color={keypoint >= 0.5 ? "emerald" : keypoint >= 0.3 ? "amber" : "red"} />
         <StatCard icon={CheckCircle2} label="OCR" value={ocrMatch ? "PASSED" : "FAILED"} sublabel={ocrMatch ? "Text matched" : `Expected "${ocrExpected}"`} color={ocrMatch ? "emerald" : "red"} />
       </div>
 
-      {/* ── 3. AI VERDICT + FRAUD GAUGE (ONCE) ──────── */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-8">
+      {/* ── 3. AI VERDICT + FRAUD GAUGE ──────────────── */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 mb-6">
         <div className="lg:col-span-8">
           <div className="relative overflow-hidden rounded-xl border border-slate-800/80 bg-gradient-to-br from-[#0f172a]/70 to-[#0a0f1d]/70 p-6 h-full">
             <div className="absolute top-0 right-0 w-64 h-64 bg-cyan-500/3 blur-[80px]" />
-            <RecommendationCard recommendation={recDecision} confidence={recommendation.confidence || 42} reasoning={recommendation.reasoning || "AI confidence is below the auto-decide threshold. Manual review required."} flags={recommendation.flags || []} />
+            <RecommendationCard recommendation={recDecision} confidence={aiConfidence} reasoning={recommendation.reasoning || "AI confidence is below the auto-decide threshold. Manual review required."} flags={recommendation.flags || []} />
           </div>
         </div>
         <div className="lg:col-span-4">
@@ -561,13 +553,13 @@ export default function InspectionDetailPage() {
         </div>
       </div>
 
-      {/* ── 4. IMAGE COMPARISON (ONCE) ──────────────── */}
-      <div className="mb-8">
+      {/* ── 4. IMAGE COMPARISON ──────────────────────── */}
+      <div className="mb-6">
         <ImageComparison goldenUrl={merged.goldenImageUrl} uploadedUrl={merged.uploadedImageUrl} imageHash={merged.imageHash} />
       </div>
 
-      {/* ── 5. HEATMAP + AI EXPLANATION (ONCE) ──────── */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+      {/* ── 5. HEATMAP + AI EXPLANATION ──────────────── */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-6">
         <HeatmapViewer imageUrl={merged.uploadedImageUrl} heatmapUrl={heatmapUrl} label={heatmapUrl ? "SSIM Anomaly Heatmap" : "AI Attention Region"} />
         <div className="rounded-xl border border-slate-800/80 bg-gradient-to-br from-[#0f172a]/70 to-[#0a0f1d]/70 p-6 flex flex-col">
           <h3 className="text-xs font-black uppercase tracking-widest text-slate-400 mb-4 flex items-center gap-2"><FileText size={14} className="text-cyan-400" /> AI Explanation</h3>
@@ -581,21 +573,21 @@ export default function InspectionDetailPage() {
         </div>
       </div>
 
-      {/* ── 6. KEY METRICS (ONCE) ────────────────────── */}
-      <div className="rounded-xl border border-slate-800/80 bg-gradient-to-br from-[#0f172a]/70 to-[#0a0f1d]/70 p-6 mb-8">
+      {/* ── 6. KEY METRICS ────────────────────────────── */}
+      <div className="rounded-xl border border-slate-800/80 bg-gradient-to-br from-[#0f172a]/70 to-[#0a0f1d]/70 p-6 mb-6">
         <h3 className="text-xs font-black uppercase tracking-widest text-slate-400 mb-5 flex items-center gap-2"><Activity size={14} className="text-cyan-400" /> Key Metrics</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-          <MetricBar label="SSIM" value={ssim * 100} Icon={Image} color={ssim >= 0.8 ? "" : ssim >= 0.5 ? "from-amber-500 to-orange-600" : "from-red-500 to-rose-600"} />
-          <MetricBar label="Keypoint Match" value={keypoint * 100} Icon={ScanLine} color={keypoint >= 0.5 ? "" : keypoint >= 0.3 ? "from-amber-500 to-orange-600" : "from-red-500 to-rose-600"} />
-          <MetricBar label="OCR Accuracy" value={ocrMatch ? 100 : 0} Icon={Text} color={ocrMatch ? "" : "from-red-500 to-rose-600"} />
-          <MetricBar label="AI Confidence" value={recommendation.confidence || 42} Icon={BarChart3} color={recommendation.confidence >= 70 ? "" : recommendation.confidence >= 40 ? "from-amber-500 to-orange-600" : "from-red-500 to-rose-600"} />
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-5">
+          <MetricBar label="SSIM" value={ssim * 100} icon={Image} color={ssim >= 0.8 ? "" : ssim >= 0.5 ? "from-amber-500 to-orange-600" : "from-red-500 to-rose-600"} />
+          <MetricBar label="Keypoint Match" value={keypoint * 100} icon={ScanLine} color={keypoint >= 0.5 ? "" : keypoint >= 0.3 ? "from-amber-500 to-orange-600" : "from-red-500 to-rose-600"} />
+          <MetricBar label="OCR Accuracy" value={ocrAccuracyPct} icon={Text} color={ocrMatch ? "" : "from-red-500 to-rose-600"} />
+          <MetricBar label="AI Confidence" value={aiConfidence} icon={BarChart3} color={aiConfidence >= 70 ? "" : aiConfidence >= 40 ? "from-amber-500 to-orange-600" : "from-red-500 to-rose-600"} />
         </div>
       </div>
 
-      {/* ── 7. OCR RESULTS (ONCE) ────────────────────── */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-8">
+      {/* ── 7. OCR RESULTS + AI CLASSIFICATION ────────── */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 mb-6">
         <div className="lg:col-span-7">
-          <div className="rounded-xl border border-slate-800/80 bg-gradient-to-br from-[#0f172a]/70 to-[#0a0f1d]/70 p-6">
+          <div className="rounded-xl border border-slate-800/80 bg-gradient-to-br from-[#0f172a]/70 to-[#0a0f1d]/70 p-6 h-full">
             <h3 className="text-xs font-black uppercase tracking-widest text-slate-400 mb-1 flex items-center gap-2"><Text size={14} className="text-cyan-400" /> OCR Results</h3>
             <p className="text-[11px] text-slate-500 mb-5">Character recognition comparison</p>
             <div className={`flex items-center gap-3 px-4 py-3 rounded-xl mb-5 ${ocrMatch ? "bg-emerald-500/10 border border-emerald-500/20 text-emerald-400" : "bg-red-500/10 border border-red-500/20 text-red-400"}`}>
@@ -608,40 +600,56 @@ export default function InspectionDetailPage() {
             <OCRResults results={ocrResults} />
           </div>
         </div>
-        <div className="lg:col-span-5 flex flex-col gap-6">
+        <div className="lg:col-span-5 flex flex-col gap-5">
+          {/* OCR Comparison — all values computed from backend data */}
           <div className="rounded-xl border border-slate-800/80 bg-gradient-to-br from-[#0f172a]/70 to-[#0a0f1d]/70 p-6">
-            <h3 className="text-xs font-black uppercase tracking-widest text-slate-400 mb-4 flex items-center gap-2"><BarChart3 size={14} className="text-cyan-400" /> Comparison</h3>
+            <h3 className="text-xs font-black uppercase tracking-widest text-slate-400 mb-4 flex items-center gap-2"><BarChart3 size={14} className="text-cyan-400" /> OCR Analysis</h3>
             <div className="space-y-4">
-              <MetricBar label="Text Match" value={ocrMatch ? 92 : 23} />
-              <MetricBar label="Character Accuracy" value={ocrMatch ? 95 : 18} color={ocrMatch ? "from-emerald-500 to-teal-600" : "from-red-500 to-rose-600"} />
-              <MetricBar label="Field Completeness" value={ocrResults.filter((r) => r.extracted).length / Math.max(ocrResults.length, 1) * 100} />
+              <MetricBar label="Text Match" value={ocrAccuracyPct} icon={Text} color={ocrMatch ? "from-emerald-500 to-teal-600" : "from-red-500 to-rose-600"} />
+              <MetricBar label="Field Completeness" value={ocrCompletenessPct} icon={FileText} color={ocrCompletenessPct >= 80 ? "from-emerald-500 to-teal-600" : ocrCompletenessPct >= 50 ? "from-amber-500 to-orange-600" : "from-red-500 to-rose-600"} />
+              <MetricBar label="AI Confidence" value={aiConfidence} icon={BarChart3} color={aiConfidence >= 70 ? "from-emerald-500 to-teal-600" : aiConfidence >= 40 ? "from-amber-500 to-orange-600" : "from-red-500 to-rose-600"} />
             </div>
           </div>
           
-          <div className="rounded-xl border border-slate-800/80 bg-gradient-to-br from-[#0f172a]/70 to-[#0a0f1d]/70 p-6 flex-1 flex flex-col justify-center">
+          {/* AI Classification Insights — from backend verdict & recommended_action */}
+          <div className="rounded-xl border border-slate-800/80 bg-gradient-to-br from-[#0f172a]/70 to-[#0a0f1d]/70 p-6 flex-1">
             <h3 className="text-xs font-black uppercase tracking-widest text-slate-400 mb-4 flex items-center gap-2"><FileText size={14} className="text-cyan-400" /> AI Classification Insights</h3>
             <div className="grid grid-cols-2 gap-4">
               <div className="bg-slate-950/60 border border-slate-800/60 rounded-xl p-4 flex flex-col justify-center">
-                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">Classification</p>
-                <p className={`text-base font-black uppercase tracking-wide ${aiClassification === 'TAMPERED' ? 'text-red-400' : aiClassification === 'UNKNOWN' ? 'text-slate-400' : 'text-emerald-400'}`}>{aiClassification}</p>
+                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">Verdict</p>
+                <p className={`text-base font-black uppercase tracking-wide ${
+                  ["tampered", "missing", "mismatched", "reused"].includes(aiClassification?.toLowerCase())
+                    ? "text-red-400"
+                    : aiClassification?.toLowerCase() === "clean"
+                      ? "text-emerald-400"
+                      : "text-slate-400"
+                }`}>{aiClassification}</p>
               </div>
               <div className="bg-slate-950/60 border border-slate-800/60 rounded-xl p-4 flex flex-col justify-center">
-                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">Category</p>
-                <p className={`text-sm font-bold ${aiCategory.includes('Escalate') ? 'text-amber-400' : aiCategory === 'UNKNOWN' ? 'text-slate-400' : 'text-cyan-400'}`}>{aiCategory}</p>
+                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">Recommended Action</p>
+                <p className={`text-sm font-bold ${
+                  aiCategory === "Accept"
+                    ? "text-emerald-400"
+                    : aiCategory?.includes("Escalate") || aiCategory?.includes("Quarantine")
+                      ? "text-red-400"
+                      : aiCategory === "UNKNOWN"
+                        ? "text-slate-400"
+                        : "text-amber-400"
+                }`}>{aiCategory}</p>
               </div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* ── 8. DETECTOR METRICS + METADATA (ONCE) ────── */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-8">
+      {/* ── 8. DETECTOR METRICS + METADATA ────────────── */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 mb-6">
         <div className="lg:col-span-7"><DetectorMetrics metrics={merged.metrics || []} /></div>
         <div className="lg:col-span-5"><MetadataCard caseData={merged} /></div>
       </div>
 
-      {/* ── 9. EXECUTION TELEMETRY (ONCE) ────────────── */}
-      <div className="rounded-xl border border-slate-800/80 bg-gradient-to-br from-[#0f172a]/70 to-[#0a0f1d]/70 overflow-hidden mb-8">
+      {/* ── 9. EXECUTION TELEMETRY ────────────────────── */}
+      <div className="rounded-xl border border-slate-800/80 bg-gradient-to-br from-[#0f172a]/70 to-[#0a0f1d]/70 overflow-hidden mb-6">
         <div className="px-6 py-4 border-b border-slate-800/80 bg-slate-900/50 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="p-2 rounded-lg bg-cyan-500/10 border border-cyan-500/20"><Terminal size={16} className="text-cyan-400" /></div>
@@ -650,42 +658,26 @@ export default function InspectionDetailPage() {
               <p className="text-[10px] text-slate-500">Multi-agent pipeline log</p>
             </div>
           </div>
-          <div className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-emerald-500 animate-ping" /><span className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider">Live</span></div>
+          <div className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-emerald-500 animate-ping" /><span className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider">Complete</span></div>
         </div>
         <div className="p-6 bg-slate-950 font-tech-code text-[12px] leading-loose">
           <div className="space-y-2">
-            <p className="text-slate-500"><span className="text-slate-600">[</span><span className="text-cyan-400">SYSTEM</span><span className="text-slate-600">]</span> Pipeline Active at <span className="text-slate-400">{merged.updatedAt || new Date().toISOString()}</span></p>
+            <p className="text-slate-500"><span className="text-slate-600">[</span><span className="text-cyan-400">SYSTEM</span><span className="text-slate-600">]</span> Pipeline Active at <span className="text-slate-400">{merged.updatedAt || "N/A"}</span></p>
             <p className="text-cyan-400"><span className="text-slate-500">{">"}</span> [Agent-1] Aspect ratio & resolution check <span className="text-emerald-400 font-bold">[PASSED]</span></p>
             <p className="text-cyan-400"><span className="text-slate-500">{">"}</span> [Agent-1] Classified as <span className="text-yellow-400">"{merged.commodity || "N/A"}"</span></p>
             <p className="text-emerald-400"><span className="text-slate-500">{">"}</span> [Agent-2] Keypoints Match Rate: <span className="font-bold">{(keypoint * 100).toFixed(1)}%</span></p>
             <p className="text-purple-400"><span className="text-slate-500">{">"}</span> [Agent-3] SSIM index: <span className="font-bold">{ssim.toFixed(2)}</span></p>
             <p className={`font-bold ${ocrMatch ? "text-green-400" : "text-red-400"}`}><span className="text-slate-500">{">"}</span> [Agent-3] OCR: Expected <span className="text-yellow-400">"{ocrExpected}"</span> | Got <span className="text-yellow-400">"{ocrText}"</span> | {ocrMatch ? "PASSED" : "FAILED"}</p>
-            <p className="text-blue-400"><span className="text-slate-500">{">"}</span> [Agent-4] Fraud Score: <span className="font-bold">{fraudScore}%</span> | Confidence: <span className="font-bold">{merged.confidencePct || recommendation.confidence || 42}%</span></p>
+            <p className="text-blue-400"><span className="text-slate-500">{">"}</span> [Agent-4] Fraud Score: <span className="font-bold">{fraudScore}%</span> | Confidence: <span className="font-bold">{aiConfidence}%</span></p>
+            <p className="text-indigo-400"><span className="text-slate-500">{">"}</span> [Agent-4] Verdict: <span className="text-yellow-400">"{aiClassification}"</span> | Action: <span className="text-yellow-400">"{aiCategory}"</span></p>
             <p className="text-indigo-400"><span className="text-slate-500">{">"}</span> [Agent-5] Narrative: <span className="text-slate-300">"{recommendation.reasoning || "Audit complete."}"</span></p>
             <p className="text-slate-500 pt-2 border-t border-slate-800/60"><span className="text-slate-600">[</span><span className="text-cyan-400">SYSTEM</span><span className="text-slate-600">]</span> Execution complete.</p>
           </div>
         </div>
       </div>
 
-      {/* ── 10. EVIDENCE TIMELINE (ONCE) ─────────────── */}
-      <div className="mb-8"><EvidenceTimeline events={merged.timeline || []} /></div>
-
-      {/* ── 11. STICKY BOTTOM BAR (ONCE) ─────────────── */}
-      <div className="sticky bottom-4 mt-8 z-40">
-        <div className="max-w-4xl mx-auto bg-slate-900/90 backdrop-blur-xl border border-slate-800/80 rounded-2xl p-4 shadow-2xl shadow-black/50">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <p className="text-xs text-slate-400"><span className="font-bold text-slate-200">#{merged.id}</span> — {merged.commodity || "N/A"}</p>
-              <div className="h-4 w-px bg-slate-800" />
-              <span className="text-[10px] font-bold text-slate-500">Fraud: <span className={`${fraudScore >= 70 ? "text-red-400" : fraudScore >= 40 ? "text-amber-400" : "text-emerald-400"}`}>{fraudScore}%</span></span>
-            </div>
-            <div className="flex items-center gap-2">
-              <button onClick={handleDownloadPDF} className="px-4 py-2 bg-slate-800/80 border border-slate-700 text-slate-300 rounded-xl text-xs font-bold hover:bg-slate-700 transition-all flex items-center gap-1.5"><Download size={12} /> PDF</button>
-              <button onClick={() => navigate(`${ROUTES.HUMAN_REVIEW}?caseId=${merged.id}`)} className="px-4 py-2 bg-gradient-to-r from-cyan-500 to-blue-600 text-white rounded-xl text-xs font-bold hover:shadow-[0_0_20px_rgba(6,182,212,0.2)] transition-all flex items-center gap-1.5"><ShieldAlert size={12} /> Human Review</button>
-            </div>
-          </div>
-        </div>
-      </div>
+      {/* ── 10. EVIDENCE TIMELINE ─────────────────────── */}
+      <div className="mb-6"><EvidenceTimeline events={merged.timeline || []} /></div>
     </Layout>
   );
 }
