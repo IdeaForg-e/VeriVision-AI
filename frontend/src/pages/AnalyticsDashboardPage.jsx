@@ -102,63 +102,6 @@ function ChartCard({ title, icon: Icon, iconColor, children, badge, badgeColor }
     );
 }
 
-const mockVendors = [
-    {
-        name: "Vendor A",
-        componentsSupplied: 120,
-        fraudCases: 18,
-        fraudRate: "15%",
-        trustScore: 85,
-        months: [
-            { month: "Jan", fraud: 2, genuine: 18 },
-            { month: "Feb", fraud: 1, genuine: 21 },
-            { month: "Mar", fraud: 4, genuine: 16 },
-            { month: "Apr", fraud: 3, genuine: 15 }
-        ],
-        components: ["Brake Disc", "Gear Shaft", "Bearing", "Engine Mount"]
-    },
-    {
-        name: "Vendor B",
-        componentsSupplied: 80,
-        fraudCases: 2,
-        fraudRate: "2.5%",
-        trustScore: 98,
-        months: [
-            { month: "Jan", fraud: 0, genuine: 20 },
-            { month: "Feb", fraud: 1, genuine: 19 },
-            { month: "Mar", fraud: 0, genuine: 20 },
-            { month: "Apr", fraud: 1, genuine: 20 }
-        ],
-        components: ["Engine Mount", "Bearing"]
-    },
-    {
-        name: "Vendor C",
-        componentsSupplied: 45,
-        fraudCases: 11,
-        fraudRate: "24%",
-        trustScore: 76,
-        months: [
-            { month: "Jan", fraud: 3, genuine: 8 },
-            { month: "Feb", fraud: 2, genuine: 10 },
-            { month: "Mar", fraud: 4, genuine: 7 },
-            { month: "Apr", fraud: 2, genuine: 9 }
-        ],
-        components: ["Brake Disc", "Gear Shaft"]
-    }
-];
-
-const mockSites = [
-    { site: "Plant 1", inspections: 420, fraudCases: 19, fraudRate: "4.5%" },
-    { site: "Plant 2", inspections: 310, fraudCases: 34, fraudRate: "11%" },
-    { site: "Plant 3", inspections: 185, fraudCases: 7, fraudRate: "3.8%" }
-];
-
-const mockVendorSummary = [
-    { vendor: "Vendor A", fraudCases: 12 },
-    { vendor: "Vendor B", fraudCases: 1 },
-    { vendor: "Vendor C", fraudCases: 9 }
-];
-
 export default function AnalyticsDashboardPage() {
     const [queueItems, setQueueItems] = useState([]);
     const [cases, setCases] = useState([]);
@@ -176,7 +119,6 @@ export default function AnalyticsDashboardPage() {
     const [selectedVendor, setSelectedVendor] = useState(null);
     const [vendorDetailLoading, setVendorDetailLoading] = useState(false);
     const [vendorDetails, setVendorDetails] = useState(null);
-    const [selectedMockVendor, setSelectedMockVendor] = useState(null);
 
     const fetchData = async () => {
         setLoading(true);
@@ -419,8 +361,8 @@ export default function AnalyticsDashboardPage() {
                             </thead>
                             <tbody className="divide-y divide-slate-800/60">
                                 {vendors.map((vendor, i) => (
-                                    <tr 
-                                        key={i} 
+                                    <tr
+                                        key={i}
                                         onClick={() => handleVendorClick(vendor.vendor)}
                                         className="hover:bg-slate-900/40 transition-colors cursor-pointer"
                                     >
