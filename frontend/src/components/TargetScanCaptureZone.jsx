@@ -43,8 +43,8 @@ export default function TargetScanCaptureZone({
         err.name === "NotAllowedError"
           ? "Camera access was denied. Please allow camera permission and try again."
           : err.name === "NotFoundError"
-          ? "No camera found on this device."
-          : `Camera error: ${err.message}`;
+            ? "No camera found on this device."
+            : `Camera error: ${err.message}`;
       setWebcamError(msg);
     }
   }, []);
@@ -52,7 +52,7 @@ export default function TargetScanCaptureZone({
   useEffect(() => {
     if (videoRef.current && webcamStream) {
       videoRef.current.srcObject = webcamStream;
-      videoRef.current.play().catch(() => {});
+      videoRef.current.play().catch(() => { });
     }
   }, [webcamStream]);
 
@@ -158,11 +158,10 @@ export default function TargetScanCaptureZone({
             type="button"
             onClick={() => handleTabSwitch("upload")}
             disabled={disabled}
-            className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-[9px] font-bold uppercase tracking-wider transition-all ${
-              targetMode === "upload"
-                ? "bg-gradient-to-r from-blue-600/80 to-indigo-700/80 text-white shadow-[0_0_10px_rgba(99,102,241,0.3)]"
-                : "text-slate-500 hover:text-slate-350"
-            }`}
+            className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-[9px] font-bold uppercase tracking-wider transition-all ${targetMode === "upload"
+              ? "bg-gradient-to-r from-blue-600/80 to-indigo-700/80 text-white shadow-[0_0_10px_rgba(99,102,241,0.3)]"
+              : "text-slate-500 hover:text-slate-350"
+              }`}
           >
             <Upload size={9} /> Upload
           </button>
@@ -170,11 +169,10 @@ export default function TargetScanCaptureZone({
             type="button"
             onClick={() => handleTabSwitch("webcam")}
             disabled={disabled}
-            className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-[9px] font-bold uppercase tracking-wider transition-all ${
-              targetMode === "webcam"
-                ? "bg-gradient-to-r from-cyan-600/80 to-blue-700/80 text-white shadow-[0_0_10px_rgba(6,182,212,0.3)]"
-                : "text-slate-500 hover:text-slate-350"
-            }`}
+            className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-[9px] font-bold uppercase tracking-wider transition-all ${targetMode === "webcam"
+              ? "bg-gradient-to-r from-cyan-600/80 to-blue-700/80 text-white shadow-[0_0_10px_rgba(6,182,212,0.3)]"
+              : "text-slate-500 hover:text-slate-350"
+              }`}
           >
             <Camera size={9} /> Camera
           </button>
@@ -187,7 +185,7 @@ export default function TargetScanCaptureZone({
           <div className="absolute -inset-0.5 bg-gradient-to-br from-blue-500/10 to-indigo-600/10 rounded-xl blur opacity-0 hover:opacity-100 pointer-events-none transition duration-500" />
           {targetPreview ? (
             <div className="relative bg-slate-900/80 border border-slate-700/80 rounded-xl overflow-hidden hover:border-blue-500/40 transition-all">
-              <div className="relative h-36 bg-slate-950/80 flex items-center justify-center overflow-hidden">
+              <div className="relative h-64 bg-slate-950/80 flex items-center justify-center overflow-hidden">
                 <img src={targetPreview} className="w-full h-full object-contain" alt="Target" />
               </div>
               <div className="px-3 py-2.5 flex items-center justify-between border-t border-slate-800/60">
@@ -206,7 +204,7 @@ export default function TargetScanCaptureZone({
               </div>
             </div>
           ) : (
-            <label className="flex flex-col items-center justify-center gap-2.5 min-h-[10rem] flex-1 rounded-xl border-2 border-dashed border-slate-700/50 bg-slate-900/40 hover:bg-blue-950/10 hover:border-blue-500/50 cursor-pointer transition-all z-10">
+            <label className="flex flex-col items-center justify-center gap-2.5 min-h-[18rem] flex-1 rounded-xl border-2 border-dashed border-slate-700/50 bg-slate-900/40 hover:bg-blue-950/10 hover:border-blue-500/50 cursor-pointer transition-all z-10">
               <input type="file" accept="image/*" onChange={handleTargetChange} className="hidden" disabled={disabled} />
               <div className="h-10 w-10 rounded-full bg-slate-950 border border-slate-700/60 flex items-center justify-center hover:scale-110 hover:border-blue-500/30 transition-all">
                 <Camera size={16} className="text-slate-500 hover:text-blue-400 transition-colors" />
@@ -226,7 +224,7 @@ export default function TargetScanCaptureZone({
           {targetPreview ? (
             <div className="flex flex-col gap-1.5">
               <div className="relative bg-slate-900/80 border border-cyan-500/30 rounded-xl overflow-hidden shadow-[0_0_20px_rgba(6,182,212,0.1)]">
-                <div className="relative h-36 bg-slate-950/80 flex items-center justify-center overflow-hidden">
+                <div className="relative h-64 bg-slate-950/80 flex items-center justify-center overflow-hidden">
                   <img src={targetPreview} className="w-full h-full object-contain" alt="Webcam capture" />
                   <div className="absolute top-2 left-2 flex items-center gap-1 bg-emerald-900/70 border border-emerald-500/30 rounded px-1.5 py-0.5">
                     <div className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
@@ -251,34 +249,29 @@ export default function TargetScanCaptureZone({
 
               {/* Agent 1 Scan Result Panel */}
               {webcamScanResult && (
-                <div className={`rounded-xl border px-3 py-2.5 ${
-                  webcamScanResult.status === "pass"
-                    ? "bg-emerald-950/30 border-emerald-500/20"
-                    : "bg-red-950/30 border-red-500/20"
-                }`}>
-                  <p className={`text-[9px] font-black tracking-[0.15em] uppercase mb-1.5 flex items-center gap-1 ${
-                    webcamScanResult.status === "pass" ? "text-emerald-400" : "text-red-400"
+                <div className={`rounded-xl border px-3 py-2.5 ${webcamScanResult.status === "pass"
+                  ? "bg-emerald-950/30 border-emerald-500/20"
+                  : "bg-red-950/30 border-red-500/20"
                   }`}>
+                  <p className={`text-[9px] font-black tracking-[0.15em] uppercase mb-1.5 flex items-center gap-1 ${webcamScanResult.status === "pass" ? "text-emerald-400" : "text-red-400"
+                    }`}>
                     <Cpu size={9} />
                     Agent 1 — Image Integrity Scan
-                    <span className={`ml-auto px-1.5 py-0.5 rounded text-[7px] font-extrabold tracking-widest border ${
-                      webcamScanResult.status === "pass"
-                        ? "bg-emerald-900/50 border-emerald-500/30 text-emerald-300"
-                        : "bg-red-900/50 border-red-500/30 text-red-300"
-                    }`}>
+                    <span className={`ml-auto px-1.5 py-0.5 rounded text-[7px] font-extrabold tracking-widest border ${webcamScanResult.status === "pass"
+                      ? "bg-emerald-900/50 border-emerald-500/30 text-emerald-300"
+                      : "bg-red-900/50 border-red-500/30 text-red-300"
+                      }`}>
                       {webcamScanResult.status === "pass" ? "PASS" : "FAIL"}
                     </span>
                   </p>
                   <div className="space-y-1">
                     {webcamScanResult.checks.map((chk, i) => (
                       <div key={i} className="flex items-center gap-2">
-                        <span className={`shrink-0 text-[8px] font-black ${
-                          chk.ok ? "text-emerald-400" : "text-red-400"
-                        }`}>{chk.ok ? "✓" : "✗"}</span>
+                        <span className={`shrink-0 text-[8px] font-black ${chk.ok ? "text-emerald-400" : "text-red-400"
+                          }`}>{chk.ok ? "✓" : "✗"}</span>
                         <span className="text-[9px] text-slate-400 font-semibold shrink-0 w-28">{chk.label}:</span>
-                        <span className={`text-[9px] truncate ${
-                          chk.ok ? "text-slate-300" : "text-red-300 font-semibold"
-                        }`}>{chk.detail}</span>
+                        <span className={`text-[9px] truncate ${chk.ok ? "text-slate-300" : "text-red-300 font-semibold"
+                          }`}>{chk.detail}</span>
                       </div>
                     ))}
                   </div>
@@ -288,7 +281,7 @@ export default function TargetScanCaptureZone({
           ) : (
             <div className="relative rounded-xl overflow-hidden border border-cyan-500/25 bg-slate-950 shadow-[0_0_25px_rgba(6,182,212,0.08)]">
               {webcamError ? (
-                <div className="h-36 flex flex-col items-center justify-center gap-2 px-4">
+                <div className="h-64 flex flex-col items-center justify-center gap-2 px-4">
                   <ZapOff size={22} className="text-red-400/70" />
                   <p className="text-[10px] text-red-400/80 text-center leading-relaxed">{webcamError}</p>
                   <button
@@ -319,7 +312,7 @@ export default function TargetScanCaptureZone({
                     playsInline
                     muted
                     onCanPlay={() => setWebcamReady(true)}
-                    className="w-full h-36 object-cover bg-slate-950"
+                    className="w-full h-64 object-cover bg-slate-950"
                   />
                   <canvas ref={canvasRef} className="hidden" />
                   {!webcamReady && !webcamError && (
