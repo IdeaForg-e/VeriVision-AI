@@ -429,8 +429,16 @@ export default function AnalyticsDashboardPage() {
                                 </thead>
                                 <tbody className="divide-y divide-slate-800/60">
                                     {sites.map((site, i) => (
-                                        <tr key={i} onClick={() => handleSiteClick(site.site, site.fraud_cases)} className="hover:bg-slate-900/40 transition-colors cursor-pointer">
-                                            <td className="px-6 py-4 text-slate-200 font-semibold">{site.site}</td>
+                                        <tr key={i} onClick={() => handleSiteClick(site.site, site.fraud_cases)} className="group hover:bg-blue-950/20 transition-all duration-300 cursor-pointer border-l-2 border-l-transparent hover:border-l-blue-500">
+                                            <td className="px-6 py-4 flex items-center gap-2">
+                                                <span className="text-blue-400 font-bold text-xs underline underline-offset-4 decoration-blue-500/40 group-hover:decoration-blue-400 group-hover:text-blue-300 transition-all duration-300">
+                                                    {site.site}
+                                                </span>
+                                                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 translate-x-[-8px] group-hover:translate-x-0 transition-all duration-300">
+                                                    <span className="text-[8px] font-bold text-blue-400/80 uppercase tracking-wider">View</span>
+                                                    <ChevronRight size={12} className="text-blue-400" />
+                                                </div>
+                                            </td>
                                             <td className="px-6 py-4 text-center text-slate-300 font-tech-code">{site.inspections}</td>
                                             <td className="px-6 py-4 text-center text-red-400 font-bold font-tech-code">{site.fraud_cases}</td>
                                             <td className="px-6 py-4 text-right font-tech-code">
