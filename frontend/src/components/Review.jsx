@@ -84,7 +84,7 @@ export function CaseStatusTracker({ status }) {
 
 // ==========================================
 
-export function EvidencePanel({ caseData, region, onRegionChange, onRegionCommit }) {
+export function EvidencePanel({ caseData, region, onRegionChange, onRegionCommit, learningStatus }) {
   if (!caseData) return null;
 
   return (
@@ -127,17 +127,38 @@ export function EvidencePanel({ caseData, region, onRegionChange, onRegionCommit
               alt="Uploaded part under review"
               src={caseData.uploadedImageUrl}
             />
-            <ROIEditor region={region} onChange={onRegionChange} onCommit={onRegionCommit} />
+            <ROIEditor region={region} onChange={onRegionChange} onCommit={onRegionCommit} learningStatus={learningStatus} />
           </div>
         </div>
       </div>
 
-      <div className="bg-[#090d16]/60 p-4 rounded-lg flex gap-3 items-start border-l-4 border-cyan-500 border border-slate-850/50">
-        <span className="material-symbols-outlined text-cyan-400 mt-0.5">info</span>
-        <p className="text-body-sm text-slate-400 leading-relaxed">
-          Drag or resize the box if the AI's highlighted region is off. Your correction is saved as a training
-          example for the <span className="font-tech-code text-cyan-400">{caseData.neuralModel}</span> neural model.
-        </p>
+      <div className={`p-4 rounded-lg flex flex-col md:flex-row items-start md:items-center justify-between border-l-4 transition-all duration-300 ${
+        learningStatus === 'learning' ? 'bg-cyan-900/20 border-cyan-400 shadow-[0_0_15px_rgba(6,182,212,0.2)]' :
+        learningStatus === 'success' ? 'bg-emerald-900/20 border-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.2)]' :
+        'bg-[#090d16]/60 border-cyan-500 border border-slate-850/50'
+      }`}>
+        <div className="flex gap-3 items-start">
+          <span className={`material-symbols-outlined mt-0.5 ${
+            learningStatus === 'success' ? 'text-emerald-400' : 'text-cyan-400'
+          }`}>
+            {learningStatus === 'success' ? 'check_circle' : 'info'}
+          </span>
+          <p className="text-body-sm text-slate-400 leading-relaxed">
+            Drag or resize the box if the AI's highlighted region is off. Your correction is saved as a training
+            example for the <span className="font-tech-code text-cyan-400">{caseData.neuralModel}</span> neural model.
+          </p>
+        </div>
+        {learningStatus === 'learning' && (
+          <div className="flex items-center gap-2 text-cyan-400 text-sm font-bold animate-pulse whitespace-nowrap mt-3 md:mt-0 ml-0 md:ml-4">
+            <span className="material-symbols-outlined animate-spin">sync</span>
+            Ingesting correction...
+          </div>
+        )}
+        {learningStatus === 'success' && (
+          <div className="flex items-center gap-2 text-emerald-400 text-sm font-bold whitespace-nowrap mt-3 md:mt-0 ml-0 md:ml-4">
+            Model Updated ✨
+          </div>
+        )}
       </div>
     </div>
   );
@@ -220,7 +241,7 @@ export function ReviewerComment({ value, onChange }) {
 
 // ==========================================
 
-export function ROIEditor({ region, onChange, onCommit, label = "AI_PREDICTION_REGION" }) {
+export function ROIEditor({ region, onChange, onCommit, learningStatus, label = "AI_PREDICTION_REGION" }) {
   const containerRef = useRef(null);
   const dragState = useRef(null);
   const [active, setActive] = useState(false);
@@ -294,7 +315,13 @@ export function ROIEditor({ region, onChange, onCommit, label = "AI_PREDICTION_R
       onTouchEnd={endDrag}
     >
       <div
-        className={`absolute border-2 border-dashed border-cyan-400 bg-cyan-400/10 shadow-lg z-10 cursor-move ${active ? "ring-2 ring-cyan-400" : ""}`}
+        className={`absolute border-2 border-dashed shadow-lg z-10 cursor-move transition-all duration-300 ${
+          learningStatus === 'learning'
+            ? 'border-cyan-300 bg-cyan-400/30 ring-4 ring-cyan-400 animate-pulse'
+            : learningStatus === 'success'
+            ? 'border-emerald-400 bg-emerald-400/20 ring-2 ring-emerald-400'
+            : `border-cyan-400 bg-cyan-400/10 ${active ? "ring-2 ring-cyan-400" : ""}`
+        }`}
         style={{
           left: `${region.x}%`,
           top: `${region.y}%`,
