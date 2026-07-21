@@ -327,12 +327,21 @@ export function HeatmapViewer({
       </div>
 
       <div className="relative aspect-square bg-slate-950/80 rounded-lg overflow-hidden border border-slate-800 select-none">
-        {/* Base image: dynamically swaps to heatmapUrl if overlay is enabled */}
+        {/* Base image */}
         <img
-          src={showOverlay && heatmapUrl ? heatmapUrl : imageUrl}
+          src={imageUrl}
           alt={alt}
           className="w-full h-full object-contain"
         />
+
+        {/* Heatmap Overlay */}
+        {heatmapUrl && (
+          <img
+            src={heatmapUrl}
+            alt="Heatmap Overlay"
+            className={`absolute inset-0 w-full h-full object-contain transition-opacity duration-300 pointer-events-none ${showOverlay ? 'opacity-100' : 'opacity-0'}`}
+          />
+        )}
 
         {/* Overlay: fallback bounding box region if separate heatmapUrl is not used */}
         {showOverlay && !heatmapUrl && region && (
