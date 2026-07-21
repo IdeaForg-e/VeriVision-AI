@@ -102,6 +102,63 @@ function ChartCard({ title, icon: Icon, iconColor, children, badge, badgeColor }
     );
 }
 
+const mockVendors = [
+    {
+        name: "Vendor A",
+        componentsSupplied: 120,
+        fraudCases: 18,
+        fraudRate: "15%",
+        trustScore: 85,
+        months: [
+            { month: "Jan", fraud: 2, genuine: 18 },
+            { month: "Feb", fraud: 1, genuine: 21 },
+            { month: "Mar", fraud: 4, genuine: 16 },
+            { month: "Apr", fraud: 3, genuine: 15 }
+        ],
+        components: ["Brake Disc", "Gear Shaft", "Bearing", "Engine Mount"]
+    },
+    {
+        name: "Vendor B",
+        componentsSupplied: 80,
+        fraudCases: 2,
+        fraudRate: "2.5%",
+        trustScore: 98,
+        months: [
+            { month: "Jan", fraud: 0, genuine: 20 },
+            { month: "Feb", fraud: 1, genuine: 19 },
+            { month: "Mar", fraud: 0, genuine: 20 },
+            { month: "Apr", fraud: 1, genuine: 20 }
+        ],
+        components: ["Engine Mount", "Bearing"]
+    },
+    {
+        name: "Vendor C",
+        componentsSupplied: 45,
+        fraudCases: 11,
+        fraudRate: "24%",
+        trustScore: 76,
+        months: [
+            { month: "Jan", fraud: 3, genuine: 8 },
+            { month: "Feb", fraud: 2, genuine: 10 },
+            { month: "Mar", fraud: 4, genuine: 7 },
+            { month: "Apr", fraud: 2, genuine: 9 }
+        ],
+        components: ["Brake Disc", "Gear Shaft"]
+    }
+];
+
+const mockSites = [
+    { site: "Plant 1", inspections: 420, fraudCases: 19, fraudRate: "4.5%" },
+    { site: "Plant 2", inspections: 310, fraudCases: 34, fraudRate: "11%" },
+    { site: "Plant 3", inspections: 185, fraudCases: 7, fraudRate: "3.8%" }
+];
+
+const mockVendorSummary = [
+    { vendor: "Vendor A", fraudCases: 12 },
+    { vendor: "Vendor B", fraudCases: 1 },
+    { vendor: "Vendor C", fraudCases: 9 }
+];
+
 export default function AnalyticsDashboardPage() {
     const [queueItems, setQueueItems] = useState([]);
     const [cases, setCases] = useState([]);
@@ -119,6 +176,7 @@ export default function AnalyticsDashboardPage() {
     const [selectedVendor, setSelectedVendor] = useState(null);
     const [vendorDetailLoading, setVendorDetailLoading] = useState(false);
     const [vendorDetails, setVendorDetails] = useState(null);
+    const [selectedMockVendor, setSelectedMockVendor] = useState(null);
 
     const fetchData = async () => {
         setLoading(true);
@@ -336,84 +394,124 @@ export default function AnalyticsDashboardPage() {
                 <StatCard label="Pending Review" value={stats?.pendingReview || 0} icon={Activity} color="emerald" sublabel="Awaiting human review" />
             </div>
 
-            {/* Charts Row 1 — Both Backend Data */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-                <ChartCard
-                    title="Fraud Category Distribution"
-                    icon={PieChartIcon}
-                    iconColor="bg-purple-950/20 border-purple-500/20 text-purple-400"
-                    badge="LIVE"
-                    badgeColor="bg-emerald-950/20 border-emerald-500/20 text-emerald-400"
-                >
-                    {pieData.length > 0 ? (
-                        <ResponsiveContainer width="100%" height={300}>
-                            <PieChart>
-                                <Pie
-                                    data={pieData}
-                                    cx="50%"
-                                    cy="50%"
-                                    innerRadius={65}
-                                    outerRadius={110}
-                                    fill="#8884d8"
-                                    dataKey="value"
-                                    paddingAngle={3}
-                                    stroke="none"
-                                >
-                                    {pieData.map((entry, index) => (
-                                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                                    ))}
-                                </Pie>
-                                <Tooltip content={<CustomTooltip />} />
-                                <Legend
-                                    verticalAlign="bottom"
-                                    height={36}
-                                    iconType="circle"
-                                    iconSize={8}
-                                    formatter={(value) => <span className="text-xs text-slate-400">{value}</span>}
-                                />
-                            </PieChart>
-                        </ResponsiveContainer>
-                    ) : (
-                        <div className="flex flex-col items-center justify-center h-72 text-slate-500 gap-3">
-                            <Layers size={32} className="text-slate-700" />
-                            <p className="text-xs font-semibold">No inspection data available yet</p>
-                            <p className="text-[10px] text-slate-600">Run an inspection to see fraud distribution</p>
+            {/* Vendor Performance Table */}
+            <div className="mb-8 relative group">
+                <div className="relative bg-[#0f172a]/55 border border-slate-800/80 rounded-xl shadow-lg overflow-hidden">
+                    <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-blue-500/20 to-transparent" />
+                    <div className="px-6 py-4 border-b border-slate-800 bg-[#0d1527]/50 flex items-center justify-between">
+                        <div className="flex items-center gap-2.5">
+                            <div className="h-7 w-7 rounded-lg bg-blue-950/20 border border-blue-500/20 flex items-center justify-center text-blue-400">
+                                <Database size={14} />
+                            </div>
+                            <h2 className="text-xs font-extrabold uppercase tracking-wider text-slate-200">Vendor Performance Overview</h2>
                         </div>
-                    )}
-                </ChartCard>
+                    </div>
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-xs">
+                            <thead>
+                                <tr className="border-b border-slate-800 bg-slate-900/30">
+                                    <th className="text-left px-6 py-3.5 text-[10px] font-extrabold uppercase tracking-wider text-slate-500">Vendor</th>
+                                    <th className="text-center px-6 py-3.5 text-[10px] font-extrabold uppercase tracking-wider text-slate-500">Components Supplied</th>
+                                    <th className="text-center px-6 py-3.5 text-[10px] font-extrabold uppercase tracking-wider text-slate-500">Fraud Cases</th>
+                                    <th className="text-right px-6 py-3.5 text-[10px] font-extrabold uppercase tracking-wider text-slate-500 pr-12">Fraud Rate</th>
+                                    <th className="text-center px-6 py-3.5 text-[10px] font-extrabold uppercase tracking-wider text-slate-500">Trust Score</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-800/60">
+                                {vendors.map((vendor, i) => (
+                                    <tr 
+                                        key={i} 
+                                        onClick={() => handleVendorClick(vendor.vendor)}
+                                        className="hover:bg-slate-900/40 transition-colors cursor-pointer"
+                                    >
+                                        <td className="px-6 py-4 text-slate-200 font-semibold">{vendor.vendor}</td>
+                                        <td className="px-6 py-4 text-center text-slate-300 font-tech-code">{vendor.components_supplied}</td>
+                                        <td className="px-6 py-4 text-center text-red-400 font-bold font-tech-code">{vendor.fraud_cases}</td>
+                                        <td className="px-6 py-4 text-right pr-12 font-tech-code">
+                                            <span className={parseFloat(vendor.fraud_rate) > 10 ? "text-red-400 font-extrabold" : "text-emerald-400 font-bold"}>
+                                                {vendor.fraud_rate}%
+                                            </span>
+                                        </td>
+                                        <td className="px-6 py-4 text-center text-slate-300 font-tech-code">{vendor.trust_score}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
 
-                <ChartCard
-                    title="Fraud Breakdown by Commodity"
-                    icon={BarChart3}
-                    iconColor="bg-blue-950/20 border-blue-500/20 text-blue-400"
-                    badge="LIVE"
-                    badgeColor="bg-emerald-950/20 border-emerald-500/20 text-emerald-400"
-                >
-                    {commodityData.length > 0 ? (
-                        <ResponsiveContainer width="100%" height={300}>
-                            <BarChart data={commodityData} barGap={4} barCategoryGap="20%">
-                                <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" strokeOpacity={0.5} />
-                                <XAxis dataKey="commodity" stroke="#64748b" fontSize={11} tickFormatter={(v) => v.length > 8 ? v.slice(0, 8) + '...' : v} />
-                                <YAxis stroke="#64748b" fontSize={11} />
-                                <Tooltip content={<CustomTooltip />} cursor={{ fill: '#1e293b', opacity: 0.3 }} />
-                                <Legend
-                                    verticalAlign="bottom"
-                                    height={30}
-                                    iconType="rect"
-                                    iconSize={10}
-                                    formatter={(value) => <span className="text-xs text-slate-400">{value}</span>}
-                                />
-                                <Bar dataKey="total" fill="#3b82f6" name="Total Cases" radius={[4, 4, 0, 0]} maxBarSize={40} />
-                                <Bar dataKey="fraud" fill="#ef4444" name="Fraud Cases" radius={[4, 4, 0, 0]} maxBarSize={40} />
-                            </BarChart>
-                        </ResponsiveContainer>
-                    ) : (
-                        <div className="flex flex-col items-center justify-center h-72 text-slate-500 gap-3">
-                            <Database size={32} className="text-slate-700" />
-                            <p className="text-xs font-semibold">No commodity data available</p>
+            {/* Site and Vendor Summaries */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+                {/* Site Performance Table */}
+                <div className="relative group">
+                    <div className="relative bg-[#0f172a]/55 border border-slate-800/80 rounded-xl shadow-lg overflow-hidden h-full">
+                        <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-cyan-500/20 to-transparent" />
+                        <div className="px-6 py-4 border-b border-slate-800 bg-[#0d1527]/50 flex items-center gap-2.5">
+                            <div className="h-7 w-7 rounded-lg bg-cyan-950/20 border border-cyan-500/20 flex items-center justify-center text-cyan-400">
+                                <Activity size={14} />
+                            </div>
+                            <h2 className="text-xs font-extrabold uppercase tracking-wider text-slate-200">Site Performance</h2>
                         </div>
-                    )}
-                </ChartCard>
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-xs">
+                                <thead>
+                                    <tr className="border-b border-slate-800 bg-slate-900/30">
+                                        <th className="text-left px-6 py-3.5 text-[10px] font-extrabold uppercase tracking-wider text-slate-500">Site</th>
+                                        <th className="text-center px-6 py-3.5 text-[10px] font-extrabold uppercase tracking-wider text-slate-500">Inspections</th>
+                                        <th className="text-center px-6 py-3.5 text-[10px] font-extrabold uppercase tracking-wider text-slate-500">Fraud Cases</th>
+                                        <th className="text-right px-6 py-3.5 text-[10px] font-extrabold uppercase tracking-wider text-slate-500">Fraud Rate</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-800/60">
+                                    {sites.map((site, i) => (
+                                        <tr key={i} className="hover:bg-slate-900/40 transition-colors">
+                                            <td className="px-6 py-4 text-slate-200 font-semibold">{site.site}</td>
+                                            <td className="px-6 py-4 text-center text-slate-300 font-tech-code">{site.inspections}</td>
+                                            <td className="px-6 py-4 text-center text-red-400 font-bold font-tech-code">{site.fraud_cases}</td>
+                                            <td className="px-6 py-4 text-right font-tech-code">
+                                                <span className={parseFloat(site.fraud_rate) > 5 ? "text-red-400 font-extrabold" : "text-emerald-400 font-bold"}>
+                                                    {site.fraud_rate}%
+                                                </span>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Vendor Fraud Summary Table */}
+                <div className="relative group">
+                    <div className="relative bg-[#0f172a]/55 border border-slate-800/80 rounded-xl shadow-lg overflow-hidden h-full">
+                        <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-purple-500/20 to-transparent" />
+                        <div className="px-6 py-4 border-b border-slate-800 bg-[#0d1527]/50 flex items-center gap-2.5">
+                            <div className="h-7 w-7 rounded-lg bg-purple-950/20 border border-purple-500/20 flex items-center justify-center text-purple-400">
+                                <AlertTriangle size={14} />
+                            </div>
+                            <h2 className="text-xs font-extrabold uppercase tracking-wider text-slate-200">Vendor Fraud Summary</h2>
+                        </div>
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-xs">
+                                <thead>
+                                    <tr className="border-b border-slate-800 bg-slate-900/30">
+                                        <th className="text-left px-6 py-3.5 text-[10px] font-extrabold uppercase tracking-wider text-slate-500">Vendor</th>
+                                        <th className="text-right px-6 py-3.5 text-[10px] font-extrabold uppercase tracking-wider text-slate-500">Fraud Cases</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-800/60">
+                                    {vendors.slice(0, 5).map((v, i) => (
+                                        <tr key={i} className="hover:bg-slate-900/40 transition-colors">
+                                            <td className="px-6 py-4 text-slate-200 font-semibold">{v.vendor}</td>
+                                            <td className="px-6 py-4 text-right text-red-400 font-bold font-tech-code">{v.fraud_cases}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             {/* Charts Row 2 — Month-on-Month Compliance Trend & Granular Table */}
@@ -445,43 +543,6 @@ export default function AnalyticsDashboardPage() {
                                 </BarChart>
                             </ResponsiveContainer>
 
-                            {/* Granular Monthly Performance Table */}
-                            <div className="border-t border-slate-800/80 pt-5">
-                                <div className="flex items-center gap-2 mb-3 px-1">
-                                    <div className="h-2 w-2 rounded-full bg-cyan-400 shadow-[0_0_8px_rgba(6,182,212,0.5)]" />
-                                    <h3 className="text-[10px] font-black uppercase tracking-wider text-slate-400">Monthly Vendor & Site Integrity Ledger</h3>
-                                </div>
-                                <div className="overflow-x-auto rounded-lg border border-slate-800/80 bg-slate-950/40">
-                                    <table className="w-full text-xs">
-                                        <thead>
-                                            <tr className="border-b border-slate-850 bg-slate-900/40 text-slate-500 uppercase text-[9px] tracking-wider">
-                                                <th className="text-left px-5 py-2.5">Month</th>
-                                                <th className="text-left px-5 py-2.5">Vendor</th>
-                                                <th className="text-left px-5 py-2.5">Received At / Site</th>
-                                                <th className="text-center px-5 py-2.5">Total Supplied</th>
-                                                <th className="text-center px-5 py-2.5">Fraud Cases</th>
-                                                <th className="text-right px-5 py-2.5 pr-6">Fraud Rate</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-slate-850">
-                                            {monthlyBreakdown.map((row, idx) => (
-                                                <tr key={idx} className="hover:bg-slate-900/25 transition-colors">
-                                                    <td className="px-5 py-3 font-extrabold text-cyan-400 font-tech-code">{row.month}</td>
-                                                    <td className="px-5 py-3 font-semibold text-slate-200">{row.vendor}</td>
-                                                    <td className="px-5 py-3 text-slate-400">{row.location}</td>
-                                                    <td className="px-5 py-3 text-center text-slate-300 font-tech-code">{row.total_inspections}</td>
-                                                    <td className="px-5 py-3 text-center text-red-400 font-bold font-tech-code">{row.fraud_cases}</td>
-                                                    <td className="px-5 py-3 text-right pr-6 font-tech-code">
-                                                        <span className={row.fraud_cases > 0 ? "text-red-400 font-extrabold" : "text-emerald-400"}>
-                                                            {row.fraud_rate}%
-                                                        </span>
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
                         </div>
                     ) : (
                         <div className="flex flex-col items-center justify-center h-72 text-slate-500 gap-3">
@@ -578,6 +639,50 @@ export default function AnalyticsDashboardPage() {
                     </span>
                 </div>
             </div>
+            {/* Vendor Details Modal */}
+            {selectedVendor && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+                    <div className="bg-slate-900 border border-slate-700 p-6 rounded-xl shadow-2xl max-w-md w-full relative">
+                        <button onClick={() => setSelectedVendor(null)} className="absolute top-4 right-4 text-slate-400 hover:text-white">
+                            ✕
+                        </button>
+                        {vendorDetailLoading ? (
+                            <div className="flex justify-center py-8">
+                                <div className="h-8 w-8 border-2 border-cyan-500/30 border-t-cyan-400 rounded-full animate-spin" />
+                            </div>
+                        ) : vendorDetails ? (
+                            <>
+                                <h3 className="text-xl font-bold text-white mb-4">{vendorDetails.vendor}</h3>
+                                <div className="mb-6">
+                                    <h4 className="text-sm font-semibold text-slate-300 uppercase mb-2">Monthly Breakdown</h4>
+                                    <div className="space-y-2">
+                                        {vendorDetails.monthly_trend.map((m, i) => (
+                                            <div key={i} className="flex justify-between text-sm font-tech-code">
+                                                <span className="w-12 text-slate-400">{m.month}</span>
+                                                <span className="text-red-400 w-24 font-bold">{m.fraud} Fraud</span>
+                                                <span className="text-emerald-400 w-24">{m.genuine} Genuine</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                                <div>
+                                    <h4 className="text-sm font-semibold text-slate-300 uppercase mb-2 border-b border-slate-700 pb-2">Fraud Components Supplied</h4>
+                                    <ul className="text-sm text-slate-400 space-y-1 mt-3 list-disc pl-5">
+                                        {vendorDetails.fraud_components.map((c, i) => (
+                                            <li key={i}>{c}</li>
+                                        ))}
+                                        {vendorDetails.fraud_components.length === 0 && (
+                                            <li>No fraud components on record.</li>
+                                        )}
+                                    </ul>
+                                </div>
+                            </>
+                        ) : (
+                            <div className="text-center py-8 text-slate-400">Failed to load details.</div>
+                        )}
+                    </div>
+                </div>
+            )}
         </Layout>
     );
 }
