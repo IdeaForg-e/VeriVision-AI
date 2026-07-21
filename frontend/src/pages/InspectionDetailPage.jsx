@@ -226,6 +226,29 @@ export default function InspectionDetailPage() {
   const heatmapUrl = merged.heatmapUrl || null;
   const fraudScore = merged.fraudScore ?? 0;
 
+  const reasoningText = recommendation.reasoning || "";
+  
+  let aiClassification = "UNKNOWN";
+  let aiCategory = "UNKNOWN";
+
+  const classMatch = reasoningText.match(/categorized as\s+([^.,\n]+)/i);
+  if (classMatch) {
+    aiClassification = classMatch[1].trim();
+  }
+
+  const catMatch = reasoningText.match(/pres[e]?cribed response is\s+([^.,\n]+)/i);
+  if (catMatch) {
+    aiCategory = catMatch[1].trim();
+  }
+
+  if (aiClassification === "UNKNOWN" || aiCategory === "UNKNOWN") {
+    const aiMatch = reasoningText.match(/classified as\s+(.*?)\s+with a recommended action of\s+(.*?)(?:\.|$)/i);
+    if (aiMatch) {
+      if (aiClassification === "UNKNOWN") aiClassification = aiMatch[1].trim();
+      if (aiCategory === "UNKNOWN") aiCategory = aiMatch[2].trim();
+    }
+  }
+
   // Filtered reports
   const filteredReports = useMemo(() => {
     let r = [...reportsList];
@@ -585,13 +608,27 @@ export default function InspectionDetailPage() {
             <OCRResults results={ocrResults} />
           </div>
         </div>
-        <div className="lg:col-span-5">
+        <div className="lg:col-span-5 flex flex-col gap-6">
           <div className="rounded-xl border border-slate-800/80 bg-gradient-to-br from-[#0f172a]/70 to-[#0a0f1d]/70 p-6">
             <h3 className="text-xs font-black uppercase tracking-widest text-slate-400 mb-4 flex items-center gap-2"><BarChart3 size={14} className="text-cyan-400" /> Comparison</h3>
             <div className="space-y-4">
               <MetricBar label="Text Match" value={ocrMatch ? 92 : 23} />
               <MetricBar label="Character Accuracy" value={ocrMatch ? 95 : 18} color={ocrMatch ? "from-emerald-500 to-teal-600" : "from-red-500 to-rose-600"} />
               <MetricBar label="Field Completeness" value={ocrResults.filter((r) => r.extracted).length / Math.max(ocrResults.length, 1) * 100} />
+            </div>
+          </div>
+          
+          <div className="rounded-xl border border-slate-800/80 bg-gradient-to-br from-[#0f172a]/70 to-[#0a0f1d]/70 p-6 flex-1 flex flex-col justify-center">
+            <h3 className="text-xs font-black uppercase tracking-widest text-slate-400 mb-4 flex items-center gap-2"><FileText size={14} className="text-cyan-400" /> AI Classification Insights</h3>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="bg-slate-950/60 border border-slate-800/60 rounded-xl p-4 flex flex-col justify-center">
+                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">Classification</p>
+                <p className={`text-base font-black uppercase tracking-wide ${aiClassification === 'TAMPERED' ? 'text-red-400' : aiClassification === 'UNKNOWN' ? 'text-slate-400' : 'text-emerald-400'}`}>{aiClassification}</p>
+              </div>
+              <div className="bg-slate-950/60 border border-slate-800/60 rounded-xl p-4 flex flex-col justify-center">
+                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">Category</p>
+                <p className={`text-sm font-bold ${aiCategory.includes('Escalate') ? 'text-amber-400' : aiCategory === 'UNKNOWN' ? 'text-slate-400' : 'text-cyan-400'}`}>{aiCategory}</p>
+              </div>
             </div>
           </div>
         </div>
