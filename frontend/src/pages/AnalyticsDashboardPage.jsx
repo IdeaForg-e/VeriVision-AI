@@ -378,11 +378,16 @@ export default function AnalyticsDashboardPage() {
                                     <tr
                                         key={i}
                                         onClick={() => handleVendorClick(vendor.vendor)}
-                                        className="group hover:bg-slate-900/40 transition-colors cursor-pointer"
+                                        className="group hover:bg-blue-950/20 transition-all duration-300 cursor-pointer border-l-2 border-l-transparent hover:border-l-blue-500"
                                     >
-                                        <td className="px-6 py-4 text-slate-200 font-semibold flex items-center gap-1.5">
-                                            {vendor.vendor}
-                                            <ChevronRight size={10} className="text-cyan-500/0 group-hover:text-cyan-400/70 transition-all duration-300" />
+                                        <td className="px-6 py-4 flex items-center gap-2">
+                                            <span className="text-blue-400 font-bold text-xs underline underline-offset-4 decoration-blue-500/40 group-hover:decoration-blue-400 group-hover:text-blue-300 transition-all duration-300">
+                                                {vendor.vendor}
+                                            </span>
+                                            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 translate-x-[-8px] group-hover:translate-x-0 transition-all duration-300">
+                                                <span className="text-[8px] font-bold text-blue-400/80 uppercase tracking-wider">View</span>
+                                                <ChevronRight size={12} className="text-blue-400" />
+                                            </div>
                                         </td>
                                         <td className="px-6 py-4 text-center text-slate-300 font-tech-code">{vendor.components_supplied}</td>
                                         <td className="px-6 py-4 text-center text-red-400 font-bold font-tech-code">{vendor.fraud_cases}</td>
@@ -514,7 +519,7 @@ export default function AnalyticsDashboardPage() {
 
 
 
-            {/* Recent Cases Table — Backend Data */}
+            {/* Recent Cases — Card-Based Design */}
             <div className="relative group">
                 <div className="relative bg-[#0f172a]/55 border border-slate-800/80 rounded-xl shadow-lg overflow-hidden">
                     <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-emerald-500/20 to-transparent" />
@@ -525,63 +530,66 @@ export default function AnalyticsDashboardPage() {
                             </div>
                             <h2 className="text-xs font-extrabold uppercase tracking-wider text-slate-200">Recent Inspection Outcomes</h2>
                         </div>
-                        <span className="text-[9px] text-slate-500 bg-slate-900 px-2 py-1 rounded-full border border-slate-800 font-semibold">{queueItems.length} CASES</span>
+                        <div className="flex items-center gap-2">
+                            <span className="text-[9px] text-slate-500 bg-slate-900 px-2 py-1 rounded-full border border-slate-800 font-semibold">{queueItems.length} CASES</span>
+                            <span className="text-[9px] text-slate-500 bg-slate-900 px-2 py-1 rounded-full border border-slate-800 font-semibold">{fraudCases} FRAUD</span>
+                        </div>
                     </div>
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-xs">
-                            <thead>
-                                <tr className="border-b border-slate-800 bg-slate-900/30">
-                                    <th className="text-left px-6 py-3.5 text-[10px] font-extrabold uppercase tracking-wider text-slate-500">Case ID</th>
-                                    <th className="text-left px-6 py-3.5 text-[10px] font-extrabold uppercase tracking-wider text-slate-500">Delivery Date</th>
-                                    <th className="text-left px-6 py-3.5 text-[10px] font-extrabold uppercase tracking-wider text-slate-500">Part</th>
-                                    <th className="text-left px-6 py-3.5 text-[10px] font-extrabold uppercase tracking-wider text-slate-500">Commodity</th>
-                                    <th className="text-left px-6 py-3.5 text-[10px] font-extrabold uppercase tracking-wider text-slate-500">Risk Score</th>
-                                    <th className="text-left px-6 py-3.5 text-[10px] font-extrabold uppercase tracking-wider text-slate-500">Status</th>
-                                    <th className="text-right px-6 py-3.5 text-[10px] font-extrabold uppercase tracking-wider text-slate-500">Reason</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-800/60">
-                                {queueItems.slice(0, 8).map((item, i) => (
-                                    <tr key={item.id || i} className="hover:bg-slate-900/20 transition-colors">
-                                        <td className="px-6 py-4">
-                                            <span className="font-tech-code text-cyan-400 font-bold">{item.caseId?.slice(0, 8)}...</span>
-                                        </td>
-                                        <td className="px-6 py-4 text-slate-450 font-semibold">{item.date || "N/A"}</td>
-                                        <td className="px-6 py-4 text-slate-300 font-semibold">{item.partNumber || "N/A"}</td>
-                                        <td className="px-6 py-4">
-                                            <span className="flex items-center gap-1.5 text-slate-400">
-                                                {getCategoryIcon(item.commodity)}
-                                                {item.commodity || "Unknown"}
-                                            </span>
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            <div className="flex items-center gap-2">
-                                                <div className="w-16 h-1.5 bg-slate-800 rounded-full overflow-hidden">
-                                                    <div
-                                                        className={`h-full rounded-full ${item.riskScore >= 75 ? 'bg-red-500' : item.riskScore >= 50 ? 'bg-amber-500' : 'bg-emerald-500'}`}
-                                                        style={{ width: `${item.riskScore}%` }}
-                                                    />
-                                                </div>
-                                                <span className={`text-[10px] font-bold font-tech-code ${item.riskScore >= 75 ? 'text-red-400' : item.riskScore >= 50 ? 'text-amber-400' : 'text-emerald-400'}`}>
-                                                    {item.riskScore}
-                                                </span>
+                    <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-3">
+                        {queueItems.slice(0, 8).map((item, i) => (
+                            <div key={item.id || i} className="group/card relative bg-slate-900/40 border border-slate-800/70 rounded-xl p-4 hover:border-emerald-500/30 hover:bg-slate-900/60 transition-all duration-300">
+                                {/* Top gradient line */}
+                                <div className="absolute top-0 left-2 right-2 h-[1.5px] bg-gradient-to-r from-transparent via-emerald-500/20 to-transparent rounded-full" />
+
+                                {/* Header row */}
+                                <div className="flex items-center justify-between mb-2.5">
+                                    <div className="flex items-center gap-2">
+                                        {getCategoryIcon(item.commodity)}
+                                        <span className="font-tech-code text-[10px] text-cyan-400 font-bold tracking-wider">{item.caseId?.slice(0, 10) || "N/A"}</span>
+                                    </div>
+                                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[8px] font-extrabold uppercase tracking-wider ${item.status === 'AUTO-APPROVED' ? 'bg-emerald-950/30 text-emerald-400 border border-emerald-500/20' : item.status === 'QUARANTINE' ? 'bg-red-950/30 text-red-400 border border-red-500/20' : item.status === 'RETAKE REQUESTED' ? 'bg-amber-950/30 text-amber-400 border border-amber-500/20' : 'bg-slate-800 text-slate-400 border border-slate-700'}`}>
+                                        {item.status === 'AUTO-APPROVED' ? <CheckCircle size={8} /> : item.status === 'QUARANTINE' ? <AlertTriangle size={8} /> : null}
+                                        {item.status || "PENDING"}
+                                    </span>
+                                </div>
+
+                                {/* Info rows */}
+                                <div className="space-y-1.5">
+                                    <div className="flex items-center justify-between text-[10px]">
+                                        <span className="text-slate-500 font-semibold">Part / Date</span>
+                                        <span className="text-slate-300 font-semibold">{item.partNumber || "N/A"} · {item.date || "—"}</span>
+                                    </div>
+                                    <div className="flex items-center justify-between text-[10px]">
+                                        <span className="text-slate-500 font-semibold">Commodity</span>
+                                        <span className="text-slate-300">{item.commodity || "Unknown"}</span>
+                                    </div>
+                                    <div className="flex items-center justify-between text-[10px]">
+                                        <span className="text-slate-500 font-semibold">Risk Score</span>
+                                        <div className="flex items-center gap-2">
+                                            <div className="w-14 h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                                                <div
+                                                    className={`h-full rounded-full ${item.riskScore >= 75 ? 'bg-red-500' : item.riskScore >= 50 ? 'bg-amber-500' : 'bg-emerald-500'}`}
+                                                    style={{ width: `${Math.min(item.riskScore || 0, 100)}%` }}
+                                                />
                                             </div>
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-extrabold uppercase tracking-wider ${item.status === 'AUTO-APPROVED' ? 'bg-emerald-950/20 text-emerald-400 border border-emerald-500/20' : item.status === 'QUARANTINE' ? 'bg-red-950/20 text-red-400 border border-red-500/20' : item.status === 'RETAKE REQUESTED' ? 'bg-amber-950/20 text-amber-400 border border-amber-500/20' : 'bg-slate-800 text-slate-400 border border-slate-700'}`}>
-                                                {item.status === 'AUTO-APPROVED' ? <CheckCircle size={10} /> : item.status === 'QUARANTINE' ? <AlertTriangle size={10} /> : null}
-                                                {item.status || "PENDING"}
+                                            <span className={`text-[10px] font-bold font-tech-code ${item.riskScore >= 75 ? 'text-red-400' : item.riskScore >= 50 ? 'text-amber-400' : 'text-emerald-400'}`}>
+                                                {item.riskScore || 0}
                                             </span>
-                                        </td>
-                                        <td className="px-6 py-4 text-right text-slate-500">{item.reason || "—"}</td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Reason footer */}
+                                <div className="mt-2.5 pt-2 border-t border-slate-800/60 flex items-center justify-between">
+                                    <span className="text-[9px] text-slate-600 font-semibold">Reason</span>
+                                    <span className="text-[9px] text-slate-500 max-w-[60%] truncate text-right">{item.reason || "—"}</span>
+                                </div>
+                            </div>
+                        ))}
                     </div>
                     {queueItems.length > 8 && (
                         <div className="px-6 py-3 border-t border-slate-800 bg-slate-900/20 text-center">
-                            <button className="text-[10px] font-extrabold uppercase tracking-wider text-cyan-400 hover:text-cyan-300 transition-colors">
+                            <button className="text-[10px] font-extrabold uppercase tracking-wider text-emerald-400 hover:text-emerald-300 hover:underline underline-offset-4 transition-all">
                                 View all {queueItems.length} cases →
                             </button>
                         </div>
