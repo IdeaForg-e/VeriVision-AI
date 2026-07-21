@@ -18,7 +18,7 @@ import {
 import {
     TrendingUp, AlertTriangle, CheckCircle, Activity, BarChart3,
     PieChart as PieChartIcon, Database, Layers, Eye, Download, RefreshCw,
-    Truck, Cpu, FileText, Sliders, ChevronDown, ChevronUp, Calendar, ShieldAlert
+    Truck, Cpu, FileText, Sliders, ChevronDown, ChevronUp, ChevronRight, Calendar, ShieldAlert
 } from "lucide-react";
 
 const COLORS = ["#10b981", "#ef4444", "#f59e0b", "#8b5cf6", "#3b82f6", "#64748b"];
@@ -120,6 +120,10 @@ export default function AnalyticsDashboardPage() {
     const [vendorDetailLoading, setVendorDetailLoading] = useState(false);
     const [vendorDetails, setVendorDetails] = useState(null);
 
+    // Interactive selected site details state
+    const [selectedSite, setSelectedSite] = useState(null);
+    const [siteDetails, setSiteDetails] = useState(null);
+
     const fetchData = async () => {
         setLoading(true);
         try {
@@ -177,6 +181,16 @@ export default function AnalyticsDashboardPage() {
         } finally {
             setVendorDetailLoading(false);
         }
+    };
+
+    const handleSiteClick = (siteName, fraudCases) => {
+        if (selectedSite === siteName) {
+            setSelectedSite(null);
+            setSiteDetails(null);
+            return;
+        }
+        setSelectedSite(siteName);
+        setSiteDetails({ site: siteName, fraud_cases: fraudCases });
     };
 
     // CSV Export function — downloads current queue data as .csv file
@@ -364,9 +378,12 @@ export default function AnalyticsDashboardPage() {
                                     <tr
                                         key={i}
                                         onClick={() => handleVendorClick(vendor.vendor)}
-                                        className="hover:bg-slate-900/40 transition-colors cursor-pointer"
+                                        className="group hover:bg-slate-900/40 transition-colors cursor-pointer"
                                     >
-                                        <td className="px-6 py-4 text-slate-200 font-semibold">{vendor.vendor}</td>
+                                        <td className="px-6 py-4 text-slate-200 font-semibold flex items-center gap-1.5">
+                                            {vendor.vendor}
+                                            <ChevronRight size={10} className="text-cyan-500/0 group-hover:text-cyan-400/70 transition-all duration-300" />
+                                        </td>
                                         <td className="px-6 py-4 text-center text-slate-300 font-tech-code">{vendor.components_supplied}</td>
                                         <td className="px-6 py-4 text-center text-red-400 font-bold font-tech-code">{vendor.fraud_cases}</td>
                                         <td className="px-6 py-4 text-right pr-12 font-tech-code">
@@ -407,7 +424,7 @@ export default function AnalyticsDashboardPage() {
                                 </thead>
                                 <tbody className="divide-y divide-slate-800/60">
                                     {sites.map((site, i) => (
-                                        <tr key={i} className="hover:bg-slate-900/40 transition-colors">
+                                        <tr key={i} onClick={() => handleSiteClick(site.site, site.fraud_cases)} className="hover:bg-slate-900/40 transition-colors cursor-pointer">
                                             <td className="px-6 py-4 text-slate-200 font-semibold">{site.site}</td>
                                             <td className="px-6 py-4 text-center text-slate-300 font-tech-code">{site.inspections}</td>
                                             <td className="px-6 py-4 text-center text-red-400 font-bold font-tech-code">{site.fraud_cases}</td>
@@ -581,6 +598,34 @@ export default function AnalyticsDashboardPage() {
                     </span>
                 </div>
             </div>
+            {/* Site Details Modal */}
+            {selectedSite && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+                    <div className="bg-slate-900 border border-slate-700 p-6 rounded-xl shadow-2xl max-w-md w-full relative">
+                        <button onClick={() => setSelectedSite(null)} className="absolute top-4 right-4 text-slate-400 hover:text-white">
+                            ✕
+                        </button>
+                        <div className="flex items-center gap-3 mb-4">
+                            <div className="h-9 w-9 rounded-lg bg-cyan-950/20 border border-cyan-500/20 flex items-center justify-center text-cyan-400">
+                                <Activity size={18} />
+                            </div>
+                            <div>
+                                <h3 className="text-lg font-bold text-white">{siteDetails?.site}</h3>
+                                <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Site Details</p>
+                            </div>
+                        </div>
+                        {siteDetails && (
+                            <div className="space-y-4">
+                                <div className="flex justify-between items-center p-3 rounded-lg bg-slate-800/40 border border-slate-700/60">
+                                    <span className="text-sm text-slate-400 font-semibold">Fraud Cases</span>
+                                    <span className="text-lg font-extrabold text-red-400 font-tech-code">{siteDetails.fraud_cases}</span>
+                                </div>
+                                <p className="text-[10px] text-slate-500 text-center pt-2">Click on another site or close to dismiss</p>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
             {/* Vendor Details Modal */}
             {selectedVendor && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
