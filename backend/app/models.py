@@ -41,6 +41,7 @@ class GoldenReference(Base):
     expected_serial = Column(String, nullable=True)
     roi_config = Column(JSON, nullable=True)  # Coordinates for text/labels/seals
     angle = Column(String, default="top")
+    embedding_vector = Column(JSON, nullable=True)  # 512-dim visual vector embedding
     created_at = Column(DateTime, default=datetime.utcnow)
 
     product = relationship("Product", back_populates="golden_references")

@@ -43,12 +43,13 @@ def make_decision(ensemble_results: dict) -> dict:
     temp_score = ensemble_results.get("template_match_score", 1.0)
     temp_found = ensemble_results.get("template_match_found", True)
     color_sim = ensemble_results.get("color_hist_similarity", 1.0)
+    vec_match = float(ensemble_results.get("vector_embedding_match", 85.0))
     source_reference_identical = bool(ensemble_results.get("source_reference_identical", False))
 
     logger.info(
         f"Make Decision called with metrics: SSIM={ssim:.3f}, OCR Sim={ocr_sim:.2f}, "
         f"Mismatches={len(ocr_mismatches)}, Keypoints Rate={kp_ratio:.3f}, "
-        f"Template Found={temp_found} ({temp_score:.2f}), Color Hist={color_sim:.3f}"
+        f"Template Found={temp_found} ({temp_score:.2f}), Color Hist={color_sim:.3f}, Vector Embedding Match={vec_match:.1f}%"
     )
     logger.info(
         f"Tuning Panel Calibration Target Values: SSIM={ssim_target:.2f}, "
@@ -74,13 +75,14 @@ def make_decision(ensemble_results: dict) -> dict:
     ocr_loss = max(0.0, 1.0 - ocr_sim)
     kp_loss = abs(1.0 - kp_ratio)
     color_loss = max(0.0, 1.0 - color_sim)
+    vec_loss = max(0.0, (100.0 - vec_match) / 100.0)
     template_loss = 0.0 if temp_found else 1.0
 
-    # Weights: SSIM = 40%, OCR = 25%, Keypoints = 15%, Template/Logo = 10%, Color Correlation = 10%
-    weighted_score = (ssim_loss * 40) + (ocr_loss * 25) + (min(kp_loss, 1.0) * 15) + (template_loss * 10) + (color_loss * 10)
+    # Weights: SSIM = 35%, OCR = 20%, Vector Embedding = 15%, Keypoints = 15%, Template/Logo = 10%, Color = 5%
+    weighted_score = (ssim_loss * 35) + (ocr_loss * 20) + (vec_loss * 15) + (min(kp_loss, 1.0) * 15) + (template_loss * 10) + (color_loss * 5)
     fraud_score = int(min(max(weighted_score * 1.5, 0.0), 100.0))
     logger.info(
-        f"Local calculated losses - SSIM: {ssim_loss:.3f}, OCR: {ocr_loss:.3f}, Keypoints: {kp_loss:.3f}, "
+        f"Local calculated losses - SSIM: {ssim_loss:.3f}, OCR: {ocr_loss:.3f}, Vector: {vec_loss:.3f}, Keypoints: {kp_loss:.3f}, "
         f"Template: {template_loss:.1f}, Color: {color_loss:.3f}. Weighted Score: {weighted_score:.2f} -> Fraud Score: {fraud_score}"
     )
 

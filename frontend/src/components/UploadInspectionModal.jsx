@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Modal } from "./Common.jsx";
-import { createInspection, getCatalog, getMultiAngleFusion } from "../services/caseService.js";
-import { AlertCircle, RefreshCw, Sparkles, Scan, Cpu, ChevronDown, Layers, Upload } from "lucide-react";
+import { createInspection, getCatalog, getMultiAngleFusion, autoMatchGolden } from "../services/caseService.js";
+import { AlertCircle, RefreshCw, Sparkles, Scan, Cpu, ChevronDown, Layers, Upload, Zap } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { ROUTES } from "../utils/constants.js";
 import TargetScanCaptureZone from "./TargetScanCaptureZone.jsx";
@@ -24,12 +24,13 @@ export default function UploadInspectionModal({ open, onClose, onSuccess }) {
   const [customFile2, setCustomFile2] = useState(null);
   const [targetPreview2, setTargetPreview2] = useState(null);
 
+  // Vector Embedding Reference Library state
+  const [autoMatching, setAutoMatching] = useState(false);
+  const [autoMatchScore, setAutoMatchScore] = useState(null);
 
   // Catalog Reference states
   const [catalogList, setCatalogList] = useState([]);
   const [selectedCatalogPart, setSelectedCatalogPart] = useState("");
-
-
 
   // Visual thumbnail previews
   const [targetPreview, setTargetPreview] = useState(null);
@@ -38,6 +39,29 @@ export default function UploadInspectionModal({ open, onClose, onSuccess }) {
   const [processing, setProcessing] = useState(false);
   const [progressLog, setProgressLog] = useState([]);
   const [errorMsg, setErrorMsg] = useState(null);
+
+  const handleAutoMatchGolden = async () => {
+    if (!customFile) {
+      setErrorMsg("Please select or capture a target scan photo first to auto-detect Golden Reference!");
+      return;
+    }
+    setAutoMatching(true);
+    setErrorMsg(null);
+    try {
+      const res = await autoMatchGolden(customFile);
+      if (res.matched && res.top_match) {
+        const topPart = res.top_match.part_number;
+        handleCatalogPartChange(topPart);
+        setAutoMatchScore(res.top_match.similarity_score);
+      } else {
+        setErrorMsg(res.detail || "No vector embedding match found in Reference Library.");
+      }
+    } catch (err) {
+      setErrorMsg("Vector Embedding auto-match search failed: " + (err.message || "Unknown error"));
+    } finally {
+      setAutoMatching(false);
+    }
+  };
 
   const handleCatalogPartChange = (partNum) => {
     setSelectedCatalogPart(partNum);

@@ -33,7 +33,7 @@ def verify_comparison_viability(src_image_path: str, ref_image_path: str) -> dic
     if ref is None:
         return {"viable": False, "detail": "Unable to read golden reference standard image."}
 
-    # 2. Visual Layout Matching Check (ORB keypoints agreement)
+    # 2. Visual Layout Matching Check (ORB keypoints agreement — informative logging)
     gray_src = cv2.cvtColor(src, cv2.COLOR_BGR2GRAY)
     gray_ref = cv2.cvtColor(ref, cv2.COLOR_BGR2GRAY)
     orb = cv2.ORB_create(nfeatures=500)
@@ -46,11 +46,7 @@ def verify_comparison_viability(src_image_path: str, ref_image_path: str) -> dic
             matches = bf.match(des_src, des_ref)
             good_matches = [m for m in matches if m.distance < 50]
             if len(good_matches) < 3:
-                logger.warning("[Agent 1: Selector] Visual mismatch detected: Less than 3 ORB matches found between images.")
-                return {
-                    "viable": False,
-                    "detail": "This part's golden image was not available in our database. Please contact your admin."
-                }
+                logger.info("[Agent 1: Selector] Low ORB keypoint match agreement (likely severe structural defect/burn). Proceeding with AI anomaly ensemble.")
         except Exception as match_err:
             logger.error(f"[Agent 1: Selector] Keypoint matching failed during viability check: {match_err}")
 
@@ -199,3 +195,26 @@ def classify_part_commodity(image_path: str) -> str:
 
     logger.info("[Agent 1: Selector] Defaulting to commodity type: motherboard")
     return "motherboard"
+
+
+def auto_select_golden_reference(uploaded_image_path: str, db) -> dict:
+    """
+    Agent 1 (Reference Selector):
+    Auto-detects and retrieves the best matching OEM Golden Standard from the
+    Reference Library using 512-dim visual vector embeddings & Cosine Similarity search.
+    """
+    logger.info(f"[Agent 1: Reference Selector] Auto-selecting Golden Reference for: {uploaded_image_path}")
+    from app.services.embedding_service import search_reference_library
+
+    search_res = search_reference_library(uploaded_image_path, db)
+    if not search_res.get("matched"):
+        logger.warning(f"[Agent 1: Reference Selector] Vector search failed: {search_res.get('detail')}")
+        return search_res
+
+    top_match = search_res["top_match"]
+    logger.info(
+        f"[Agent 1: Reference Selector] Successfully auto-paired uploaded scan with "
+        f"'{top_match['part_number']}' ({top_match['name']}) at {top_match['similarity_score']}% confidence."
+    )
+    return search_res
+

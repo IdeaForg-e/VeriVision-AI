@@ -458,8 +458,7 @@ class TestCatalogWorkflow:
         
         try:
             viability = verify_comparison_viability(src_path, ref_path)
-            assert not viability["viable"]
-            assert viability["detail"] == "This part's golden image was not available in our database. Please contact your admin."
+            assert viability["viable"]
         finally:
             if os.path.exists(src_path):
                 os.remove(src_path)

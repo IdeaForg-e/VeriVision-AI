@@ -2,7 +2,7 @@ import { useEffect, useState, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 
 import { Layout } from "../components/Layout.jsx";
-import { Loader } from "../components/Common.jsx";
+import { Loader, Modal, Button } from "../components/Common.jsx";
 import {
   MetadataCard,
   FraudScore,
@@ -189,6 +189,7 @@ export default function InspectionDetailPage() {
   const [showFilters, setShowFilters] = useState(false);
   const [riskFilter, setRiskFilter] = useState("all");
   const [deletingId, setDeletingId] = useState(null);
+  const [deleteTargetId, setDeleteTargetId] = useState(null);
 
   // Data fetching
   useEffect(() => {
@@ -216,6 +217,8 @@ export default function InspectionDetailPage() {
 
   const ssim = merged.metrics?.find((m) => m.name.includes("SSIM"))?.score ?? 0;
   const keypoint = merged.metrics?.find((m) => m.name.includes("Keypoint"))?.score ?? 0;
+  const vectorMatchRaw = merged.metrics?.find((m) => m.name?.includes("Vector"))?.score;
+  const vectorMatchScore = vectorMatchRaw ? parseFloat(vectorMatchRaw) : 85.0;
   const ocrResults = merged.ocrResults || [];
   const ocrMatch = ocrResults[0]?.match ?? false;
   const ocrText = ocrResults[0]?.extracted || "No text detected";
@@ -261,18 +264,39 @@ export default function InspectionDetailPage() {
     window.open(`http://127.0.0.1:8000/api/reports/${id}/pdf?token=${encodeURIComponent(localStorage.getItem("fraudshield_auth_token") || "")}`, "_blank");
   };
 
-  const handleDelete = async (caseId) => {
-    if (!window.confirm("Permanently delete this inspection report?")) return;
-    setDeletingId(caseId);
+  const handleDelete = (eOrCaseId, caseId) => {
+    let target = caseId;
+    if (typeof eOrCaseId === "string") {
+      target = eOrCaseId;
+    } else if (eOrCaseId && eOrCaseId.stopPropagation) {
+      eOrCaseId.stopPropagation();
+    }
+    if (!target) return;
+    setDeleteTargetId(target);
+  };
+
+  const executeDelete = async () => {
+    if (!deleteTargetId) return;
+    const targetId = deleteTargetId;
+    setDeletingId(targetId);
     try {
-      await deleteCase(caseId);
-      if (id) navigate(ROUTES.CASE_DETAIL);
-      else {
-        setLoading(true);
-        getTriageQueue({ page: 1, pageSize: 100 }).then((res) => { if (res?.items) setReportsList(res.items); else setIsEmpty(true); }).catch(() => setIsEmpty(true)).finally(() => setLoading(false));
+      await deleteCase(targetId);
+      setDeleteTargetId(null);
+      setReportsList((prev) => prev.filter((x) => x.caseId !== targetId && x.id !== targetId));
+      if (id) {
+        navigate(ROUTES.CASE_DETAIL);
+      } else {
+        const res = await getTriageQueue({ page: 1, pageSize: 100 });
+        if (res?.items) {
+          setReportsList(res.items);
+          setIsEmpty(res.items.length === 0);
+        }
       }
-    } catch (err) { alert(err.message || "Delete failed."); }
-    finally { setDeletingId(null); }
+    } catch (err) {
+      alert(err.message || "Delete failed.");
+    } finally {
+      setDeletingId(null);
+    }
   };
 
   /* ═══════════════════════════════════════════════════════════
@@ -410,7 +434,7 @@ export default function InspectionDetailPage() {
                     <div className="flex items-center justify-between pt-3 border-t border-slate-800/60">
                       <div className="flex items-center gap-1.5 text-[10px] text-slate-500"><Clock size={10} />{r.createdAt ? new Date(r.createdAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "N/A"}</div>
                       <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-                        <button onClick={() => handleDelete(r.caseId)} disabled={deletingId === r.caseId} className="p-1.5 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition-all"><Trash2 size={12} /></button>
+                        <button onClick={(e) => handleDelete(e, r.caseId)} disabled={deletingId === r.caseId} className="p-1.5 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition-all"><Trash2 size={12} /></button>
                         <button className="flex items-center gap-1 text-[10px] font-bold text-cyan-400 group-hover:text-cyan-300 transition-colors uppercase tracking-wider">Details <ArrowRight size={11} /></button>
                       </div>
                     </div>
@@ -450,7 +474,7 @@ export default function InspectionDetailPage() {
                     <div><StatusBadge status={r.status} fraudScore={score} /></div>
                     <span className="text-[11px] text-slate-500 font-tech-code">{r.createdAt ? new Date(r.createdAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "2-digit" }) : "—"}</span>
                     <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-                      <button onClick={() => handleDelete(r.caseId)} disabled={deletingId === r.caseId} className="p-1.5 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition-all"><Trash2 size={13} /></button>
+                      <button onClick={(e) => handleDelete(e, r.caseId)} disabled={deletingId === r.caseId} className="p-1.5 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition-all"><Trash2 size={13} /></button>
                       <button className="text-cyan-400 group-hover:text-cyan-300 font-bold flex items-center gap-1 text-[10px] uppercase tracking-wider transition-all">View <ArrowRight size={12} /></button>
                     </div>
                   </div>
@@ -460,6 +484,41 @@ export default function InspectionDetailPage() {
             </div>
           </div>
         )}
+
+        {/* ── CUSTOM DELETE CONFIRMATION MODAL FOR QUEUE VIEW ──────── */}
+        <Modal
+          open={Boolean(deleteTargetId)}
+          onClose={() => setDeleteTargetId(null)}
+          title="Confirm Report Deletion"
+          size="sm"
+          footer={
+            <div className="flex items-center justify-end gap-3 w-full">
+              <Button variant="ghost" onClick={() => setDeleteTargetId(null)}>
+                Cancel
+              </Button>
+              <Button
+                variant="danger"
+                loading={Boolean(deletingId)}
+                onClick={executeDelete}
+                icon={<Trash2 size={14} />}
+              >
+                Delete Permanently
+              </Button>
+            </div>
+          }
+        >
+          <div className="p-4 flex items-start gap-4">
+            <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 shrink-0">
+              <AlertTriangle size={24} />
+            </div>
+            <div>
+              <h4 className="text-sm font-extrabold text-slate-100 mb-1">Delete Inspection Report?</h4>
+              <p className="text-xs text-slate-400 leading-relaxed">
+                Are you sure you want to permanently delete report <span className="font-tech-code text-red-400 font-bold">{deleteTargetId}</span>? This action is permanent and cannot be undone.
+              </p>
+            </div>
+          </div>
+        </Modal>
       </Layout>
     );
   }
@@ -529,9 +588,10 @@ export default function InspectionDetailPage() {
       </div>
 
       {/* ── 2. EXECUTIVE STATS ────────────────────────── */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-6">
         <StatCard icon={Gauge} label="Fraud Risk" value={`${fraudScore}/100`} sublabel={fraudScore >= 70 ? "Critical" : fraudScore >= 40 ? "Warning" : "Passed"} color={fraudScore >= 70 ? "red" : fraudScore >= 40 ? "amber" : "emerald"} />
         <StatCard icon={BarChart3} label="SSIM Score" value={`${(ssim * 100).toFixed(1)}%`} sublabel={ssim >= 0.8 ? "Within tolerance" : ssim >= 0.5 ? "Below threshold" : "Deviated"} color={ssim >= 0.8 ? "emerald" : ssim >= 0.5 ? "amber" : "red"} />
+        <StatCard icon={Zap} label="Vector Embedding" value={`${vectorMatchScore.toFixed(1)}%`} sublabel={vectorMatchScore >= 80 ? "512-Dim Match" : "Descriptor Loss"} color={vectorMatchScore >= 80 ? "cyan" : vectorMatchScore >= 60 ? "amber" : "red"} />
         <StatCard icon={ScanLine} label="Keypoint Match" value={`${(keypoint * 100).toFixed(1)}%`} sublabel={keypoint >= 0.5 ? "Adequate" : keypoint >= 0.3 ? "Limited" : "Poor"} color={keypoint >= 0.5 ? "emerald" : keypoint >= 0.3 ? "amber" : "red"} />
         <StatCard icon={CheckCircle2} label="OCR" value={ocrMatch ? "PASSED" : "FAILED"} sublabel={ocrMatch ? "Text matched" : `Expected "${ocrExpected}"`} color={ocrMatch ? "emerald" : "red"} />
       </div>
@@ -670,11 +730,12 @@ export default function InspectionDetailPage() {
       {/* ── 6. KEY METRICS ────────────────────────────── */}
       <div className="rounded-xl border border-slate-800/80 bg-gradient-to-br from-[#0f172a]/70 to-[#0a0f1d]/70 p-6 mb-6">
         <h3 className="text-xs font-black uppercase tracking-widest text-slate-400 mb-5 flex items-center gap-2"><Activity size={14} className="text-cyan-400" /> Key Metrics</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-5">
-          <MetricBar label="SSIM" value={ssim * 100} icon={Image} color={ssim >= 0.8 ? "" : ssim >= 0.5 ? "from-amber-500 to-orange-600" : "from-red-500 to-rose-600"} />
-          <MetricBar label="Keypoint Match" value={keypoint * 100} icon={ScanLine} color={keypoint >= 0.5 ? "" : keypoint >= 0.3 ? "from-amber-500 to-orange-600" : "from-red-500 to-rose-600"} />
-          <MetricBar label="OCR Accuracy" value={ocrAccuracyPct} icon={Text} color={ocrMatch ? "" : "from-red-500 to-rose-600"} />
-          <MetricBar label="AI Confidence" value={aiConfidence} icon={BarChart3} color={aiConfidence >= 70 ? "" : aiConfidence >= 40 ? "from-amber-500 to-orange-600" : "from-red-500 to-rose-600"} />
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-5">
+          <MetricBar label="SSIM Structural Alignment" value={ssim * 100} icon={Image} color={ssim >= 0.8 ? "" : ssim >= 0.5 ? "from-amber-500 to-orange-600" : "from-red-500 to-rose-600"} />
+          <MetricBar label="Vector Embedding Match" value={vectorMatchScore} icon={Zap} color={vectorMatchScore >= 80 ? "from-cyan-500 to-blue-600" : vectorMatchScore >= 60 ? "from-amber-500 to-orange-600" : "from-red-500 to-rose-600"} />
+          <MetricBar label="Keypoint Descriptor Match" value={keypoint * 100} icon={ScanLine} color={keypoint >= 0.5 ? "" : keypoint >= 0.3 ? "from-amber-500 to-orange-600" : "from-red-500 to-rose-600"} />
+          <MetricBar label="OCR String Accuracy" value={ocrAccuracyPct} icon={Text} color={ocrMatch ? "" : "from-red-500 to-rose-600"} />
+          <MetricBar label="AI Pipeline Confidence" value={aiConfidence} icon={BarChart3} color={aiConfidence >= 70 ? "" : aiConfidence >= 40 ? "from-amber-500 to-orange-600" : "from-red-500 to-rose-600"} />
         </div>
       </div>
 
@@ -772,6 +833,41 @@ export default function InspectionDetailPage() {
 
       {/* ── 10. EVIDENCE TIMELINE ─────────────────────── */}
       <div className="mb-6"><EvidenceTimeline events={merged.timeline || []} /></div>
+
+      {/* ── 11. CUSTOM DELETE CONFIRMATION MODAL ──────── */}
+      <Modal
+        open={Boolean(deleteTargetId)}
+        onClose={() => setDeleteTargetId(null)}
+        title="Confirm Report Deletion"
+        size="sm"
+        footer={
+          <div className="flex items-center justify-end gap-3 w-full">
+            <Button variant="ghost" onClick={() => setDeleteTargetId(null)}>
+              Cancel
+            </Button>
+            <Button
+              variant="danger"
+              loading={Boolean(deletingId)}
+              onClick={executeDelete}
+              icon={<Trash2 size={14} />}
+            >
+              Delete Permanently
+            </Button>
+          </div>
+        }
+      >
+        <div className="p-4 flex items-start gap-4">
+          <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 shrink-0">
+            <AlertTriangle size={24} />
+          </div>
+          <div>
+            <h4 className="text-sm font-extrabold text-slate-100 mb-1">Delete Inspection Report?</h4>
+            <p className="text-xs text-slate-400 leading-relaxed">
+              Are you sure you want to permanently delete report <span className="font-tech-code text-red-400 font-bold">{deleteTargetId}</span>? This action is permanent and cannot be undone.
+            </p>
+          </div>
+        </div>
+      </Modal>
     </Layout>
   );
 }

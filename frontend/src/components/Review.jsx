@@ -99,13 +99,12 @@ export function EvidencePanel({ caseData, region, onRegionChange, onRegionCommit
         </span>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Golden Reference */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">        {/* Golden Reference */}
         <div className="flex flex-col gap-3">
           <span className="font-label-caps text-slate-400 uppercase">Golden Reference (OEM Standard)</span>
-          <div className="relative aspect-square bg-slate-950 border border-slate-850 rounded-lg overflow-hidden group">
+          <div className="relative aspect-square bg-slate-950 border border-slate-850 rounded-lg overflow-hidden group p-2">
             <img
-              className="w-full h-full object-cover"
+              className="w-full h-full object-contain"
               alt="Golden reference part"
               src={caseData.goldenImageUrl}
             />
@@ -121,13 +120,12 @@ export function EvidencePanel({ caseData, region, onRegionChange, onRegionCommit
           <span className="font-label-caps text-slate-400 uppercase">
             Defective / Uploaded (Review Required)
           </span>
-          <div className="relative aspect-square bg-slate-950 border border-slate-850 rounded-lg overflow-hidden select-none">
+          <div className="relative aspect-square bg-slate-950 border border-slate-850 rounded-lg overflow-hidden select-none p-2">
             <img
-              className="w-full h-full object-cover absolute inset-0"
+              className="w-full h-full object-contain absolute inset-0 p-2"
               alt="Uploaded part under review"
               src={caseData.uploadedImageUrl}
             />
-            <ROIEditor region={region} onChange={onRegionChange} onCommit={onRegionCommit} learningStatus={learningStatus} />
           </div>
         </div>
       </div>

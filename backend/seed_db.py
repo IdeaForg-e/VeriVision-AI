@@ -39,6 +39,13 @@ def migrate_db():
         ("date", "TEXT"),
     ]
 
+    # Check existing columns in golden_references table
+    cursor.execute("PRAGMA table_info(golden_references)")
+    gld_cols = {row[1] for row in cursor.fetchall()}
+    if "embedding_vector" not in gld_cols:
+        cursor.execute("ALTER TABLE golden_references ADD COLUMN embedding_vector TEXT")
+        print("  [MIGRATE] Added column 'golden_references.embedding_vector'")
+
     for col_name, col_type in migrations:
         if col_name not in existing_cols:
             cursor.execute(f"ALTER TABLE inspections ADD COLUMN {col_name} {col_type}")
@@ -254,17 +261,22 @@ def seed():
             db.commit()
             db.refresh(new_prod)
 
+            # Calculate 512-dim visual vector embedding
+            from app.services.embedding_service import extract_image_embedding
+            emb_vec = extract_image_embedding(dst_file_path)
+
             new_golden = models.GoldenReference(
                 product_id=new_prod.id,
                 image_path=f"data/golden/{dst_filename}",
                 expected_serial=prod["expected_serial"],
                 roi_config=roi_json,
-                angle="top"
+                angle="top",
+                embedding_vector=emb_vec
             )
             db.add(new_golden)
             db.commit()
             created_prod += 1
-            print(f"  [CREATED] Seeded catalog product '{prod['name']}' ({prod['part_number']})")
+            print(f"  [CREATED] Seeded catalog product '{prod['name']}' ({prod['part_number']}) with 512-dim vector embedding.")
 
         print(f"\n[OK] Seeding complete! {created_acc} accounts, {created_prod} catalog parts registered.")
 

@@ -60,5 +60,11 @@ export async function deleteCase(caseId) {
 }
 
 export async function getMultiAngleFusion(caseIds) {
-  return await api.post("/inspections/multi-angle-fusion", caseIds);
-}
+  return await api.post("/inspections/multi-angle-fusion", { case_ids: caseIds });
+}
+
+export async function autoMatchGolden(file) {
+  const formData = new FormData();
+  formData.append("file", file);
+  return await api.post("/inspections/auto-match-golden", formData);
+}

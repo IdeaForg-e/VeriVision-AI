@@ -1,4 +1,5 @@
 import os
+import shutil
 import cv2
 import numpy as np
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, status
@@ -87,9 +88,31 @@ async def create_inspection(
             )
 
         filename = os.path.basename(db_golden.image_path)
-        golden_file_path = os.path.join(settings.GOLDEN_DIR, filename)
+        possible_paths = [
+            os.path.join(settings.GOLDEN_DIR, filename),
+            os.path.abspath(db_golden.image_path),
+            os.path.join(settings.BASE_DIR, db_golden.image_path),
+            os.path.join(os.path.dirname(settings.BASE_DIR), "Golden_Images", filename),
+        ]
+        golden_file_path = None
+        for p in possible_paths:
+            if os.path.exists(p):
+                golden_file_path = p
+                break
 
-        if not os.path.exists(golden_file_path):
+        # Fallback copy if file is in Golden_Images directory
+        if not golden_file_path:
+            project_root = os.path.dirname(settings.BASE_DIR)
+            for fname in [filename, f"golden_{db_product.part_number.lower()}.png"]:
+                candidate = os.path.join(project_root, "Golden_Images", fname)
+                if os.path.exists(candidate):
+                    target_p = os.path.join(settings.GOLDEN_DIR, filename)
+                    os.makedirs(settings.GOLDEN_DIR, exist_ok=True)
+                    shutil.copy(candidate, target_p)
+                    golden_file_path = target_p
+                    break
+
+        if not golden_file_path or not os.path.exists(golden_file_path):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="This part's golden image was not available in our database. Please contact your admin."
@@ -99,7 +122,7 @@ async def create_inspection(
         if ref_img is None:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="This part's golden image was not available in our database. Please contact your admin."
+                detail="This part's golden reference image could not be loaded into memory. Please contact your admin."
             )
 
         detected_commodity = db_product.commodity
@@ -405,4 +428,35 @@ def get_multi_angle_fusion(
     fused = services.fuse_multi_angle_decisions(angle_results)
     fused["individual_angles"] = angle_results
     return fused
+
+
+@router.post("/auto-match-golden", response_model=dict)
+def auto_match_golden_reference(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(utils.get_current_user),
+):
+    """
+    Reference Library Vector Embedding Auto-Match Endpoint (Bonus Challenge 3):
+    Uploads a target scan photo, extracts 512-dim visual vector embedding,
+    runs sub-10ms Cosine Similarity search across the Reference Library,
+    and returns the top matching OEM Golden Reference product & confidence score.
+    """
+    file_ext = os.path.splitext(file.filename)[1]
+    temp_filename = f"temp_automatch_{uuid.uuid4()}{file_ext}"
+    temp_path = os.path.join(settings.UPLOAD_DIR, temp_filename)
+
+    try:
+        with open(temp_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+
+        match_result = services.auto_select_golden_reference(temp_path, db)
+        return match_result
+    finally:
+        if os.path.exists(temp_path):
+            try:
+                os.remove(temp_path)
+            except Exception:
+                pass
+
 
