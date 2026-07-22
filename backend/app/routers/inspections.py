@@ -369,3 +369,40 @@ def delete_inspection(
         db.rollback()
         logger.error(f"Failed to delete inspection case {case_id}: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to delete inspection case: {str(e)}")
+
+
+@router.post("/multi-angle-fusion")
+def get_multi_angle_fusion(
+    case_ids: List[str],
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(utils.get_current_user)
+):
+    """
+    Multi-Angle Fusion API (Bonus Challenge):
+    Receives 2-3 case IDs representing different capture angles of the same part.
+    Calculates combined fused fraud score, joint confidence, and aggregated verdict.
+    """
+    if not case_ids or len(case_ids) < 1:
+        raise HTTPException(status_code=400, detail="At least one case_id must be provided for multi-angle fusion.")
+
+    angle_results = []
+    for cid in case_ids:
+        ins = db.query(models.Inspection).filter(models.Inspection.case_id == cid).first()
+        if ins and ins.result:
+            angle_results.append({
+                "case_id": cid,
+                "angle": ins.capture_angle or "top",
+                "fraud_score": ins.result.fraud_score,
+                "verdict": ins.result.verdict,
+                "confidence": ins.result.confidence,
+                "recommended_action": ins.result.recommended_action,
+                "ssim_score": ins.result.ssim_score,
+            })
+
+    if not angle_results:
+        raise HTTPException(status_code=404, detail="No valid completed inspection results found for the provided case IDs.")
+
+    fused = services.fuse_multi_angle_decisions(angle_results)
+    fused["individual_angles"] = angle_results
+    return fused
+

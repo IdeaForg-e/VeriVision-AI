@@ -6,7 +6,8 @@ export default function TargetScanCaptureZone({
   setCustomFile,
   targetPreview,
   setTargetPreview,
-  disabled
+  disabled,
+  label
 }) {
   const [targetMode, setTargetMode] = useState("upload"); // "upload" | "webcam"
   const [webcamStream, setWebcamStream] = useState(null);
@@ -150,7 +151,7 @@ export default function TargetScanCaptureZone({
       <div className="flex items-center justify-between">
         <label className="text-[10px] font-bold tracking-wider text-slate-400 uppercase flex items-center gap-1.5">
           <Camera size={12} className="text-blue-400" />
-          Target Part Scan
+          {label || "Target Part Scan"}
         </label>
         {/* Upload / Camera toggle */}
         <div className="flex items-center gap-0.5 bg-slate-900/80 border border-slate-800/80 rounded-lg p-0.5">

@@ -163,7 +163,7 @@ def process_and_validate(image_path: str, golden_path: str) -> dict:
     is_blurry, blur_val = check_blur(src)
     result["blur_score"] = blur_val
     if is_blurry:
-        detail_msg = f"Image is blurry. Clarity score {blur_val:.1f} < threshold {settings.BLUR_THRESHOLD}"
+        detail_msg = f"Image quality is too poor (blurry, clarity score {blur_val:.1f} < threshold {settings.BLUR_THRESHOLD}). Retake required: Please hold camera steady and capture a high-focus close-up of the component label."
         logger.warning(f"Validation failure details: {detail_msg}")
         result.update({"status": "fail", "detail": detail_msg})
         return result
@@ -172,7 +172,11 @@ def process_and_validate(image_path: str, golden_path: str) -> dict:
     is_poor_light, light_val = check_lighting(src)
     result["brightness_score"] = light_val
     if is_poor_light:
-        detail_msg = f"Poor lighting conditions. Brightness {light_val:.1f}"
+        if light_val < settings.BRIGHTNESS_MIN:
+            guidance = "Image is underexposed/dark. Please turn on direct workstation lighting and re-capture the top-level part label."
+        else:
+            guidance = "Image is overexposed/glared. Please adjust light positioning to reduce camera glare over the component label."
+        detail_msg = f"Image quality is too poor (lighting intensity {light_val:.1f}). Retake required: {guidance}"
         logger.warning(f"Validation failure details: {detail_msg}")
         result.update({"status": "fail", "detail": detail_msg})
         return result

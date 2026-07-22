@@ -26,6 +26,10 @@ export async function getCaseById(caseId) {
     imageHash: data.metadata.imageHash,
     neuralModel: data.metadata.neuralModel,
     heatmapUrl: data.metadata.heatmapUrl,
+    goldenImageUrl: data.metadata.goldenImageUrl,
+    uploadedImageUrl: data.metadata.uploadedImageUrl,
+    captureAngle: data.metadata.captureAngle,
+    multiAngleViews: data.metadata.multiAngleViews || [],
     title: `Case detail for ${data.metadata.partCode}`,
     ocrResults: data.ocrResults,
     metrics: data.metrics,
@@ -54,3 +58,7 @@ export async function getCatalog() {
 export async function deleteCase(caseId) {
   return await api.delete(`/inspections/${caseId}`);
 }
+
+export async function getMultiAngleFusion(caseIds) {
+  return await api.post("/inspections/multi-angle-fusion", caseIds);
+}

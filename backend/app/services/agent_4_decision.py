@@ -209,3 +209,85 @@ def make_decision(ensemble_results: dict) -> dict:
         "recommended_action": recommended_action,
         "reasoning": reason_note,
     }
+
+
+def fuse_multi_angle_decisions(angle_results: list[dict]) -> dict:
+    """
+    Multi-Angle Fusion Engine (Bonus Challenge):
+    Combines evaluation results from 2-3 camera angles (e.g., top, side, perspective)
+    of the same part to calculate a fused fraud score and higher decision confidence.
+    """
+    if not angle_results:
+        return {
+            "fused_fraud_score": 0,
+            "fused_verdict": "clean",
+            "fused_confidence": 0.0,
+            "fused_action": "Accept",
+            "fusion_summary": "No multi-angle inspection evidence provided.",
+            "angles_analyzed": []
+        }
+
+    if len(angle_results) == 1:
+        single = angle_results[0]
+        return {
+            "fused_fraud_score": single.get("fraud_score", 0),
+            "fused_verdict": single.get("verdict", "clean"),
+            "fused_confidence": single.get("confidence", 0.90),
+            "fused_action": single.get("recommended_action", "Accept"),
+            "fusion_summary": f"Single angle analysis ({single.get('angle', 'top')}).",
+            "angles_analyzed": [single.get("angle", "top")]
+        }
+
+    logger.info(f"Running Multi-Angle Fusion on {len(angle_results)} inspection angles...")
+    
+    angles_analyzed = [item.get("angle", f"angle_{idx+1}") for idx, item in enumerate(angle_results)]
+    scores = [float(item.get("fraud_score", 0)) for item in angle_results]
+    confidences = [float(item.get("confidence", 0.5)) for item in angle_results]
+    verdicts = [item.get("verdict", "clean").lower() for item in angle_results]
+    actions = [item.get("recommended_action", "Accept") for item in angle_results]
+
+    # 1. Probabilistic Noisy-OR Fusion for Fraud Score:
+    # 1 - prod(1 - s_i / 100) ensures multiple angle indicators compound joint probability
+    prod_clean = 1.0
+    for s in scores:
+        prod_clean *= (1.0 - (min(max(s, 0.0), 100.0) / 100.0))
+    
+    fused_score = int(round((1.0 - prod_clean) * 100.0))
+    fused_score = min(max(fused_score, int(max(scores))), 100)
+
+    # 2. Priority Hierarchy for Fused Verdict: tampered > missing > mismatched > reused > clean
+    verdict_priority = {"tampered": 5, "missing": 4, "mismatched": 3, "reused": 2, "clean": 1}
+    sorted_by_severity = sorted(angle_results, key=lambda x: verdict_priority.get(x.get("verdict", "clean").lower(), 1), reverse=True)
+    fused_verdict = sorted_by_severity[0].get("verdict", "clean")
+
+    # 3. Action Assignment
+    action_priority = {"Quarantine & Escalate": 4, "Request Vendor Verification": 3, "Request Additional Angle": 2, "Accept": 1}
+    sorted_by_action = sorted(angle_results, key=lambda x: action_priority.get(x.get("recommended_action", "Accept"), 1), reverse=True)
+    fused_action = sorted_by_action[0].get("recommended_action", "Accept")
+
+    # 4. Agreement Multiplier for Fused Confidence:
+    # Multi-angle agreement boosts statistical confidence by +5% per agreeing angle (max 1.0)
+    matching_verdicts_count = sum(1 for v in verdicts if v == fused_verdict)
+    base_confidence = max(confidences)
+    confidence_boost = (matching_verdicts_count - 1) * 0.05
+    fused_confidence = round(min(1.0, base_confidence + confidence_boost), 2)
+
+    # 5. Build Fusion Summary Narrative
+    angle_details_str = ", ".join([f"{a.get('angle', 'unknown')}: score {a.get('fraud_score')}/100 ({a.get('verdict')})" for a in angle_results])
+    fusion_summary = (
+        f"Multi-Angle Fusion completed across {len(angle_results)} views ({', '.join(angles_analyzed)}). "
+        f"Individual results: [{angle_details_str}]. "
+        f"Cross-angle evidence agreement elevates combined fraud confidence to {fused_confidence * 100:.0f}% with a fused risk score of {fused_score}/100."
+    )
+
+    logger.info(f"Multi-Angle Fusion Result: Fused Score={fused_score}, Fused Verdict={fused_verdict.upper()}, Fused Confidence={fused_confidence}")
+
+    return {
+        "fused_fraud_score": fused_score,
+        "fused_verdict": fused_verdict,
+        "fused_confidence": fused_confidence,
+        "fused_action": fused_action,
+        "fusion_summary": fusion_summary,
+        "angles_analyzed": angles_analyzed
+    }
+

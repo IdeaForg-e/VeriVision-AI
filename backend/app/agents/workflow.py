@@ -343,7 +343,11 @@ app_workflow = workflow.compile()
 def run_inspection_pipeline(initial_state: Dict[str, Any]) -> Dict[str, Any]:
     """
     Helper function to run the compiled StateGraph with initial parameters.
+    Measures and logs total end-to-end pipeline execution latency in milliseconds.
     """
+    import time
+    t_start = time.time()
+
     state_input = {
         "case_id": initial_state["case_id"],
         "image_path": initial_state["image_path"],
@@ -377,4 +381,7 @@ def run_inspection_pipeline(initial_state: Dict[str, Any]) -> Dict[str, Any]:
         "status": "pending"
     }
     
-    return app_workflow.invoke(state_input)
+    result = app_workflow.invoke(state_input)
+    t_elapsed = time.time() - t_start
+    logger.info(f"\n⚡ [PERFORMANCE TELEMETRY] Total 5-Agent Pipeline Execution Time for Case {initial_state['case_id']}: {t_elapsed:.3f}s ({t_elapsed*1000:.0f} ms)\n")
+    return result

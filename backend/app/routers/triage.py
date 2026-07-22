@@ -254,6 +254,36 @@ def get_case_detail(
     if result and result.heatmap_path:
         heatmap_url = f"/data/cases/{os.path.basename(result.heatmap_path)}"
 
+    uploaded_image_url = None
+    if inspection.captured_image_path:
+        uploaded_image_url = f"/data/cases/{os.path.basename(inspection.captured_image_path)}"
+
+    # Multi-Angle Views lookup for same product/user
+    multi_angle_views = []
+    if product:
+        sibling_inspections = db.query(models.Inspection).filter(
+            models.Inspection.product_id == product.id,
+            models.Inspection.user_id == inspection.user_id
+        ).order_by(models.Inspection.created_at.desc()).limit(4).all()
+
+        seen_angles = set()
+        for sibling in sibling_inspections:
+            angle = (sibling.capture_angle or "top").lower()
+            if angle not in seen_angles:
+                seen_angles.add(angle)
+                sib_result = sibling.result
+                if sib_result:
+                    sib_captured_url = f"/data/cases/{os.path.basename(sibling.captured_image_path)}" if sibling.captured_image_path else None
+                    sib_heatmap_url = f"/data/cases/{os.path.basename(sib_result.heatmap_path)}" if sib_result.heatmap_path else None
+                    multi_angle_views.append({
+                        "caseId": sibling.case_id,
+                        "angle": angle,
+                        "fraudScore": sib_result.fraud_score,
+                        "verdict": sib_result.verdict,
+                        "uploadedUrl": sib_captured_url,
+                        "heatmapUrl": sib_heatmap_url,
+                    })
+
     return {
         "metadata": {
             "id": inspection.case_id,
@@ -266,6 +296,10 @@ def get_case_detail(
             "neuralModel": "FraudSense v4.2",
             "updatedAt": inspection.created_at.isoformat() if inspection.created_at else "",
             "heatmapUrl": heatmap_url,
+            "goldenImageUrl": golden_image_url,
+            "uploadedImageUrl": uploaded_image_url,
+            "captureAngle": inspection.capture_angle or "top",
+            "multiAngleViews": multi_angle_views,
         },
         "ocrResults": ocr_results,
         "metrics": metrics,
@@ -277,6 +311,7 @@ def get_case_detail(
             "flags": [],
         },
     }
+
 
 
 @router.get("/cases/{case_id}/review", response_model=schemas.ReviewDetailResponse)

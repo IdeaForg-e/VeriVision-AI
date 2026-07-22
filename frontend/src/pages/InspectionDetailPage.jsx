@@ -553,7 +553,101 @@ export default function InspectionDetailPage() {
         </div>
       </div>
 
-      {/* ── 4. IMAGE COMPARISON ──────────────────────── */}
+      {/* ── 4. MULTI-ANGLE FUSION INTELLIGENCE BANNER & VISUAL GALLERY (ONLY FOR MULTI-ANGLE RUNS) ──────── */}
+      {((merged.multiAngleViews && merged.multiAngleViews.length > 1) || (recommendation.reasoning && recommendation.reasoning.includes("MULTI-ANGLE FUSION"))) && (
+        <div className="mb-6 rounded-xl border border-cyan-500/30 bg-gradient-to-r from-cyan-950/40 via-slate-900/80 to-blue-950/40 p-5 shadow-[0_0_25px_rgba(6,182,212,0.1)] space-y-4">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-cyan-500/15 pb-3.5">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 rounded-xl bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 shrink-0">
+                <Zap size={18} />
+              </div>
+              <div>
+                <p className="text-xs font-black uppercase tracking-wider text-cyan-400 flex items-center gap-2">
+                  Multi-Angle Risk Fusion System
+                  <span className="px-2 py-0.5 rounded-full text-[9px] font-extrabold bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 uppercase tracking-widest">
+                    Multi-View Active ✨
+                  </span>
+                </p>
+                <p className="text-[11px] text-slate-400 mt-0.5">
+                  Evaluated across complementary camera angles • Joint multi-angle risk assessment compiled.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Fused Risk:</span>
+              <StatusBadge fraudScore={fraudScore} size="sm" />
+            </div>
+          </div>
+
+          {/* 3-Card Visual Comparison Evidence Grid: Golden Standard | Top View | Side View */}
+          <div>
+            <p className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 mb-3 flex items-center gap-1.5">
+              <ScanLine size={13} className="text-cyan-400" />
+              Cross-Angle Visual Inspection Evidence (3 Reference Cards)
+            </p>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {/* Card 1: OEM Golden Standard */}
+              <div className="p-3.5 rounded-xl bg-slate-950/70 border border-emerald-500/30 space-y-2.5 hover:border-emerald-500/50 transition-all">
+                <div className="flex items-center justify-between">
+                  <span className="px-2 py-0.5 rounded text-[9px] font-extrabold bg-emerald-950 text-emerald-300 border border-emerald-500/30 uppercase tracking-wider flex items-center gap-1">
+                    ⭐ OEM GOLDEN STANDARD
+                  </span>
+                  <span className="text-[11px] font-tech-code font-bold text-emerald-400">PASSED</span>
+                </div>
+                <div className="aspect-video rounded-lg bg-slate-900 border border-slate-800 overflow-hidden relative group">
+                  <img src={merged.goldenImageUrl} alt="OEM Golden Standard" className="w-full h-full object-contain" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity p-2 flex items-end justify-between">
+                    <span className="text-[9px] text-slate-300 font-bold uppercase">Master Reference Standard</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Card 2: Primary Scan (Top View) */}
+              <div className="p-3.5 rounded-xl bg-slate-950/70 border border-cyan-500/30 space-y-2.5 hover:border-cyan-500/50 transition-all">
+                <div className="flex items-center justify-between">
+                  <span className="px-2 py-0.5 rounded text-[9px] font-extrabold bg-cyan-950 text-cyan-300 border border-cyan-500/30 uppercase tracking-wider">
+                    📷 TOP VIEW (PRIMARY)
+                  </span>
+                  <span className="text-[11px] font-tech-code font-bold text-red-400">{fraudScore}/100</span>
+                </div>
+                <div className="aspect-video rounded-lg bg-slate-900 border border-slate-800 overflow-hidden relative group">
+                  <img src={merged.uploadedImageUrl} alt="Primary Top View Scan" className="w-full h-full object-contain" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity p-2 flex items-end justify-between">
+                    <span className="text-[9px] text-slate-300 font-bold uppercase">Top Angle Target Scan</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Card 3: Secondary Scan (Side View) */}
+              {(() => {
+                const secondaryView = (merged.multiAngleViews || []).find(v => v.caseId !== merged.id || (v.angle && v.angle.toLowerCase() !== "top")) || (merged.multiAngleViews || [])[1] || {};
+                const secAngle = secondaryView.angle ? secondaryView.angle.toUpperCase() : "SIDE";
+                const secScore = secondaryView.fraudScore !== undefined ? secondaryView.fraudScore : fraudScore;
+                const secUrl = secondaryView.uploadedUrl || merged.uploadedImageUrl;
+                return (
+                  <div className="p-3.5 rounded-xl bg-slate-950/70 border border-indigo-500/30 space-y-2.5 hover:border-indigo-500/50 transition-all">
+                    <div className="flex items-center justify-between">
+                      <span className="px-2 py-0.5 rounded text-[9px] font-extrabold bg-indigo-950 text-indigo-300 border border-indigo-500/30 uppercase tracking-wider">
+                        📷 {secAngle} VIEW (SECONDARY)
+                      </span>
+                      <span className="text-[11px] font-tech-code font-bold text-amber-400">{secScore}/100</span>
+                    </div>
+                    <div className="aspect-video rounded-lg bg-slate-900 border border-slate-800 overflow-hidden relative group">
+                      <img src={secUrl} alt="Secondary View Scan" className="w-full h-full object-contain" />
+                      <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity p-2 flex items-end justify-between">
+                        <span className="text-[9px] text-slate-300 font-bold uppercase">{secAngle} Angle Target Scan</span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── 5. IMAGE COMPARISON ──────────────────────── */}
       <div className="mb-6">
         <ImageComparison goldenUrl={merged.goldenImageUrl} uploadedUrl={merged.uploadedImageUrl} imageHash={merged.imageHash} />
       </div>

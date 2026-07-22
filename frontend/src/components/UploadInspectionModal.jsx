@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Modal } from "./Common.jsx";
-import { createInspection, getCatalog } from "../services/caseService.js";
-import { AlertCircle, RefreshCw, Sparkles, Scan, Cpu, ChevronDown } from "lucide-react";
+import { createInspection, getCatalog, getMultiAngleFusion } from "../services/caseService.js";
+import { AlertCircle, RefreshCw, Sparkles, Scan, Cpu, ChevronDown, Layers, Upload } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { ROUTES } from "../utils/constants.js";
 import TargetScanCaptureZone from "./TargetScanCaptureZone.jsx";
@@ -17,6 +17,13 @@ export default function UploadInspectionModal({ open, onClose, onSuccess }) {
   const [componentName, setComponentName] = useState("");
   const [vendor, setVendor] = useState("");
   const [date, setDate] = useState("");
+
+  // Multi-Angle Fusion states (Bonus Challenge)
+  const [enableMultiAngle, setEnableMultiAngle] = useState(false);
+  const [captureAngle2, setCaptureAngle2] = useState("angled");
+  const [customFile2, setCustomFile2] = useState(null);
+  const [targetPreview2, setTargetPreview2] = useState(null);
+
 
   // Catalog Reference states
   const [catalogList, setCatalogList] = useState([]);
@@ -87,7 +94,7 @@ export default function UploadInspectionModal({ open, onClose, onSuccess }) {
 
 
 
-  const runSimulatedProgress = () => {
+  const runSimulatedProgress = (isMulti = false) => {
     setProgressLog([]);
     const logs = [
       { text: "✓ Ingest & Triage: Image clarity & lighting exposure checked [OK]", delay: 200, status: "success" },
@@ -95,7 +102,7 @@ export default function UploadInspectionModal({ open, onClose, onSuccess }) {
       { text: "✓ Classifier: Golden reference part category auto-detected [OK]", delay: 1800, status: "success" },
       { text: "⚙ Vision Ensemble: Running structural SSIM diff mapping...", delay: 2600, status: "active" },
       { text: "⚙ EasyOCR Engine: Initializing character mismatch verification...", delay: 3400, status: "active" },
-      { text: "⚙ Decision Judge: Evaluating compliance policy & calculating risk index...", delay: 4200, status: "active" },
+      { text: isMulti ? "⚙ Multi-Angle Fusion: Fusing primary & secondary angle evidence..." : "⚙ Decision Judge: Evaluating compliance policy & calculating risk index...", delay: 4200, status: "active" },
       { text: "⚙ Explainer: Writing natural language audit justification...", delay: 5000, status: "active" }
     ];
     logs.forEach(log => {
@@ -110,7 +117,8 @@ export default function UploadInspectionModal({ open, onClose, onSuccess }) {
     
     setProcessing(true);
     setErrorMsg(null);
-    runSimulatedProgress();
+    const isMultiActive = enableMultiAngle && customFile2;
+    runSimulatedProgress(isMultiActive);
     try {
       const formData = new FormData();
       formData.append("capture_site", captureSite);
@@ -123,11 +131,44 @@ export default function UploadInspectionModal({ open, onClose, onSuccess }) {
       if (componentName) formData.append("component_name", componentName.trim());
       if (date) formData.append("date", date);
       
-      const result = await createInspection(formData);
+      let finalCaseId = null;
+
+      if (isMultiActive) {
+        // Parallel Execution (Bonus Feature): Send both angle scan requests simultaneously!
+        const formData2 = new FormData();
+        formData2.append("capture_site", captureSite);
+        formData2.append("capture_angle", captureAngle2);
+        formData2.append("file", customFile2);
+        formData2.append("catalog_part_number", selectedCatalogPart);
+        if (expectedSerial) formData2.append("expected_serial", expectedSerial.trim());
+        if (vendor) formData2.append("vendor", vendor.trim());
+        if (componentName) formData2.append("component_name", componentName.trim());
+        if (date) formData2.append("date", date);
+
+        // Run both 5-Agent pipelines in parallel concurrently
+        const [result1, result2] = await Promise.all([
+          createInspection(formData),
+          createInspection(formData2)
+        ]);
+
+        finalCaseId = result1.case_id;
+
+        // Perform instant multi-angle risk fusion
+        try {
+          await getMultiAngleFusion([result1.case_id, result2.case_id]);
+        } catch (fusionErr) {
+          console.warn("Multi-Angle Fusion warning:", fusionErr);
+        }
+      } else {
+        // Single Angle Inspection
+        const result = await createInspection(formData);
+        finalCaseId = result.case_id;
+      }
+
       setProcessing(false);
       onClose();
       if (onSuccess) onSuccess();
-      navigate(`${ROUTES.CASE_DETAIL}/${result.case_id}`);
+      navigate(`${ROUTES.CASE_DETAIL}/${finalCaseId}`);
     } catch (err) {
       setProcessing(false);
       let errMsg = err.message || "Failed to process parts inspection.";
@@ -334,20 +375,85 @@ export default function UploadInspectionModal({ open, onClose, onSuccess }) {
                   className="w-full h-11 px-3.5 rounded-xl bg-slate-900/80 border border-slate-700/60 text-slate-200 text-xs placeholder:text-slate-700 focus:border-cyan-500/40 focus:shadow-[0_0_15px_rgba(6,182,212,0.1)] transition-all outline-none" />
               </div>
               <div>
-                <label className="text-[9px] font-bold tracking-wider text-slate-500 uppercase mb-1.5 block">Camera Angle</label>
+                <label className="text-[9px] font-bold tracking-wider text-slate-500 uppercase mb-1.5 block">Primary Camera Angle</label>
                 <div className="relative">
                   <select value={captureAngle} onChange={(e) => setCaptureAngle(e.target.value)}
                     className="w-full h-11 px-3.5 pr-9 rounded-xl bg-slate-900/80 border border-slate-700/60 text-slate-200 text-xs appearance-none cursor-pointer focus:border-cyan-500/40 focus:shadow-[0_0_15px_rgba(6,182,212,0.1)] transition-all outline-none">
                     <option value="top">Top Down (Default)</option>
                     <option value="angled">Angled Perspective</option>
+                    <option value="side">Side View</option>
                   </select>
                   <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
                 </div>
               </div>
+            </div>
+
+            {/* ── Multi-Angle Fusion Toggle Banner (Bonus Challenge) ── */}
+            <div className="pt-2">
+              <button
+                type="button"
+                onClick={() => setEnableMultiAngle(!enableMultiAngle)}
+                className={`w-full p-3 rounded-xl border flex items-center justify-between transition-all ${
+                  enableMultiAngle
+                    ? "bg-cyan-950/30 border-cyan-500/40 shadow-[0_0_20px_rgba(6,182,212,0.15)] text-cyan-300"
+                    : "bg-slate-900/40 border-slate-800 text-slate-400 hover:border-slate-700 hover:text-slate-300"
+                }`}
+              >
+                <div className="flex items-center gap-2.5">
+                  <div className={`p-1.5 rounded-lg ${enableMultiAngle ? "bg-cyan-500/20 text-cyan-400" : "bg-slate-800 text-slate-500"}`}>
+                    <Layers size={15} />
+                  </div>
+                  <div className="text-left">
+                    <p className="text-xs font-bold uppercase tracking-wider">Multi-Angle Fusion Scan (Bonus Mode)</p>
+                    <p className="text-[10px] text-slate-500 font-normal">Upload secondary angle photo (e.g. Side/Angled view) for joint AI risk fusion</p>
+                  </div>
+                </div>
+                <span className={`text-[10px] font-extrabold px-2.5 py-1 rounded-full uppercase tracking-wider ${
+                  enableMultiAngle ? "bg-cyan-500 text-slate-950" : "bg-slate-800 text-slate-400"
+                }`}>
+                  {enableMultiAngle ? "ENABLED" : "+ ADD ANGLE"}
+                </span>
+              </button>
+
+              {/* Secondary Angle File Upload & Live Webcam Zone */}
+              {enableMultiAngle && (
+                <div className="mt-3 p-4 rounded-xl border border-cyan-500/30 bg-slate-950/60 space-y-3 animate-fadeIn">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-bold tracking-wider text-cyan-400 uppercase flex items-center gap-1.5">
+                      <Layers size={13} />
+                      Secondary Angle Settings
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[9px] text-slate-500 font-bold uppercase">Angle:</span>
+                      <div className="relative">
+                        <select
+                          value={captureAngle2}
+                          onChange={(e) => setCaptureAngle2(e.target.value)}
+                          className="h-8 px-2.5 pr-7 rounded-lg bg-slate-900 border border-slate-700 text-slate-300 text-[10px] font-bold appearance-none cursor-pointer outline-none"
+                        >
+                          <option value="angled">Angled Perspective</option>
+                          <option value="side">Side View</option>
+                          <option value="top">Top View</option>
+                        </select>
+                        <ChevronDown size={12} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
+                      </div>
+                    </div>
+                  </div>
+
+                  <TargetScanCaptureZone
+                    customFile={customFile2}
+                    setCustomFile={setCustomFile2}
+                    targetPreview={targetPreview2}
+                    setTargetPreview={setTargetPreview2}
+                    disabled={processing}
+                    label="Secondary Angle Scan (Webcam / File)"
+                  />
+                </div>
+              )}
             </div>
           </div>
         </div>
       )}
     </Modal>
   );
-}
+}

@@ -92,6 +92,14 @@ def generate_pdf_report(inspection_id: int, db: Session) -> str:
             [Paragraph("<b>Confidence Level:</b>", body_style), Paragraph(f"{res.confidence * 100:.1f}%", body_style)],
             [Paragraph("<b>Next Action Recommended:</b>", body_style), Paragraph(f"<b>{res.recommended_action}</b>", body_style)]
         ]
+        # Multi-Angle Fusion Indicator in PDF Report
+        has_multi = "MULTI-ANGLE FUSION" in (res.explanation or "") or inspection.capture_angle != "top"
+        if has_multi:
+            verdict_data.append([
+                Paragraph("<b>Multi-Angle Fusion:</b>", body_style),
+                Paragraph("<b>ACTIVE (Multi-View Joint Evidence Synthesized)</b>", body_style)
+            ])
+
         verdict_table = Table(verdict_data, colWidths=[180, 360])
         verdict_table.setStyle(TableStyle([
             ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#1e293b')),

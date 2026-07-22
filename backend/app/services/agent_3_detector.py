@@ -448,31 +448,80 @@ def generate_diagnostic_card(src_img: np.ndarray, ref_img: np.ndarray, heatmap_o
 
 def run_anomaly_ensemble(src_img: np.ndarray, ref_img: np.ndarray, roi_config: dict = None, src_image_path: str = None, ref_image_path: str = None, commodity: str = "motherboard") -> dict:
     """
-    Runs the hybrid CV + Vision LLM ensemble comparison logic.
-    Generates a visual diagnostic card and extracts text/features.
+    Runs the hybrid CV + Vision LLM ensemble comparison logic in PARALLEL.
+    Uses ThreadPoolExecutor to run SSIM, EasyOCR, Vision LLM, and Feature Matching concurrently.
     """
-    logger.info("Starting Vision Layer Anomaly Ensemble suite processing...")
+    import time
+    from concurrent.futures import ThreadPoolExecutor
+
+    t0 = time.time()
+    logger.info("⚡ [Agent 3: Detector] Starting Parallel Vision Anomaly Ensemble processing...")
     errors = []
 
-    # 1. Grayscale difference SSIM
-    try:
-        ssim_val, heatmap_img = compute_ssim_diff(src_img, ref_img)
-    except Exception as e:
-        logger.error(f"SSIM computation failed, defaulting to worst-case score: {e}")
-        ssim_val, heatmap_img = 0.0, src_img.copy()
-        errors.append("ssim_failed")
+    label_roi = None
+    expected_serial = ""
+    if roi_config:
+        label_roi = roi_config.get("label_roi")
+        expected_serial = roi_config.get("expected_serial", "")
 
-    # 2. Multimodal visual inspection semantic checks
-    multimodal_report = "Visual comparison skipped: inputs unavailable."
-    if src_image_path and ref_image_path:
+    # Helper sub-tasks for thread pool
+    def task_ssim():
         try:
-            multimodal_report = inspect_anomalies_multimodal(src_image_path, ref_image_path, commodity)
+            return compute_ssim_diff(src_img, ref_img)
         except Exception as e:
-            logger.error(f"Multimodal vision inspection failed: {e}")
-            multimodal_report = f"Visual comparison failed: {str(e)}"
-            errors.append("multimodal_failed")
+            logger.error(f"SSIM computation failed: {e}")
+            return 0.0, src_img.copy()
 
-    # 3. Generate visual side-by-side diagnostic card
+    def task_multimodal():
+        if src_image_path and ref_image_path:
+            try:
+                return inspect_anomalies_multimodal(src_image_path, ref_image_path, commodity)
+            except Exception as e:
+                logger.error(f"Multimodal vision inspection failed: {e}")
+                return f"Visual comparison failed: {str(e)}"
+        return "Visual comparison skipped: inputs unavailable."
+
+    def task_ocr():
+        try:
+            return extract_ocr_text(src_img, label_roi, expected_serial)
+        except Exception as e:
+            logger.error(f"OCR extraction failed: {e}")
+            return "", False
+
+    def task_features():
+        try:
+            kp_res = match_keypoints(src_img, ref_img)
+        except Exception as e:
+            logger.error(f"Keypoint matching failed: {e}")
+            kp_res = {"keypoint_match_score": 0.0, "good_matches": 0, "total_matches": 0}
+
+        try:
+            tmpl_res = match_template_roi(src_img, ref_img, roi_config)
+        except Exception as e:
+            logger.error(f"Template matching failed: {e}")
+            tmpl_res = {"template_match_score": 0.0, "template_match_found": False, "template_match_checked": True}
+
+        try:
+            color_res = compare_color_histograms(src_img, ref_img, roi_config)
+        except Exception as e:
+            logger.error(f"Color histogram comparison failed: {e}")
+            color_res = {"color_hist_similarity": 0.0, "color_hist_checked": True}
+
+        return kp_res, tmpl_res, color_res
+
+    # Dispatch tasks to ThreadPoolExecutor for concurrent parallel processing
+    with ThreadPoolExecutor(max_workers=4) as executor:
+        f_ssim = executor.submit(task_ssim)
+        f_multi = executor.submit(task_multimodal)
+        f_ocr = executor.submit(task_ocr)
+        f_feat = executor.submit(task_features)
+
+        ssim_val, heatmap_img = f_ssim.result()
+        multimodal_report = f_multi.result()
+        detected_text, ocr_engine_available = f_ocr.result()
+        keypoint_results, template_results, color_results = f_feat.result()
+
+    # Generate visual side-by-side diagnostic card
     diagnostic_card = None
     try:
         diagnostic_card = generate_diagnostic_card(src_img, ref_img, heatmap_img)
@@ -480,47 +529,10 @@ def run_anomaly_ensemble(src_img: np.ndarray, ref_img: np.ndarray, roi_config: d
         logger.error(f"Failed to generate side-by-side diagnostic card: {e}")
         errors.append("card_generation_failed")
 
-    # 4. OCR check
-    label_roi = None
-    expected_serial = ""
-    if roi_config:
-        label_roi = roi_config.get("label_roi")
-        expected_serial = roi_config.get("expected_serial", "")
-
-    try:
-        detected_text, ocr_engine_available = extract_ocr_text(src_img, label_roi, expected_serial)
-    except Exception as e:
-        logger.error(f"OCR extraction raised unexpectedly: {e}")
-        detected_text, ocr_engine_available = "", False
-        errors.append("ocr_failed")
-
+    # OCR string diff calculation
     ocr_diff = {"similarity": 1.0, "mismatches": []}
     if expected_serial and ocr_engine_available:
         ocr_diff = calculate_string_diff(detected_text, expected_serial)
-    elif expected_serial and not ocr_engine_available:
-        logger.warning("Skipping OCR string diff: OCR engine was unavailable.")
-
-    # 5. Local CV metrics
-    try:
-        keypoint_results = match_keypoints(src_img, ref_img)
-    except Exception as e:
-        logger.error(f"Keypoint matching failed, defaulting to worst-case score: {e}")
-        keypoint_results = {"keypoint_match_score": 0.0, "good_matches": 0, "total_matches": 0}
-        errors.append("keypoint_failed")
-
-    try:
-        template_results = match_template_roi(src_img, ref_img, roi_config)
-    except Exception as e:
-        logger.error(f"Template matching failed, defaulting to worst-case score: {e}")
-        template_results = {"template_match_score": 0.0, "template_match_found": False, "template_match_checked": True}
-        errors.append("template_failed")
-
-    try:
-        color_results = compare_color_histograms(src_img, ref_img, roi_config)
-    except Exception as e:
-        logger.error(f"Color histogram comparison failed, defaulting to worst-case score: {e}")
-        color_results = {"color_hist_similarity": 0.0, "color_hist_checked": True}
-        errors.append("color_failed")
 
     score_components = [keypoint_results["keypoint_match_score"]]
     checked_components = ["keypoint"]
@@ -533,9 +545,10 @@ def run_anomaly_ensemble(src_img: np.ndarray, ref_img: np.ndarray, roi_config: d
 
     matching_score = float(np.clip(sum(score_components) / max(len(score_components), 1), 0.0, 1.0))
 
+    elapsed = time.time() - t0
     logger.info(
-        f"Ensemble summary metrics - SSIM: {ssim_val:.3f}, Keypoints Rate: {keypoint_results['keypoint_match_score']:.3f}, "
-        f"Average Matching Score: {matching_score:.3f}, Errors: {errors or 'none'}"
+        f"⚡ [Agent 3: Detector] Parallel execution finished in {elapsed:.3f}s. "
+        f"SSIM: {ssim_val:.3f}, Keypoint: {keypoint_results['keypoint_match_score']:.3f}, Matching Score: {matching_score:.3f}"
     )
 
     return {
