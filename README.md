@@ -92,6 +92,14 @@ The following diagram illustrates the high-level architecture of **VeriVision AI
 
 ```mermaid
 flowchart TB
+    classDef frontend fill:#0284c7,stroke:#38bdf8,stroke-width:2px,color:#ffffff;
+    classDef gateway fill:#7c3aed,stroke:#a78bfa,stroke-width:2px,color:#ffffff;
+    classDef agent fill:#059669,stroke:#34d399,stroke-width:2px,color:#ffffff;
+    classDef detector fill:#d97706,stroke:#fbbf24,stroke-width:2px,color:#ffffff;
+    classDef storage fill:#dc2626,stroke:#f87171,stroke-width:2px,color:#ffffff;
+    classDef hitl fill:#db2777,stroke:#f472b6,stroke-width:2px,color:#ffffff;
+    classDef retake fill:#b45309,stroke:#f59e0b,stroke-width:2px,color:#ffffff;
+
     subgraph FRONTEND ["💻 Frontend Client Layer (React 18 + Vite SPA)"]
         UI["Operator & Admin Workspaces\n(Triage Queue, Split-Panel Audit Workbench, Analytics Dashboard, ROI Editor)"]
     end
@@ -143,6 +151,14 @@ flowchart TB
     REVIEW -->|Logs Audit Entry & Updates Risk| DB
     REVIEW -->|Tunes Config & ROIs| CALIB
     CALIB -->|Refines System Thresholds| API
+
+    class UI frontend;
+    class API gateway;
+    class A1,A2,A3,A4,A5 agent;
+    class RET retake;
+    class SSIM,OCR,ORB,TMPL,COLOR,VLLM detector;
+    class DB,FS storage;
+    class REVIEW,CALIB hitl;
 ```
 
 ---

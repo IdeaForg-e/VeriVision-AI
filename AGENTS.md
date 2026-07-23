@@ -34,6 +34,13 @@
 
 ```mermaid
 flowchart TD
+    classDef ingestion fill:#0284c7,stroke:#38bdf8,stroke-width:2px,color:#ffffff;
+    classDef triage fill:#7c3aed,stroke:#a78bfa,stroke-width:2px,color:#ffffff;
+    classDef detection fill:#059669,stroke:#34d399,stroke-width:2px,color:#ffffff;
+    classDef decision fill:#d97706,stroke:#fbbf24,stroke-width:2px,color:#ffffff;
+    classDef audit fill:#db2777,stroke:#f472b6,stroke-width:2px,color:#ffffff;
+    classDef retake fill:#b45309,stroke:#f59e0b,stroke-width:2px,color:#ffffff;
+
     subgraph INGESTION ["1. Intake & Retrieval"]
         A["📸 Target Scan Image"] --> B["Agent 1: Selector\n(512-Dim CLIP Vector Search)"]
         B --> C["Matching Golden Reference"]
@@ -64,6 +71,13 @@ flowchart TD
         I --> J["Human Inspector Sign-off\n(Approve / Reject / Override)"]
         J --> K["🧠 Threshold Calibration & Training Memory Store"]
     end
+
+    class A,B,C ingestion;
+    class D,E triage;
+    class RET retake;
+    class F1,F2,F3,F4,F5,F6 detection;
+    class G,H decision;
+    class I,J,K audit;
 ```
 
 ---
@@ -178,6 +192,10 @@ VeriVision AI’s intelligence is powered by a **5-Agent LangGraph State Machine
 
 ```mermaid
 graph TD
+    classDef agent fill:#059669,stroke:#34d399,stroke-width:2px,color:#ffffff;
+    classDef endfail fill:#b45309,stroke:#f59e0b,stroke-width:2px,color:#ffffff;
+    classDef endpass fill:#0284c7,stroke:#38bdf8,stroke-width:2px,color:#ffffff;
+
     A[Agent 1: Selector] -->|Viability Pass| B[Agent 2: Triage]
     A -->|Viability Fail| END1[End: Invalid Input]
     B -->|Quality Pass| C[Agent 3: Detector]
@@ -185,6 +203,10 @@ graph TD
     C --> D[Agent 4: Decision]
     D --> E[Agent 5: Explainer]
     E --> END3[End: Report Ready]
+
+    class A,B,C,D,E agent;
+    class END1,END2 endfail;
+    class END3 endpass;
 ```
 
 ---
@@ -326,6 +348,12 @@ The **Human Review Workbench** (`frontend/src/pages/HumanReviewPage.jsx`) bridge
 
 ```mermaid
 flowchart LR
+    classDef startnode fill:#0284c7,stroke:#38bdf8,stroke-width:2px,color:#ffffff;
+    classDef decision fill:#d97706,stroke:#fbbf24,stroke-width:2px,color:#ffffff;
+    classDef review fill:#7c3aed,stroke:#a78bfa,stroke-width:2px,color:#ffffff;
+    classDef auto fill:#059669,stroke:#34d399,stroke-width:2px,color:#ffffff;
+    classDef memory fill:#db2777,stroke:#f472b6,stroke-width:2px,color:#ffffff;
+
     A["AI Pipeline Inspection"] --> B{"Confidence < 70% or\nScore 40-70?"}
     B -- "Yes" --> C["Human Review Queue"]
     B -- "No" --> D["Auto Verdict Assigned"]
@@ -335,6 +363,12 @@ flowchart LR
     F & G --> H["POST /api/reviews/{case_id}"]
     H --> I["🗄️ Audit Log Saved"]
     H --> J["🔄 Threshold & Dictionary Refinement"]
+
+    class A startnode;
+    class B decision;
+    class C,E,F,G,H review;
+    class D auto;
+    class I,J memory;
 ```
 
 ### Key HITL Features:
@@ -354,9 +388,17 @@ The **Analytics Dashboard** (`frontend/src/pages/AnalyticsDashboardPage.jsx`) pr
 
 ```mermaid
 flowchart LR
+    classDef vendor fill:#0284c7,stroke:#38bdf8,stroke-width:2px,color:#ffffff;
+    classDef site fill:#7c3aed,stroke:#a78bfa,stroke-width:2px,color:#ffffff;
+    classDef trend fill:#059669,stroke:#34d399,stroke-width:2px,color:#ffffff;
+
     A["🏢 Vendor Risk Rankings\n(Fraud frequency & trust scores)"]
     B["📍 Site Anomaly Breakdown\n(Defect volumes by repair site)"]
     C["📈 Monthly Fraud Trends\n(Fraud rates over time in Recharts)"]
+
+    class A vendor;
+    class B site;
+    class C trend;
 ```
 
 ### Key Telemetry Metrics Tracked:
