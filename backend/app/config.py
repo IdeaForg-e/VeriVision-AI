@@ -11,7 +11,6 @@ class Settings:
     SECRET_KEY: str = os.getenv("SECRET_KEY", "verivision_super_secret_key_change_me_in_production")
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 1440  # 24 Hours
-    GOOGLE_CLIENT_ID: Optional[str] = os.getenv("GOOGLE_CLIENT_ID", None)
 
     # OpenRouter API Integration
     OPENROUTER_API_KEY: Optional[str] = os.getenv("OPENROUTER_API_KEY", None)
