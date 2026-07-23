@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Modal, Button } from "./Common.jsx";
 import { createInspection, getCatalog, getMultiAngleFusion, autoMatchGolden } from "../services/caseService.js";
-import { AlertCircle, RefreshCw, Sparkles, Scan, Cpu, ChevronDown, Layers } from "lucide-react";
+import { AlertCircle, RefreshCw, Sparkles, Scan, Cpu, ChevronDown, Layers, Calendar } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { ROUTES } from "../utils/constants.js";
 import TargetScanCaptureZone from "./TargetScanCaptureZone.jsx";
@@ -384,15 +384,18 @@ export default function UploadInspectionModal({ open, onClose, onSuccess }) {
                 />
               </div>
               <div>
-                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1 block">
-                  Inspection Date
+                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1 flex items-center justify-between">
+                  <span>Inspection Date</span>
+                  <Calendar className="w-3 h-3 text-cyan-400 opacity-80" />
                 </label>
-                <input
-                  type="date"
-                  value={date}
-                  onChange={(e) => setDate(e.target.value)}
-                  className="w-full h-8 px-3 text-xs lab-input"
-                />
+                <div className="relative flex items-center">
+                  <input
+                    type="date"
+                    value={date}
+                    onChange={(e) => setDate(e.target.value)}
+                    className="w-full h-8 px-3 text-xs lab-input cursor-pointer"
+                  />
+                </div>
               </div>
             </div>
 
