@@ -26,7 +26,7 @@
 
 | Name | Role |
 |:---|:---|
-| **Disha** | Team Leader |
+| **Disha** | Team Member |
 | **Anil** | Team Member |
 | **Priyanka** | Team Member |
 | **Chaitanya** | Team Member |
@@ -86,131 +86,89 @@ No manual pairing. No subjective judgment. No inconsistency between sites.
 
 ---
 
-## 🛠️ Complete Technology Stack
+## 🏗️ High-Level System Architecture
 
-VeriVision AI is built using a modern, scalable production technology stack split cleanly across microservices and layers:
+The following diagram illustrates the high-level architecture of **VeriVision AI**, highlighting the flow of data from the User Interface down to the 5-Agent LangGraph State Machine, Parallel Detection Ensemble, and Persistence Layer:
 
 ```mermaid
-mindmap
-  root((VeriVision AI Stack))
-    Frontend Layer
-      React 18 SPA
-      Vite Build Tool
-      Tailwind CSS
-      Lucide React Icons
-      Recharts Visualizations
-    Backend API Layer
-      Python 3.10+
-      FastAPI Framework
-      Uvicorn ASGI Server
-      Pydantic Schemas
-      JWT Auth & bcrypt
-    Agentic AI Engine
-      LangGraph State Machine
-      Open_CLIP ViT-B/32
-      PyTorch Tensor Engine
-      OpenRouter Vision LLM
-    Computer Vision Suite
-      OpenCV 4.7
-      scikit-image SSIM
-      EasyOCR Engine
-      NumPy & SciPy
-      RANSAC Homography
-    Storage & Reporting
-      SQLite Database
-      SQLAlchemy 2.0 ORM
-      ReportLab PDF Engine
-      CSV Data Export
+flowchart TB
+    subgraph FRONTEND ["💻 Frontend Client Layer (React 18 + Vite SPA)"]
+        UI["Operator & Admin Workspaces\n(Triage Queue, Split-Panel Audit Workbench, Analytics Dashboard, ROI Editor)"]
+    end
+
+    subgraph GATEWAY ["⚡ Backend API Gateway (FastAPI)"]
+        API["REST API Router Services\n(Auth, Inspections, Triage Queue, Reviews, Reports, Analytics)"]
+    end
+
+    subgraph PIPELINE ["🤖 5-Agent LangGraph AI Engine (workflow.py)"]
+        A1["Agent 1: Selector & Gatekeeper\n(CLIP 512-Dim Vector Search)"]
+        A2["Agent 2: Ingest & Triage Aligner\n(Blur, Brightness & ORB Homography)"]
+        A3["Agent 3: Vision-AI Hybrid Inspector\n(Parallel Anomaly Ensemble)"]
+        A4["Agent 4: Decision Judge\n(Weighted Risk Matrix & Multi-Angle Fusion)"]
+        A5["Agent 5: Audit Explainer\n(LLM Rationale & PDF Generator)"]
+
+        A1 -->|Pass Viability| A2
+        A2 -->|Pass Quality| A3
+        A2 -.->|Quality Fail| RET["⚠️ Retake Requested"]
+        A3 --> A4
+        A4 --> A5
+    end
+
+    subgraph DETECTORS ["⚡ Agent 3: Parallel Computer Vision & LLM Suite"]
+        SSIM["1. SSIM Structural Diff\n(skimage metrics)"]
+        OCR["2. EasyOCR String Diff\n(Levenshtein Distance)"]
+        ORB["3. ORB Keypoint Rate\n(BFMatcher KNN)"]
+        TMPL["4. Template ROI Check\n(cv2.matchTemplate)"]
+        COLOR["5. 3D Color Histogram\n(RGB Correlation)"]
+        VLLM["6. Multimodal Vision LLM\n(OpenRouter API)"]
+    end
+
+    subgraph STORAGE ["🗄️ Persistence & Media Storage Layer"]
+        DB[(SQLite verivision.db\nUsers | Products | GoldenRefs |\nInspections | Results | Reports | AuditLogs)]
+        FS["File System Store\ndata/cases/ | data/golden/ | data/reports/"]
+    end
+
+    subgraph HITL ["🧠 Human-in-the-Loop Feedback Loop"]
+        REVIEW["Human Review Workbench\n(Approve / Reject / Override Verdicts)"]
+        CALIB["Threshold Calibration & Audit Trail Log"]
+    end
+
+    %% Data Flow Connections
+    UI -->|HTTP / REST API Calls| API
+    API -->|Invokes State Graph| A1
+    A3 -->|ThreadPool Parallel Execution| SSIM & OCR & ORB & TMPL & COLOR & VLLM
+    A5 -->|Saves Inspection Results| DB
+    A5 -->|Saves Heatmaps & PDF Reports| FS
+    UI -->|Inspector Sign-off| REVIEW
+    REVIEW -->|Logs Audit Entry & Updates Risk| DB
+    REVIEW -->|Tunes Config & ROIs| CALIB
+    CALIB -->|Refines System Thresholds| API
 ```
-
-### Categorized Stack Breakdown
-
-| Layer | Primary Technologies | Key Libraries & Versions | Role in VeriVision AI |
-|:---|:---|:---|:---|
-| **Frontend Framework** | React 18, Vite | `react@18.3.1`, `vite@5.2.0` | High-performance Single Page Application with Hot Module Replacement |
-| **UI & Styling** | Tailwind CSS, Lucide Icons | `tailwindcss@3.4.3`, `lucide-react@0.344.0` | Dark/light mode theme system with industrial QA audit component styling |
-| **Data Visualization** | Recharts | `recharts@3.9.2` | Interactive vendor risk charts, monthly fraud trends, and site breakdowns |
-| **Client Routing & Auth** | React Router v6 | `react-router-dom@6.22.3` | Client-side routing with role-based `ProtectedRoute` wrappers |
-| **Backend API Engine** | FastAPI, Uvicorn | `fastapi>=0.100.0`, `uvicorn[standard]>=0.22.0` | Asynchronous REST API server serving all ingestion, triage, and review endpoints |
-| **Agentic Workflow** | LangGraph | `langgraph>=0.0.1` | StateGraph directed acyclic graph orchestrating the 5-Agent pipeline |
-| **Deep Learning & Vectors** | PyTorch, Open_CLIP | `torch>=2.0.0`, `open_clip_torch>=2.20.0` | ViT-B/32 neural network extracting 512-dim visual embeddings for Cosine Similarity search |
-| **Computer Vision Engine** | OpenCV, scikit-image | `opencv-python-headless>=4.7.0`, `scikit-image>=0.20.0` | RANSAC homography image registration, Laplacian blur checking, and SSIM heatmap generation |
-| **Text Extraction (OCR)** | EasyOCR | `easyocr>=1.7.0` | Optical Character Recognition for serial numbers, date codes, and character diffs |
-| **Multimodal Vision & LLM** | OpenRouter API | `requests>=2.31.0` | Semantic anomaly detection via vision models & audit-ready natural language explanations |
-| **PDF Reporting Engine** | ReportLab | `reportlab>=4.0.0` | Laboratory-grade PDF audit certificate generation with side-by-side images & tables |
-| **Database & ORM** | SQLite, SQLAlchemy | `sqlalchemy>=2.0.0` | Relational persistence with 7 tables, audit logs, and embedding storage |
-| **Security & Auth** | Passlib, PyJWT | `python-jose>=3.3.0`, `passlib[bcrypt]>=1.7.4` | Role-Based Access Control (RBAC) with bcrypt hashed credentials |
 
 ---
 
-## 🏗️ High-Level System Architecture
+## 🛠️ Complete Technology Stack
 
-VeriVision AI utilizes a **layered multi-tier system architecture**. The diagram below demonstrates how data flows seamlessly between the React UI, FastAPI Gateway, the 5-Agent LangGraph State Machine, the Parallel Anomaly Detector Suite, and the Persistence Layer:
-
-```mermaid
-flowchart TD
-    subgraph CLIENT_LAYER ["💻 1. Frontend Client Layer (React 18 + Vite)"]
-        UI_AUTH["🔐 Auth & Session (JWT)"]
-        UI_INGEST["📸 Inspection Submission Zone"]
-        UI_TRIAGE["📊 Triage Queue & Search"]
-        UI_WORKBENCH["🔍 Split-Panel Audit Workbench"]
-        UI_HITL["🎨 HITL Review & ROI Canvas"]
-        UI_ANALYTICS["📈 Vendor Analytics (Recharts)"]
-    end
-
-    subgraph API_GATEWAY ["⚡ 2. FastAPI Backend Gateway (/api)"]
-        GW_AUTH["/api/auth (Login/Register/RBAC)"]
-        GW_INSP["/api/inspections (Upload Scan)"]
-        GW_TRIAGE["/api/triage (Queue & Config)"]
-        GW_REVIEW["/api/reviews (HITL Actions)"]
-        GW_ANALYTICS["/api/analytics (Vendor/Site KPIs)"]
-        GW_REPORTS["/api/reports (PDF Certificate Export)"]
-    end
-
-    subgraph LANGGRAPH_ENGINE ["🤖 3. LangGraph 5-Agent State Machine (workflow.py)"]
-        AG1["Agent 1: Selector & Gatekeeper\n(CLIP 512-Dim Vector Search)"]
-        AG2["Agent 2: Ingest & Triage Aligner\n(Blur, Brightness, ORB Homography)"]
-        AG3["Agent 3: Vision-AI Hybrid Inspector\n(Parallel Detector Ensemble)"]
-        AG4["Agent 4: Decision Judge\n(Weighted Scoring Matrix & Multi-Angle Fusion)"]
-        AG5["Agent 5: Audit Explainer\n(LLM Rationale & Fallback Template)"]
-        
-        AG1 -->|Pass Viability| AG2
-        AG2 -->|Pass Quality| AG3
-        AG2 --"Quality Fail"--> RET["⚠️ Retake Requested"]
-        AG3 --> AG4
-        AG4 --> AG5
-    end
-
-    subgraph DETECTOR_ENSEMBLE ["⚡ Agent 3: Parallel CV & Vision-LLM Suite"]
-        D1["1. SSIM Structural Diff\n(skimage metrics)"]
-        D2["2. EasyOCR String Diff\n(Levenshtein Distance)"]
-        D3["3. ORB Keypoint Rate\n(BFMatcher KNN)"]
-        D4["4. Template ROI Check\n(cv2.matchTemplate)"]
-        D5["5. 3D Color Histogram\n(16x16x16 RGB Correlation)"]
-        D6["6. Multimodal Vision LLM\n(OpenRouter API)"]
-    end
-
-    subgraph PERSISTENCE_LAYER ["🗄️ 4. Data & Media Persistence Layer"]
-        DB[(SQLite verivision.db\nUsers | Products | GoldenRefs |\nInspections | Results | Reports | AuditLogs)]
-        FS_CASES["📁 data/cases/\nUploaded Scans & Heatmaps"]
-        FS_GOLDEN["📁 data/golden/\nOEM Golden References"]
-        FS_REPORTS["📁 data/reports/\nReportLab PDF Certificates"]
-    end
-
-    %% Flow Connections
-    UI_INGEST -->|Multipart POST| GW_INSP
-    GW_INSP -->|Invoke StateGraph| AG1
-    AG3 -->|ThreadPoolExecutor| D1 & D2 & D3 & D4 & D5 & D6
-    AG5 -->|Save Case Results| DB
-    AG5 -->|Save Heatmap & PDF| FS_CASES & FS_REPORTS
-    
-    UI_HITL -->|Verdict Override + ROI Notes| GW_REVIEW
-    GW_REVIEW -->|Update AuditLog & Confidence| DB
-    
-    GW_REPORTS -->|Download PDF| UI_WORKBENCH
-    GW_ANALYTICS -->|Query Fraud KPIs| DB
-    DB -->|Supply Data| GW_ANALYTICS -->|Render Graphs| UI_ANALYTICS
-```
+| Layer / Category | Technology | Version / Spec | Purpose & Role |
+|:---|:---|:---|:---|
+| **Frontend Framework** | React 18 | `18.3.1` | Modern component-based Single Page Application (SPA) |
+| **Frontend Build Tool** | Vite | `5.2.0` | Lightning-fast development server with Hot Module Replacement (HMR) |
+| **Styling & Theme** | Tailwind CSS | `3.4.3` | Utility-first styling with custom dark/light mode theme tokens |
+| **UI Components & Icons** | Lucide React | `0.344.0` | Industrial QA icon set for audit status & navigation |
+| **Data Visualization** | Recharts | `3.9.2` | Interactive charts for vendor risk, site breakdown, and monthly fraud trends |
+| **Routing & Protection** | React Router | `6.22.3` | Declarative client-side routing with role-based `ProtectedRoute` guards |
+| **Backend API Gateway** | FastAPI | `0.100.0+` | High-performance asynchronous REST API framework |
+| **Server ASGI** | Uvicorn | `0.22.0+` | ASGI web server running the backend API endpoints |
+| **Agentic Workflow** | LangGraph | `0.0.1+` | Directed acyclic graph orchestrating the 5 autonomous AI agents |
+| **Deep Learning & Neural Vector** | PyTorch & Open_CLIP | `torch 2.0+`, `ViT-B/32` | Extracts 512-dimensional visual embeddings for sub-10ms similarity matching |
+| **Computer Vision Engine** | OpenCV | `4.7.0+` | Homography image registration, Laplacian blur check, and heatmap overlays |
+| **Structural Metrics** | scikit-image | `0.20.0+` | Structural Similarity Index (SSIM) pixel delta matrix calculation |
+| **Text Extraction (OCR)** | EasyOCR | `1.7.0+` | Optical Character Recognition for serial numbers & character diffs |
+| **Multimodal Vision & LLM** | OpenRouter API | REST Endpoint | Multimodal visual comparison & audit-ready natural language explanations |
+| **PDF Report Generator** | ReportLab | `4.0.0+` | Generates laboratory compliance PDF certificates with embedded heatmaps |
+| **Database Engine** | SQLite | SQLite 3 | Embedded relational database storing cases, products, and audit trails |
+| **Database ORM** | SQLAlchemy | `2.0.0+` | Python ORM with 7 relational tables and session management |
+| **Security & Auth** | Passlib & PyJWT | `python-jose 3.3+` | JWT token authentication with bcrypt password encryption |
 
 ---
 
