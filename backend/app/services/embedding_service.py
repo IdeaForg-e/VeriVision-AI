@@ -11,27 +11,47 @@ logger = logging.getLogger(__name__)
 
 EMBEDDING_DIM = 512
 
-def extract_image_embedding(image_path: str) -> List[float]:
-    """
-    Extracts a normalized 512-dimensional visual vector embedding from an image file.
-    Combines:
-    1. 256-dim multi-channel HSV & LAB spatial color distribution features.
-    2. 128-dim gradient magnitude & orientation texture features (HOG-like).
-    3. 128-dim ORB spatial keypoint descriptor summary statistics.
-    """
-    if not os.path.exists(image_path):
-        logger.error(f"[Embedding Service] File not found: {image_path}")
-        return [0.0] * EMBEDDING_DIM
+# Lazy-loaded global CLIP model instance & transform
+_clip_model = None
+_clip_preprocess = None
+_clip_device = None
 
+def _load_clip():
+    """
+    Lazy-loads Open_CLIP model (ViT-B-32 pretrained on OpenAI) once into memory.
+    Uses GPU CUDA if available, else CPU.
+    """
+    global _clip_model, _clip_preprocess, _clip_device
+    if _clip_model is None:
+        try:
+            import torch
+            import open_clip
+
+            _clip_device = "cuda" if torch.cuda.is_available() else "cpu"
+            logger.info(f"[Embedding Service] Initializing Open_CLIP ViT-B-32 model on device: {_clip_device}...")
+
+            _clip_model, _, _clip_preprocess = open_clip.create_model_and_transforms(
+                "ViT-B-32", pretrained="openai"
+            )
+            _clip_model = _clip_model.to(_clip_device).eval()
+            logger.info("[Embedding Service] Open_CLIP model successfully loaded and ready.")
+        except Exception as err:
+            logger.error(f"[Embedding Service] Failed to load Open_CLIP model: {err}. Will fallback to OpenCV.")
+            _clip_model = False  # Mark failed to avoid retrying continuously
+
+    return _clip_model, _clip_preprocess, _clip_device
+
+
+def _extract_opencv_fallback(image_path: str) -> List[float]:
+    """
+    Fallback OpenCV feature extraction (HSV + Sobel + ORB summary stats).
+    Used if Open_CLIP model loading encounters environment issues.
+    """
     img = cv2.imread(image_path)
     if img is None:
-        logger.error(f"[Embedding Service] Unable to read image: {image_path}")
         return [0.0] * EMBEDDING_DIM
 
-    # Standardize image size for invariant feature extraction
     img_resized = cv2.resize(img, (256, 256))
-
-    # Feature 1: HSV Color Histogram (256 dimensions)
     hsv = cv2.cvtColor(img_resized, cv2.COLOR_BGR2HSV)
     hist_h = cv2.calcHist([hsv], [0], None, [96], [0, 180])
     hist_s = cv2.calcHist([hsv], [1], None, [80], [0, 256])
@@ -39,7 +59,6 @@ def extract_image_embedding(image_path: str) -> List[float]:
     color_vec = np.concatenate([hist_h, hist_s, hist_v]).flatten()
     color_vec = color_vec / (np.linalg.norm(color_vec) + 1e-7)
 
-    # Feature 2: Spatial Gradient & Texture Features (128 dimensions)
     gray = cv2.cvtColor(img_resized, cv2.COLOR_BGR2GRAY)
     sobelx = cv2.Sobel(gray, cv2.CV_64F, 1, 0, ksize=3)
     sobely = cv2.Sobel(gray, cv2.CV_64F, 0, 1, ksize=3)
@@ -47,34 +66,58 @@ def extract_image_embedding(image_path: str) -> List[float]:
     grad_hist, _ = np.histogram(ang, bins=128, weights=mag, range=(0, 360))
     texture_vec = grad_hist / (np.linalg.norm(grad_hist) + 1e-7)
 
-    # Feature 3: Keypoint & Descriptor Stats (128 dimensions)
     orb = cv2.ORB_create(nfeatures=256)
     _, des = orb.detectAndCompute(gray, None)
     if des is not None and len(des) > 0:
-        kp_mean = np.mean(des, axis=0).astype(np.float32)  # 32 values
-        kp_std = np.std(des, axis=0).astype(np.float32)   # 32 values
-        kp_max = np.max(des, axis=0).astype(np.float32)   # 32 values
-        kp_min = np.min(des, axis=0).astype(np.float32)   # 32 values
+        kp_mean = np.mean(des, axis=0).astype(np.float32)
+        kp_std = np.std(des, axis=0).astype(np.float32)
+        kp_max = np.max(des, axis=0).astype(np.float32)
+        kp_min = np.min(des, axis=0).astype(np.float32)
         kp_vec = np.concatenate([kp_mean, kp_std, kp_max, kp_min])
     else:
         kp_vec = np.zeros(128, dtype=np.float32)
     kp_vec = kp_vec / (np.linalg.norm(kp_vec) + 1e-7)
 
-    # Concatenate all 3 feature representations into 512-dim vector
     raw_vector = np.concatenate([color_vec, texture_vec, kp_vec])
     if len(raw_vector) < EMBEDDING_DIM:
         raw_vector = np.pad(raw_vector, (0, EMBEDDING_DIM - len(raw_vector)))
     elif len(raw_vector) > EMBEDDING_DIM:
         raw_vector = raw_vector[:EMBEDDING_DIM]
 
-    # L2 Normalization for Cosine Similarity
     norm = np.linalg.norm(raw_vector)
-    if norm > 0:
-        normalized_vector = raw_vector / norm
-    else:
-        normalized_vector = raw_vector
+    return (raw_vector / norm if norm > 0 else raw_vector).tolist()
 
-    return normalized_vector.tolist()
+
+def extract_image_embedding(image_path: str) -> List[float]:
+    """
+    Extracts a normalized 512-dimensional visual vector embedding from an image file using Open_CLIP ViT-B-32.
+    Falls back to OpenCV multi-histogram feature extraction if PyTorch/CLIP is unavailable.
+    """
+    if not os.path.exists(image_path):
+        logger.error(f"[Embedding Service] File not found: {image_path}")
+        return [0.0] * EMBEDDING_DIM
+
+    try:
+        model, preprocess, device = _load_clip()
+
+        if model and preprocess and device:
+            import torch
+            from PIL import Image
+
+            img = Image.open(image_path).convert("RGB")
+            img_tensor = preprocess(img).unsqueeze(0).to(device)
+
+            with torch.no_grad():
+                embedding = model.encode_image(img_tensor)
+                embedding = embedding / embedding.norm(dim=-1, keepdim=True)
+
+            return embedding.squeeze(0).cpu().tolist()
+
+    except Exception as e:
+        logger.error(f"[Embedding Service] Open_CLIP extraction failed for {image_path}: {e}. Trying fallback...")
+
+    # Fallback path
+    return _extract_opencv_fallback(image_path)
 
 
 def cosine_similarity(vec1: List[float], vec2: List[float]) -> float:
@@ -124,7 +167,6 @@ def search_reference_library(uploaded_image_path: str, db: Session) -> Dict[str,
 
     ranked_matches = []
     for ref in golden_refs:
-        # Load pre-computed embedding from database or compute on-the-fly
         ref_vec = ref.embedding_vector
         if not ref_vec or len(ref_vec) != EMBEDDING_DIM:
             if ref.image_path and os.path.exists(ref.image_path):
@@ -156,7 +198,6 @@ def search_reference_library(uploaded_image_path: str, db: Session) -> Dict[str,
             "top_match": None,
         }
 
-    # Sort descending by similarity score
     ranked_matches.sort(key=lambda x: x["similarity_score"], reverse=True)
     top = ranked_matches[0]
 
@@ -169,5 +210,5 @@ def search_reference_library(uploaded_image_path: str, db: Session) -> Dict[str,
         "matched": True,
         "detail": f"Matched catalog item '{top['part_number']}' with {top['similarity_score']}% similarity.",
         "top_match": top,
-        "candidates": ranked_matches[:3],  # Top 3 candidates
+        "candidates": ranked_matches[:3],
     }
