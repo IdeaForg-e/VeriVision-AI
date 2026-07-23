@@ -81,14 +81,16 @@ export function CaseStatusTracker({ status }) {
   );
 }
 
-export function EvidencePanel({ caseData, learningStatus }) {
+export function EvidencePanel({ caseData, region, onRegionChange, onRegionCommit, learningStatus }) {
   if (!caseData) return null;
+
+  const currentRegion = region || { x: 25, y: 25, w: 30, h: 30 };
 
   return (
     <div className="lab-card p-4 space-y-4">
       <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
         <h2 className="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider flex items-center gap-2">
-          <Sparkles size={14} className="text-sky-500" /> Evidence Image Comparison
+          <Sparkles size={14} className="text-sky-500" /> Evidence Image Comparison &amp; Interactive Anomaly ROI
         </h2>
         <span className="font-mono text-[10px] text-slate-500">HASH: {caseData.imageHash || "N/A"}</span>
       </div>
@@ -104,13 +106,27 @@ export function EvidencePanel({ caseData, learningStatus }) {
           </div>
         </div>
 
-        {/* Uploaded / Inspection Scan */}
+        {/* Uploaded / Inspection Scan with Interactive ROI Box */}
         <div className="space-y-1.5">
-          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
-            Target Unit Under Inspection
-          </span>
+          <div className="flex justify-between items-center">
+            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
+              Target Unit Under Inspection
+            </span>
+            <span className="text-[10px] font-mono text-sky-500 font-bold">
+              [ Drag / Resize ROI Box to Train AI ]
+            </span>
+          </div>
           <div className="relative aspect-square bg-slate-950 rounded-lg overflow-hidden border border-slate-800 p-2 flex items-center justify-center">
-            <img className="w-full h-full object-contain" alt="Uploaded target scan" src={caseData.uploadedImageUrl} />
+            <img className="w-full h-full object-contain pointer-events-none" alt="Uploaded target scan" src={caseData.uploadedImageUrl} />
+            <div className="absolute inset-0 p-2">
+              <ROIEditor
+                region={currentRegion}
+                onChange={onRegionChange}
+                onCommit={onRegionCommit}
+                learningStatus={learningStatus}
+                label="HUMAN_VERIFIED_ANOMALY_ROI"
+              />
+            </div>
           </div>
         </div>
       </div>
@@ -119,13 +135,13 @@ export function EvidencePanel({ caseData, learningStatus }) {
         <div className="flex gap-2 items-center text-slate-600 dark:text-slate-400">
           <Info size={15} className="text-sky-500 shrink-0" />
           <span>
-            Adjust highlighted regions if AI prediction is misaligned. Neural model:{" "}
+            Drag/resize the blue dashed ROI box on target image to mark anomaly region for AI training loop. Model:{" "}
             <span className="font-mono text-sky-600 dark:text-sky-400 font-bold">{caseData.neuralModel || "ResNet-50"}</span>
           </span>
         </div>
         {learningStatus === "learning" && (
           <span className="text-sky-500 text-xs font-bold font-mono animate-pulse flex items-center gap-1">
-            <RefreshCw size={13} className="animate-spin" /> Ingesting…
+            <RefreshCw size={13} className="animate-spin" /> Ingesting ROI Vector…
           </span>
         )}
       </div>
