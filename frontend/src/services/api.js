@@ -2,12 +2,8 @@ import { API_BASE_URL, STORAGE_KEYS } from "../utils/constants.js";
 
 /**
  * Thin fetch wrapper: attaches the auth token, base URL, and JSON handling
- * in one place. Every real service call (once the backend is live) should
- * go through `apiRequest` instead of calling `fetch` directly, so auth
- * refresh / error handling / logging only has to be written once.
- *
- * Currently unused by reviewService.js / feedbackService.js because those
- * are still fully mocked — wire them through this once endpoints exist.
+ * in one place. Every service call goes through `apiRequest` for uniform
+ * auth header injection and error handling.
  */
 
 class ApiError extends Error {

@@ -1,31 +1,23 @@
-// Consolidated components for pipeline feedback tuning
 import { useState, useEffect } from "react";
-import { 
-  Shield, 
-  Key, 
-  EyeOff, 
-  FileClock, 
-  AlertTriangle, 
-  CheckCircle2, 
-  Sliders, 
-  Plus, 
-  X, 
-  ArrowRight, 
+import {
+  Shield,
+  EyeOff,
+  FileClock,
+  Sliders,
+  Plus,
+  ArrowRight,
   Settings,
   AlertCircle,
-  HelpCircle,
-  TrendingUp,
-  Activity,
   History,
-  Lock,
   LockKeyhole,
   UploadCloud,
   Sparkles,
-  Image as ImageIcon,
-  ChevronDown
+  CheckCircle2,
+  X,
+  RefreshCw,
 } from "lucide-react";
 import { createProduct, uploadGoldenReference } from "../services/productService.js";
-
+import { Button } from "./Common.jsx";
 
 const PRIVACY_ITEMS = [
   { key: "storeImageHashOnly", icon: Shield, label: "Store image hash only", desc: "Prevents writing raw images to permanent database logs" },
@@ -37,7 +29,7 @@ function Toggle({ checked, onChange }) {
   return (
     <label className="relative inline-flex items-center cursor-pointer select-none">
       <input type="checkbox" className="sr-only peer" checked={checked} onChange={onChange} />
-      <div className="w-10 h-5 bg-slate-900 border border-slate-800 rounded-full peer peer-focus:ring-1 peer-focus:ring-cyan-500/20 peer-checked:after:translate-x-full peer-checked:after:border-cyan-400 after:content-[''] after:absolute after:top-[3px] after:left-[3px] after:bg-slate-555 after:border-slate-900 after:rounded-full after:h-3.5 after:w-3.5 after:transition-all peer-checked:bg-cyan-950/40 peer-checked:border-cyan-500/40 peer-checked:after:bg-cyan-400" />
+      <div className="w-9 h-5 bg-slate-300 dark:bg-slate-800 border border-slate-400 dark:border-slate-700 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-sky-600" />
     </label>
   );
 }
@@ -45,26 +37,26 @@ function Toggle({ checked, onChange }) {
 export function PrivacySecurity({ privacy, onToggle }) {
   return (
     <div className="col-span-12 md:col-span-6 space-y-4">
-      <div className="cyber-card bg-[#0f172a]/55 border border-slate-800/80 p-6 shadow-lg relative overflow-hidden group">
-        <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-cyan-500/25 to-transparent"></div>
-        <div className="flex items-center gap-3 mb-6">
-          <div className="h-8 w-8 rounded-lg bg-cyan-950/20 border border-cyan-500/20 flex items-center justify-center text-cyan-400">
-            <LockKeyhole size={16} />
-          </div>
-          <h2 className="text-xs font-extrabold uppercase tracking-wider text-slate-200">Privacy &amp; Security Controls</h2>
+      <div className="lab-card p-5 space-y-4">
+        <div className="flex items-center gap-2.5 border-b border-slate-200 dark:border-slate-800 pb-3">
+          <LockKeyhole size={16} className="text-sky-500" />
+          <h2 className="text-xs font-bold uppercase tracking-wider text-slate-900 dark:text-slate-100">
+            Privacy &amp; Security Controls
+          </h2>
         </div>
-        <div className="space-y-4">
+        <div className="space-y-3">
           {PRIVACY_ITEMS.map((item) => {
             const Icon = item.icon;
             return (
-              <div key={item.key} className="flex items-center justify-between p-4 bg-[#080e1a]/80 border border-slate-850 rounded-xl hover:border-slate-800 transition duration-200">
-                <div className="flex items-center gap-3.5 flex-1 pr-4">
-                  <div className="text-slate-500 mt-0.5 shrink-0">
-                    <Icon size={18} />
-                  </div>
-                  <div>
-                    <span className="block text-xs font-bold text-slate-250 leading-snug">{item.label}</span>
-                    <span className="block text-[10px] text-slate-500 mt-0.5 font-semibold leading-normal">{item.desc}</span>
+              <div
+                key={item.key}
+                className="flex items-center justify-between p-3 rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800"
+              >
+                <div className="flex items-center gap-3 pr-2 min-w-0">
+                  <Icon size={16} className="text-slate-400 shrink-0" />
+                  <div className="min-w-0">
+                    <span className="block text-xs font-bold text-slate-800 dark:text-slate-200 truncate">{item.label}</span>
+                    <span className="block text-[10px] text-slate-500 truncate">{item.desc}</span>
                   </div>
                 </div>
                 <Toggle checked={privacy[item.key]} onChange={() => onToggle(item.key)} />
@@ -79,14 +71,13 @@ export function PrivacySecurity({ privacy, onToggle }) {
 
 export function KnownLimitations() {
   return (
-    <div className="bg-cyan-950/10 p-4 border border-cyan-500/20 border-l-4 border-l-cyan-500 rounded-xl mb-6 relative overflow-hidden">
-      <div className="flex gap-3">
-        <AlertCircle className="text-cyan-400 shrink-0 mt-0.5" size={16} />
-        <div className="text-[11px] leading-relaxed text-slate-400">
-          <span className="font-extrabold text-slate-200 block mb-0.5 uppercase tracking-wider text-[10px]">Current Scope Limitation</span>
-          Inspection validation relies strictly on optical visual matching. Deep chemical material checks or internal chip firmware authenticity verification are not supported in visual triage logs.
-        </div>
-      </div>
+    <div className="p-3 rounded-lg bg-sky-500/10 border border-sky-500/20 text-xs text-slate-600 dark:text-slate-400 space-y-1">
+      <p className="font-bold text-sky-600 dark:text-sky-400 uppercase text-[10px] tracking-wider flex items-center gap-1">
+        <AlertCircle size={13} /> Optical Triage Scope Limitation
+      </p>
+      <p className="text-[11px] leading-relaxed">
+        Inspection validation relies strictly on optical visual matching. Firmware integrity or internal silicon micro-defects are outside visual audit scope.
+      </p>
     </div>
   );
 }
@@ -99,129 +90,111 @@ function formatWhen(iso) {
 export function AdjustmentHistory({ history }) {
   return (
     <div className="col-span-12 md:col-span-6 space-y-4">
-      <div className="cyber-card bg-[#0f172a]/55 border border-slate-800/80 p-6 shadow-lg relative overflow-hidden group">
-        <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-cyan-500/20 to-transparent"></div>
-        <div className="flex items-center gap-3 mb-5">
-          <div className="h-8 w-8 rounded-lg bg-cyan-950/20 border border-cyan-500/20 flex items-center justify-center text-cyan-400">
-            <History size={16} />
-          </div>
-          <h2 className="text-xs font-extrabold uppercase tracking-wider text-slate-200">Limitations &amp; Audit Logs</h2>
+      <div className="lab-card p-5 space-y-4">
+        <div className="flex items-center gap-2.5 border-b border-slate-200 dark:border-slate-800 pb-3">
+          <History size={16} className="text-sky-500" />
+          <h2 className="text-xs font-bold uppercase tracking-wider text-slate-900 dark:text-slate-100">
+            Calibration Audit Logs
+          </h2>
         </div>
 
         <KnownLimitations />
 
-        <h4 className="text-[10px] font-black uppercase text-slate-500 tracking-wider mb-3">RECENT ADJUSTMENTS LOG</h4>
-        <ul className="space-y-3 max-h-48 overflow-y-auto pr-1">
-          {history.map((h) => (
-            <li key={h.id} className="flex gap-2.5 items-start p-2.5 rounded-lg bg-slate-900/40 border border-slate-850/60 hover:border-slate-800 transition">
-              <span className="w-1.5 h-1.5 rounded-full bg-cyan-500 shrink-0 mt-1.5" />
-              <div className="flex-1 min-w-0">
-                <span className="block text-[11px] font-semibold text-slate-350 leading-relaxed">{h.summary}</span>
-                <span className="block text-[9px] text-slate-550 font-medium mt-0.5">Changed by {h.user} on {formatWhen(h.changedAt)}</span>
-              </div>
-            </li>
-          ))}
-          {history.length === 0 && <li className="text-slate-555 italic text-[11px] py-4 text-center">No calibration logs registered yet.</li>}
-        </ul>
+        <div className="space-y-2">
+          <p className="text-[10px] font-bold font-mono text-slate-500 uppercase tracking-wider">
+            Recent Calibration Entries
+          </p>
+          <ul className="space-y-2 max-h-40 overflow-y-auto">
+            {history.map((h) => (
+              <li
+                key={h.id}
+                className="flex items-start gap-2 p-2 rounded bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs"
+              >
+                <div className="w-1.5 h-1.5 rounded-full bg-sky-500 shrink-0 mt-1.5" />
+                <div className="min-w-0">
+                  <p className="font-semibold text-slate-800 dark:text-slate-200 leading-tight">{h.summary}</p>
+                  <p className="text-[10px] text-slate-500 font-mono mt-0.5">
+                    By {h.user} on {formatWhen(h.changedAt)}
+                  </p>
+                </div>
+              </li>
+            ))}
+            {history.length === 0 && (
+              <li className="text-slate-400 italic text-xs py-2 text-center">No calibration adjustments recorded.</li>
+            )}
+          </ul>
+        </div>
       </div>
-    </div>
-  );
-}
-
-export function OCRThreshold({ value, onChange }) {
-  const isStrict = Number(value) === 100;
-  const percent = ((value - 80) / 20) * 100;
-
-  return (
-    <div className="space-y-3.5">
-      <div className="flex justify-between items-center">
-        <label className="text-xs font-extrabold uppercase tracking-wider text-slate-350">OCR Character Fuzzy Match</label>
-        <span
-          className={`font-tech-code px-2.5 py-0.5 rounded text-[10px] font-black uppercase border ${
-            isStrict 
-              ? "text-red-400 bg-red-950/20 border-red-500/20" 
-              : "text-cyan-400 bg-cyan-950/20 border-cyan-500/20"
-          }`}
-        >
-          {isStrict ? "Strict (100%)" : `Fuzzy (${value}%)`}
-        </span>
-      </div>
-      <div className="relative flex items-center w-full">
-        <input
-          type="range"
-          className="w-full cursor-pointer bg-transparent focus:outline-none"
-          min={80}
-          max={100}
-          step={5}
-          value={value}
-          onChange={(e) => onChange(parseInt(e.target.value, 10))}
-        />
-      </div>
-      <p className="text-[10px] text-slate-555 leading-relaxed italic">
-        Strict match level — defines the tolerance for character substitution in serial number extraction.
-      </p>
     </div>
   );
 }
 
 export function ThresholdSlider({ label, value, min, max, step, formatValue, description, onChange }) {
   return (
-    <div className="space-y-3.5">
-      <div className="flex justify-between items-center">
-        <label className="text-xs font-extrabold uppercase tracking-wider text-slate-350">{label}</label>
-        <span className="font-tech-code text-cyan-400 bg-cyan-950/25 border border-cyan-500/20 px-2.5 py-0.5 rounded text-[10px] font-black uppercase">
+    <div className="space-y-2">
+      <div className="flex justify-between items-center text-xs">
+        <label className="font-bold text-slate-800 dark:text-slate-200 uppercase text-[10px] tracking-wider">
+          {label}
+        </label>
+        <span className="font-mono text-sky-600 dark:text-sky-400 font-bold px-2 py-0.5 rounded bg-sky-500/10 text-[11px]">
           {formatValue(value)}
         </span>
       </div>
-      <div className="relative flex items-center w-full">
-        <input
-          type="range"
-          className="w-full cursor-pointer bg-transparent focus:outline-none"
-          min={min}
-          max={max}
-          step={step}
-          value={value}
-          onChange={(e) => onChange(parseFloat(e.target.value))}
-        />
-      </div>
-      <p className="text-[10px] text-slate-555 leading-relaxed italic">{description}</p>
+      <input
+        type="range"
+        min={min}
+        max={max}
+        step={step}
+        value={value}
+        onChange={(e) => onChange(parseFloat(e.target.value))}
+        className="w-full"
+      />
+      <p className="text-[10px] text-slate-500 leading-normal">{description}</p>
     </div>
   );
 }
 
 export function PerceptionThresholds({ thresholds, onChange }) {
   return (
-    <div className="col-span-12 lg:col-span-7 space-y-4">
-      <div className="cyber-card bg-[#0f172a]/55 border border-slate-800/80 p-6 shadow-lg h-full relative overflow-hidden group">
-        <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-cyan-500/25 to-transparent"></div>
-        <div className="flex items-center gap-3 mb-6">
-          <div className="h-8 w-8 rounded-lg bg-cyan-950/20 border border-cyan-500/20 flex items-center justify-center text-cyan-400">
-            <Sliders size={16} />
-          </div>
-          <h2 className="text-xs font-extrabold uppercase tracking-wider text-slate-200">Perception Engine Thresholds</h2>
+    <div className="col-span-12 lg:col-span-7">
+      <div className="lab-card p-5 space-y-5 h-full">
+        <div className="flex items-center gap-2.5 border-b border-slate-200 dark:border-slate-800 pb-3">
+          <Sliders size={16} className="text-sky-500" />
+          <h2 className="text-xs font-bold uppercase tracking-wider text-slate-900 dark:text-slate-100">
+            Perception Engine Threshold Calibration
+          </h2>
         </div>
-        <div className="space-y-8">
+        <div className="space-y-6">
           <ThresholdSlider
-            label="Aligned Structural Similarity (SSIM)"
+            label="Aligned Structural SSIM Minimum Coefficient"
             value={thresholds.ssim}
             min={0}
             max={1}
             step={0.01}
-            formatValue={(v) => `Min Score: ${v}`}
-            description="Flags a hotspot if structural similarity drops below this normalized coefficient."
+            formatValue={(v) => `Min SSIM: ${v}`}
+            description="Structural difference below this coefficient generates a visual anomaly hotspot."
             onChange={(v) => onChange("ssim", v)}
           />
           <ThresholdSlider
-            label="Keypoint (ORB/SIFT) Matching Strictness"
+            label="ORB Descriptor Keypoint Strictness"
             value={thresholds.keypointDeltaPct}
             min={0}
             max={50}
             step={1}
             formatValue={(v) => `Max Delta: ${v}%`}
-            description="Geometric deviation above this percentage triggers a transformation mismatch alert."
+            description="Spatial keypoint deviation above this threshold triggers homography alignment warning."
             onChange={(v) => onChange("keypointDeltaPct", v)}
           />
-          <OCRThreshold value={thresholds.ocrFuzzyPct} onChange={(v) => onChange("ocrFuzzyPct", v)} />
+          <ThresholdSlider
+            label="OCR Serial Character Matching Strictness"
+            value={thresholds.ocrFuzzyPct}
+            min={80}
+            max={100}
+            step={5}
+            formatValue={(v) => `${v}% Match`}
+            description="Defines OCR character string matching strictness for component serial labels."
+            onChange={(v) => onChange("ocrFuzzyPct", v)}
+          />
         </div>
       </div>
     </div>
@@ -242,62 +215,62 @@ export function BusinessPolicyRouting({ rules, onAddRule }) {
   };
 
   return (
-    <div className="col-span-12 lg:col-span-5 space-y-4">
-      <div className="cyber-card bg-[#0f172a]/55 border border-slate-800/80 p-6 shadow-lg h-full relative overflow-hidden group">
-        <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-cyan-500/25 to-transparent"></div>
-        <div className="flex items-center gap-3 mb-6">
-          <div className="h-8 w-8 rounded-lg bg-cyan-950/20 border border-cyan-500/20 flex items-center justify-center text-cyan-400">
-            <Settings size={16} />
-          </div>
-          <h2 className="text-xs font-extrabold uppercase tracking-wider text-slate-200">Business Policy Routing</h2>
+    <div className="col-span-12 lg:col-span-5">
+      <div className="lab-card p-5 space-y-4 h-full">
+        <div className="flex items-center gap-2.5 border-b border-slate-200 dark:border-slate-800 pb-3">
+          <Settings size={16} className="text-sky-500" />
+          <h2 className="text-xs font-bold uppercase tracking-wider text-slate-900 dark:text-slate-100">
+            Business Policy Routing Rules
+          </h2>
         </div>
-        <div className="space-y-4 max-h-[360px] overflow-y-auto pr-1">
+
+        <div className="space-y-3 max-h-80 overflow-y-auto">
           {rules.map((rule) => (
-            <div
-              key={rule.id}
-              className="border border-slate-850/80 bg-slate-900/40 rounded-xl p-4.5 hover:border-cyan-500/30 transition-colors group relative overflow-hidden"
-            >
-              <div className="flex justify-between items-center mb-2.5">
-                <span className="font-tech-code text-cyan-455 text-[10px] font-extrabold px-2 py-0.5 bg-cyan-950/25 border border-cyan-500/10 rounded">{rule.id}</span>
-                <ArrowRight size={13} className="text-slate-650 group-hover:text-cyan-400 transition" />
+            <div key={rule.id} className="p-3 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50 space-y-1">
+              <div className="flex justify-between items-center">
+                <span className="font-mono text-[10px] font-bold text-sky-600 dark:text-sky-400 bg-sky-500/10 px-1.5 py-0.5 rounded">
+                  {rule.id}
+                </span>
+                <ArrowRight size={13} className="text-slate-400" />
               </div>
-              <h3 className="text-xs font-bold text-slate-200 mb-1 leading-snug">{rule.name}</h3>
-              <p className="text-[10px] text-slate-400 leading-relaxed font-medium">{rule.description}</p>
+              <h3 className="text-xs font-bold text-slate-800 dark:text-slate-200">{rule.name}</h3>
+              <p className="text-[10px] text-slate-500 leading-normal">{rule.description}</p>
             </div>
           ))}
 
           {adding ? (
-            <div className="border border-cyan-500/35 rounded-xl p-4 bg-cyan-950/10 space-y-3.5 animate-fade-in">
+            <div className="p-3 rounded-lg border border-sky-500/30 bg-sky-500/5 space-y-2">
               <input
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="Rule name (e.g. High-Risk Gate)"
-                className="w-full text-xs rounded-lg border border-slate-800 px-3 py-2 bg-slate-955 text-slate-200 focus:border-cyan-500/40 outline-none"
+                placeholder="Rule Title"
+                className="w-full h-8 px-2.5 text-xs lab-input"
               />
               <textarea
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                placeholder="Rule routing logic: If [condition] → [routing action]"
-                className="w-full text-xs rounded-lg border border-slate-800 px-3 py-2 bg-slate-955 text-slate-200 focus:border-cyan-500/40 outline-none resize-none"
-                rows={2}
+                placeholder="Routing condition..."
+                className="w-full h-16 p-2 text-xs lab-input resize-none"
               />
-              <div className="flex gap-2.5 justify-end text-[10px] font-bold uppercase tracking-wider">
-                <button onClick={() => setAdding(false)} className="text-slate-400 hover:text-slate-200 px-3.5 py-1.5 transition">
+              <div className="flex justify-end gap-2">
+                <Button variant="ghost" size="sm" onClick={() => setAdding(false)}>
                   Cancel
-                </button>
-                <button onClick={handleAdd} className="text-slate-950 bg-cyan-400 hover:bg-cyan-300 px-4 py-1.5 rounded-md transition font-black">
+                </Button>
+                <Button variant="primary" size="sm" onClick={handleAdd}>
                   Add Rule
-                </button>
+                </Button>
               </div>
             </div>
           ) : (
-            <button
+            <Button
+              variant="outline"
+              size="sm"
               onClick={() => setAdding(true)}
-              className="w-full py-3.5 border-2 border-dashed border-slate-850 hover:border-cyan-500/30 rounded-xl text-slate-400 font-bold hover:text-cyan-400 transition-all flex items-center justify-center gap-2 text-xs uppercase tracking-wider bg-slate-900/10"
+              icon={<Plus size={14} />}
+              className="w-full justify-center"
             >
-              <Plus size={14} />
-              Define New Routing Rule
-            </button>
+              Add Routing Rule
+            </Button>
           )}
         </div>
       </div>
@@ -308,23 +281,17 @@ export function BusinessPolicyRouting({ rules, onAddRule }) {
 export function SavePipelineButton({ state, onSave }) {
   const isSaving = state === "saving";
   const isSaved = state === "saved";
-  const isError = state === "error";
-
-  const colorStyle = isSaved
-    ? "bg-emerald-600 hover:bg-emerald-500 text-white"
-    : isError
-    ? "bg-red-600 hover:bg-red-500 text-white"
-    : "bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-extrabold transition shadow-[0_0_15px_rgba(6,182,212,0.2)] hover:opacity-95";
 
   return (
-    <button
+    <Button
+      variant={isSaved ? "success" : "primary"}
+      size="sm"
+      loading={isSaving}
       onClick={onSave}
-      disabled={isSaving}
-      className={`px-5 py-2.5 rounded-lg text-xs font-black uppercase tracking-wider active:scale-95 transition-all flex items-center gap-2 shadow-sm disabled:cursor-wait ${colorStyle}`}
+      icon={<CheckCircle2 size={14} />}
     >
-      <CheckCircle2 size={14} className={isSaved ? "animate-bounce" : isSaving ? "animate-spin" : ""} />
-      {isSaving ? "Saving Adjustments..." : isSaved ? "Calibration Saved!" : isError ? "Save Failed — Retry" : "Save Adjustments"}
-    </button>
+      {isSaved ? "Calibration Saved!" : "Save Pipeline Calibration"}
+    </Button>
   );
 }
 
@@ -343,8 +310,7 @@ export function RegisterProductCard({ onProductAdded }) {
     const selected = e.target.files[0];
     if (!selected) return;
     setFile(selected);
-    const url = URL.createObjectURL(selected);
-    setPreview(url);
+    setPreview(URL.createObjectURL(selected));
   };
 
   useEffect(() => {
@@ -379,24 +345,13 @@ export function RegisterProductCard({ onProductAdded }) {
 
     setRegistering(true);
     try {
-      // 1. Create the product record
       const product = await createProduct({
         part_number: fullPartNumber,
         name: name.trim(),
         commodity,
       });
 
-      // 2. Determine default ROI based on commodity type
-      let roi_json = { "label_roi": { "x": 100, "y": 100, "width": 300, "height": 200 } };
-      if (commodity === "label") {
-        roi_json = { "label_roi": { "x": 420, "y": 50, "width": 420, "height": 220 } };
-      } else if (commodity === "motherboard") {
-        roi_json = { "label_roi": { "x": 200, "y": 620, "width": 150, "height": 80 } };
-      } else if (commodity === "microchip") {
-        roi_json = { "label_roi": { "x": 250, "y": 250, "width": 200, "height": 100 } };
-      }
-
-      // 3. Upload the golden image reference
+      let roi_json = { label_roi: { x: 100, y: 100, width: 300, height: 200 } };
       const formData = new FormData();
       formData.append("file", file);
       formData.append("roi_config", JSON.stringify(roi_json));
@@ -407,7 +362,7 @@ export function RegisterProductCard({ onProductAdded }) {
 
       await uploadGoldenReference(product.id, formData);
 
-      setSuccessMsg(`Reference standard '${name}' registered successfully under Code '${fullPartNumber}'.`);
+      setSuccessMsg(`Reference standard '${name}' registered under Code '${fullPartNumber}'.`);
       setPartSuffix("");
       setName("");
       setCommodity("");
@@ -415,11 +370,8 @@ export function RegisterProductCard({ onProductAdded }) {
       setFile(null);
       setPreview(null);
 
-      if (onProductAdded) {
-        onProductAdded();
-      }
+      if (onProductAdded) onProductAdded();
     } catch (err) {
-      console.error(err);
       setErrorMsg(err.message || "Failed to register standard reference product.");
     } finally {
       setRegistering(false);
@@ -428,148 +380,117 @@ export function RegisterProductCard({ onProductAdded }) {
 
   return (
     <div className="col-span-12">
-      <div className="cyber-card bg-[#0f172a]/55 border border-slate-800/80 p-6 shadow-lg relative overflow-hidden group">
-        <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-cyan-500/25 to-transparent"></div>
-        
-        <div className="flex items-center gap-3 mb-6">
-          <div className="h-8 w-8 rounded-lg bg-cyan-950/20 border border-cyan-500/20 flex items-center justify-center text-cyan-400">
-            <Sparkles size={16} />
-          </div>
+      <div className="lab-card p-5 space-y-4">
+        <div className="flex items-center gap-2.5 border-b border-slate-200 dark:border-slate-800 pb-3">
+          <Sparkles size={16} className="text-sky-500" />
           <div>
-            <h2 className="text-xs font-extrabold uppercase tracking-wider text-slate-200">Register New Parts Reference standard (Golden Image)</h2>
-            <p className="text-[10px] text-slate-500 font-semibold leading-normal mt-0.5">
-              Add a new part code specification and upload its golden standard picture to seed comparison database.
+            <h2 className="text-xs font-bold uppercase tracking-wider text-slate-900 dark:text-slate-100">
+              Register New OEM Golden Reference Catalog Standard
+            </h2>
+            <p className="text-[10px] text-slate-500">
+              Seed comparison database with high-resolution reference photos and expected part specs.
             </p>
           </div>
         </div>
 
         {errorMsg && (
-          <div className="flex gap-2.5 bg-red-950/30 border border-red-500/20 rounded-xl p-3.5 mb-5 animate-fade-in text-[11px] leading-relaxed text-red-300">
-            <AlertCircle size={15} className="shrink-0 mt-0.5" />
-            <span>{errorMsg}</span>
+          <div className="p-3 rounded-lg bg-rose-500/10 border border-rose-500/20 text-xs text-rose-600 dark:text-rose-400 flex gap-2 items-center">
+            <AlertCircle size={15} /> {errorMsg}
           </div>
         )}
-
         {successMsg && (
-          <div className="flex gap-2.5 bg-emerald-950/30 border border-emerald-500/20 rounded-xl p-3.5 mb-5 animate-fade-in text-[11px] leading-relaxed text-emerald-300">
-            <CheckCircle2 size={15} className="shrink-0 mt-0.5" />
-            <span>{successMsg}</span>
+          <div className="p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-xs text-emerald-600 dark:text-emerald-400 flex gap-2 items-center">
+            <CheckCircle2 size={15} /> {successMsg}
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="grid grid-cols-12 gap-5">
-          <div className="col-span-12 md:col-span-4 space-y-4">
+        <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="space-y-3">
             <div>
-              <label className="text-[9px] font-bold tracking-wider text-slate-500 uppercase mb-1.5 block">Part Number Code</label>
+              <label className="text-[10px] font-bold text-slate-500 uppercase mb-1 block">Part Code Suffix</label>
               <div className="relative flex items-center">
-                <span className="absolute left-3.5 text-xs text-slate-500 font-black tracking-wider uppercase">GOLD-</span>
+                <span className="absolute left-3 text-xs font-mono font-bold text-slate-400">GOLD-</span>
                 <input
                   type="text"
                   value={partSuffix}
                   onChange={(e) => setPartSuffix(e.target.value.replace(/[^a-zA-Z0-9_-]/g, "").toUpperCase())}
                   placeholder="RAM-DELL-8G"
-                  className="w-full h-11 pl-16 pr-3.5 rounded-xl bg-slate-900/80 border border-slate-700/60 text-slate-200 text-xs placeholder:text-slate-700 focus:border-cyan-500/40 focus:shadow-[0_0_15px_rgba(6,182,212,0.1)] transition-all outline-none uppercase font-bold"
+                  className="w-full h-8 pl-14 pr-3 text-xs lab-input font-mono font-bold"
                   disabled={registering}
                 />
               </div>
             </div>
-
             <div>
-              <label className="text-[9px] font-bold tracking-wider text-slate-500 uppercase mb-1.5 block">Product Name / Title</label>
+              <label className="text-[10px] font-bold text-slate-500 uppercase mb-1 block">Part Title / Name</label>
               <input
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="e.g. Dell DDR4 8GB RAM Module"
-                className="w-full h-11 px-3.5 rounded-xl bg-slate-900/80 border border-slate-700/60 text-slate-200 text-xs placeholder:text-slate-700 focus:border-cyan-500/40 focus:shadow-[0_0_15px_rgba(6,182,212,0.1)] transition-all outline-none font-bold"
+                className="w-full h-8 px-3 text-xs lab-input"
                 disabled={registering}
               />
             </div>
           </div>
 
-          <div className="col-span-12 md:col-span-4 space-y-4">
+          <div className="space-y-3">
             <div>
-              <label className="text-[9px] font-bold tracking-wider text-slate-500 uppercase mb-1.5 block">Commodity Category</label>
+              <label className="text-[10px] font-bold text-slate-500 uppercase mb-1 block">Commodity Category</label>
               <input
                 type="text"
                 value={commodity}
                 onChange={(e) => setCommodity(e.target.value.toLowerCase())}
-                placeholder="e.g. ram, motherboard, storage..."
-                className="w-full h-11 px-3.5 rounded-xl bg-slate-900/80 border border-slate-700/60 text-slate-200 text-xs placeholder:text-slate-700 focus:border-cyan-500/40 focus:shadow-[0_0_15px_rgba(6,182,212,0.1)] transition-all outline-none font-bold"
+                placeholder="e.g. ram, motherboard, chip"
+                className="w-full h-8 px-3 text-xs lab-input"
                 disabled={registering}
               />
             </div>
-
             <div>
-              <label className="text-[9px] font-bold tracking-wider text-slate-500 uppercase mb-1.5 block">Expected Serial format/ID (Optional)</label>
+              <label className="text-[10px] font-bold text-slate-500 uppercase mb-1 block">Expected Serial ID</label>
               <input
                 type="text"
                 value={expectedSerial}
                 onChange={(e) => setExpectedSerial(e.target.value)}
                 placeholder="e.g. DELL-RAM-DDR4-001"
-                className="w-full h-11 px-3.5 rounded-xl bg-slate-900/80 border border-slate-700/60 text-slate-200 text-xs placeholder:text-slate-700 focus:border-cyan-500/40 focus:shadow-[0_0_15px_rgba(6,182,212,0.1)] transition-all outline-none font-bold"
+                className="w-full h-8 px-3 text-xs lab-input font-mono"
                 disabled={registering}
               />
             </div>
           </div>
 
-          <div className="col-span-12 md:col-span-4 flex flex-col justify-end">
-            <label className="text-[9px] font-bold tracking-wider text-slate-500 uppercase mb-1.5 block">OEM Golden Standard Image</label>
-            {preview ? (
-              <div className="relative rounded-xl border border-slate-700/60 bg-slate-900/40 overflow-hidden h-[6.5rem] flex items-center p-2 justify-between">
-                <div className="h-full w-24 rounded-lg bg-slate-950 border border-slate-800 flex items-center justify-center overflow-hidden shrink-0">
-                  <img src={preview} className="w-full h-full object-contain" alt="Golden standard preview" />
+          <div className="flex flex-col justify-between">
+            <div>
+              <label className="text-[10px] font-bold text-slate-500 uppercase mb-1 block">Golden Reference Image</label>
+              {preview ? (
+                <div className="flex items-center justify-between p-2 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-900">
+                  <img src={preview} className="h-12 w-12 object-contain rounded" alt="Preview" />
+                  <button type="button" onClick={() => { setFile(null); setPreview(null); }} className="text-slate-400 hover:text-rose-400">
+                    <X size={16} />
+                  </button>
                 </div>
-                <div className="min-w-0 flex-1 px-3">
-                  <p className="text-[10px] font-bold text-slate-250 truncate leading-snug">{file?.name}</p>
-                  <p className="text-[9px] text-slate-500 font-semibold mt-0.5">{(file?.size / 1024).toFixed(0)} KB</p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => { setFile(null); setPreview(null); }}
-                  className="h-7 w-7 rounded-lg flex items-center justify-center border border-slate-800 bg-slate-900 text-slate-500 hover:text-red-400 hover:border-red-500/30 transition-all shrink-0 active:scale-95"
-                  disabled={registering}
-                >
-                  <X size={13} />
-                </button>
-              </div>
-            ) : (
-              <label className="flex flex-col items-center justify-center gap-1.5 h-[6.5rem] rounded-xl border-2 border-dashed border-slate-700/50 bg-slate-900/40 hover:bg-cyan-950/5 hover:border-cyan-500/50 cursor-pointer transition-all">
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleFileChange}
-                  className="hidden"
-                  disabled={registering}
-                />
-                <UploadCloud size={18} className="text-slate-500 hover:text-cyan-400 transition" />
-                <span className="text-[10px] font-bold text-slate-350 hover:text-cyan-400 transition">Select Image standard</span>
-              </label>
-            )}
-          </div>
-
-          <div className="col-span-12 flex justify-end pt-2 border-t border-slate-850/60 mt-1">
-            <button
-              type="submit"
-              disabled={registering || !partSuffix || !name || !file}
-              className="group relative inline-flex items-center gap-2 px-6 py-2.5 rounded-lg bg-gradient-to-r from-cyan-500 via-blue-600 to-indigo-600 text-white font-extrabold text-xs uppercase tracking-wider shadow-[0_0_15px_rgba(6,182,212,0.2)] hover:shadow-[0_0_25px_rgba(6,182,212,0.35)] hover:scale-[1.01] active:scale-95 transition-all duration-300 disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:hover:shadow-none"
-            >
-              {registering ? (
-                <>
-                  <RefreshCw size={13} className="animate-spin" />
-                  <span>Registering...</span>
-                </>
               ) : (
-                <>
-                  <Plus size={13} />
-                  <span>Register Golden Standard</span>
-                </>
+                <label className="flex flex-col items-center justify-center p-3 rounded-lg border-2 border-dashed border-slate-300 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 transition">
+                  <input type="file" accept="image/*" onChange={handleFileChange} className="hidden" />
+                  <UploadCloud size={18} className="text-slate-400" />
+                  <span className="text-[10px] font-bold text-slate-600 dark:text-slate-400">Select Image File</span>
+                </label>
               )}
-            </button>
+            </div>
+
+            <Button
+              type="submit"
+              variant="primary"
+              size="sm"
+              loading={registering}
+              disabled={registering || !partSuffix || !name || !file}
+              icon={<Plus size={14} />}
+              className="mt-2 w-full justify-center"
+            >
+              Register Golden Standard
+            </Button>
           </div>
         </form>
       </div>
     </div>
   );
 }
-

@@ -2,7 +2,7 @@ import { useEffect, useState, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 
 import { Layout } from "../components/Layout.jsx";
-import { Loader, Modal, Button } from "../components/Common.jsx";
+import { Loader, Modal, Button, Badge } from "../components/Common.jsx";
 import {
   MetadataCard,
   FraudScore,
@@ -25,7 +25,6 @@ import {
   Cpu,
   FileText,
   ArrowRight,
-  FolderOpen,
   AlertTriangle,
   Trash2,
   Search,
@@ -35,8 +34,6 @@ import {
   CheckCircle2,
   XCircle,
   AlertCircle,
-  ChevronDown,
-  ChevronUp,
   Zap,
   Activity,
   BarChart3,
@@ -49,128 +46,70 @@ import {
   Grid,
 } from "lucide-react";
 
-/* ───────────────────────────────────────────────────────────
-   STATUS BADGE — glowing gradient pill
-   ─────────────────────────────────────────────────────────── */
-function StatusBadge({ status, fraudScore = null, size = "sm" }) {
-  const cfg = (() => {
-    if (fraudScore != null) {
-      if (fraudScore >= 70) return { label: "CRITICAL", gradient: "from-red-600 to-rose-600", glow: "rgba(239,68,68,0.25)" };
-      if (fraudScore >= 40) return { label: "WARNING", gradient: "from-amber-500 to-orange-600", glow: "rgba(245,158,11,0.25)" };
-      return { label: "PASSED", gradient: "from-emerald-500 to-teal-600", glow: "rgba(16,185,129,0.25)" };
-    }
-    return { label: status || "UNKNOWN", gradient: "from-slate-600 to-slate-700", glow: "rgba(100,116,139,0.2)" };
-  })();
-  const dim = size === "lg" ? "px-4 py-1.5 text-xs" : "px-2.5 py-0.5 text-[10px]";
-  return (
-    <span className={`inline-flex items-center gap-1.5 font-black uppercase tracking-widest rounded-full ${dim} bg-gradient-to-r ${cfg.gradient} text-white`} style={{ boxShadow: `0 0 20px ${cfg.glow}, 0 0 60px ${cfg.glow}` }}>
-      <span className="h-1.5 w-1.5 rounded-full bg-white/80 animate-pulse" />
-      {cfg.label}
-    </span>
-  );
-}
-
-/* ───────────────────────────────────────────────────────────
-   STAT CARD — glassmorphic metric tile
-   ─────────────────────────────────────────────────────────── */
-function StatCard({ icon: Icon, label, value, sublabel, color = "cyan" }) {
+function StatCard({ icon: Icon, label, value, sublabel, color = "sky" }) {
   const c = {
-    cyan: { bg: "from-cyan-500/10 to-cyan-600/5", border: "border-cyan-500/20", text: "text-cyan-400", glow: "rgba(6,182,212,0.12)" },
-    red: { bg: "from-red-500/10 to-red-600/5", border: "border-red-500/20", text: "text-red-400", glow: "rgba(239,68,68,0.12)" },
-    emerald: { bg: "from-emerald-500/10 to-emerald-600/5", border: "border-emerald-500/20", text: "text-emerald-400", glow: "rgba(16,185,129,0.12)" },
-    amber: { bg: "from-amber-500/10 to-amber-600/5", border: "border-amber-500/20", text: "text-amber-400", glow: "rgba(245,158,11,0.12)" },
-  }[color] || { bg: "from-cyan-500/10 to-cyan-600/5", border: "border-cyan-500/20", text: "text-cyan-400", glow: "rgba(6,182,212,0.12)" };
+    sky: "text-sky-600 dark:text-sky-400",
+    rose: "text-rose-600 dark:text-rose-400",
+    emerald: "text-emerald-600 dark:text-emerald-400",
+    amber: "text-amber-600 dark:text-amber-400",
+  }[color] || "text-sky-600 dark:text-sky-400";
 
   return (
-    <div className={`group relative flex-1 min-w-[140px] bg-gradient-to-br ${c.bg} border ${c.border} rounded-xl p-4 backdrop-blur-xl transition-all duration-300 hover:scale-[1.02]`} style={{ boxShadow: `0 4px 30px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.05)` }}>
-      <div className="absolute inset-0 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-500" style={{ boxShadow: `inset 0 0 40px ${c.glow}` }} />
-      <div className="relative z-10">
-        <div className={`p-2 rounded-lg bg-black/30 border border-white/5 ${c.text} w-fit mb-3`}>
-          <Icon size={16} strokeWidth={1.5} />
+    <div className="lab-card p-4 flex flex-col justify-between">
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider font-mono">{label}</span>
+        <div className="p-1.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-500">
+          <Icon size={14} />
         </div>
-        <p className={`text-2xl font-black tracking-tight ${c.text} font-tech-code`}>{value}</p>
-        <p className="text-[11px] font-semibold text-slate-400 mt-0.5 uppercase tracking-wider">{label}</p>
-        {sublabel && <p className="text-[10px] text-slate-500 mt-1 leading-tight">{sublabel}</p>}
+      </div>
+      <div>
+        <p className={`text-xl font-bold font-mono ${c}`}>{value}</p>
+        {sublabel && <p className="text-[10px] text-slate-500 mt-0.5">{sublabel}</p>}
       </div>
     </div>
   );
 }
 
-/* ───────────────────────────────────────────────────────────
-   METRIC BAR — gradient progress bar
-   ─────────────────────────────────────────────────────────── */
 function MetricBar({ label, value, max = 100, color, icon: Icon, suffix = "%" }) {
   const pct = Math.min((value / max) * 100, 100);
-  const barColor = color || (pct >= 70 ? "from-red-500 to-rose-600" : pct >= 40 ? "from-amber-500 to-orange-600" : "from-emerald-500 to-teal-600");
-  const txtColor = color || (pct >= 70 ? "text-red-400" : pct >= 40 ? "text-amber-400" : "text-emerald-400");
+  const barColor =
+    color || (pct >= 75 ? "bg-rose-500" : pct >= 50 ? "bg-amber-500" : "bg-emerald-500");
+
   return (
-    <div>
-      <div className="flex items-center justify-between mb-1.5">
-        <div className="flex items-center gap-2">
-          {Icon && <Icon size={13} className={txtColor} strokeWidth={2} />}
-          <span className="text-xs font-semibold text-slate-300 uppercase tracking-wider">{label}</span>
+    <div className="space-y-1">
+      <div className="flex items-center justify-between text-xs font-mono">
+        <div className="flex items-center gap-1.5">
+          {Icon && <Icon size={13} className="text-slate-400" />}
+          <span className="font-semibold text-slate-700 dark:text-slate-300 uppercase text-[10px]">{label}</span>
         </div>
-        <span className={`text-sm font-black font-tech-code ${txtColor}`}>{typeof value === "number" ? value.toFixed(1) : value}{suffix}</span>
+        <span className="font-bold text-slate-900 dark:text-slate-100">
+          {typeof value === "number" ? value.toFixed(1) : value}
+          {suffix}
+        </span>
       </div>
-      <div className="relative h-2 bg-slate-900/80 rounded-full overflow-hidden border border-slate-800/50">
-        <div className={`h-full rounded-full bg-gradient-to-r ${barColor} transition-all duration-1000 ease-out`} style={{ width: `${pct}%`, boxShadow: `0 0 10px ${pct >= 70 ? "rgba(239,68,68,0.3)" : pct >= 40 ? "rgba(245,158,11,0.3)" : "rgba(16,185,129,0.3)"}` }}>
-          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-shimmer" />
-        </div>
+      <div className="w-full h-1.5 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden">
+        <div
+          className={`h-full rounded-full transition-all duration-500 ${barColor}`}
+          style={{ width: `${pct}%` }}
+        />
       </div>
     </div>
   );
 }
 
-/* ───────────────────────────────────────────────────────────
-   LOADING SKELETON
-   ─────────────────────────────────────────────────────────── */
 function DetailSkeleton() {
   return (
-    <div className="animate-pulse space-y-8">
-      <div className="bg-[#0f172a]/30 border border-slate-900/60 p-6 rounded-xl">
-        <div className="h-3 w-32 bg-slate-800 rounded mb-4" />
-        <div className="h-8 w-96 bg-slate-800 rounded mb-2" />
-        <div className="h-4 w-64 bg-slate-800/60 rounded" />
-      </div>
+    <div className="animate-pulse space-y-4">
+      <div className="lab-card p-6 h-32" />
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {[...Array(4)].map((_, i) => <div key={i} className="h-28 bg-[#0f172a]/40 border border-slate-800 rounded-xl" />)}
-      </div>
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        <div className="lg:col-span-8 space-y-6">
-          <div className="h-80 bg-[#0f172a]/40 border border-slate-800 rounded-xl" />
-          <div className="h-40 bg-[#0f172a]/40 border border-slate-800 rounded-xl" />
-        </div>
-        <div className="lg:col-span-4 space-y-6">
-          <div className="h-60 bg-[#0f172a]/40 border border-slate-800 rounded-xl" />
-          <div className="h-40 bg-[#0f172a]/40 border border-slate-800 rounded-xl" />
-        </div>
+        {[...Array(4)].map((_, i) => (
+          <div key={i} className="lab-card h-24" />
+        ))}
       </div>
     </div>
   );
 }
 
-/* ───────────────────────────────────────────────────────────
-   EMPTY STATE SVG
-   ─────────────────────────────────────────────────────────── */
-function EmptyIllustration() {
-  return (
-    <svg width="120" height="120" viewBox="0 0 120 120" fill="none" className="opacity-60">
-      <rect x="10" y="20" width="100" height="80" rx="8" stroke="#1e293b" strokeWidth="2" fill="none" />
-      <rect x="20" y="30" width="35" height="25" rx="4" stroke="#334155" strokeWidth="1.5" fill="none" />
-      <rect x="65" y="30" width="35" height="25" rx="4" stroke="#334155" strokeWidth="1.5" fill="none" />
-      <line x1="20" y1="65" x2="100" y2="65" stroke="#1e293b" strokeWidth="1.5" />
-      <line x1="20" y1="75" x2="80" y2="75" stroke="#1e293b" strokeWidth="1.5" />
-      <line x1="20" y1="85" x2="90" y2="85" stroke="#1e293b" strokeWidth="1.5" />
-      <circle cx="60" cy="105" r="8" stroke="#06b6d4" strokeWidth="1.5" fill="none" />
-      <line x1="60" y1="100" x2="60" y2="110" stroke="#06b6d4" strokeWidth="1.5" />
-      <line x1="55" y1="105" x2="65" y2="105" stroke="#06b6d4" strokeWidth="1.5" />
-    </svg>
-  );
-}
-
-/* ═══════════════════════════════════════════════════════════
-   MAIN COMPONENT
-   ═══════════════════════════════════════════════════════════ */
 export default function InspectionDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -182,7 +121,6 @@ export default function InspectionDetailPage() {
   const [error, setError] = useState(null);
   const [isEmpty, setIsEmpty] = useState(false);
 
-  // UI state
   const [searchQuery, setSearchQuery] = useState("");
   const [viewMode, setViewMode] = useState("grid");
   const [sortBy, setSortBy] = useState("newest");
@@ -191,14 +129,15 @@ export default function InspectionDetailPage() {
   const [deletingId, setDeletingId] = useState(null);
   const [deleteTargetId, setDeleteTargetId] = useState(null);
 
-  // Data fetching
   useEffect(() => {
     if (!id) {
       setLoading(true);
       getTriageQueue({ page: 1, pageSize: 100 })
         .then((res) => {
-          if (res?.items?.length) { setReportsList(res.items); setIsEmpty(false); }
-          else setIsEmpty(true);
+          if (res?.items?.length) {
+            setReportsList(res.items);
+            setIsEmpty(false);
+          } else setIsEmpty(true);
         })
         .catch(() => setIsEmpty(true))
         .finally(() => setLoading(false));
@@ -206,13 +145,15 @@ export default function InspectionDetailPage() {
       setIsEmpty(false);
       setLoading(true);
       Promise.all([getCaseById(id), fetchCaseForReview(id)])
-        .then(([c, r]) => { setCaseData(c); setReviewData(r); })
+        .then(([c, r]) => {
+          setCaseData(c);
+          setReviewData(r);
+        })
         .catch((err) => setError(err.message))
         .finally(() => setLoading(false));
     }
   }, [id]);
 
-  // Derived data — ALL from backend, zero hardcoded values
   const merged = useMemo(() => ({ ...caseData, ...reviewData }), [caseData, reviewData]);
 
   const ssim = merged.metrics?.find((m) => m.name.includes("SSIM"))?.score ?? 0;
@@ -224,44 +165,68 @@ export default function InspectionDetailPage() {
   const ocrText = ocrResults[0]?.extracted || "No text detected";
   const ocrExpected = ocrResults[0]?.expected || "N/A";
   const recommendation = merged.recommendation || {};
-  const recDecision = recommendation.decision === "Accept" ? REVIEW_DECISION.APPROVED
-    : recommendation.decision === "Quarantine & Escalate" ? REVIEW_DECISION.REJECTED
+  const recDecision =
+    recommendation.decision === "Accept"
+      ? REVIEW_DECISION.APPROVED
+      : recommendation.decision === "Quarantine & Escalate"
+      ? REVIEW_DECISION.REJECTED
       : REVIEW_DECISION.NEEDS_MORE_EVIDENCE;
   const heatmapUrl = merged.heatmapUrl || null;
   const fraudScore = merged.fraudScore ?? 0;
   const aiConfidence = recommendation.confidence ?? merged.confidencePct ?? 0;
 
-  // Classification & Category — directly from backend fields, no regex parsing
   const aiClassification = merged.status || "UNKNOWN";
   const aiCategory = recommendation.decision || "UNKNOWN";
 
-  // Compute OCR accuracy from actual backend data
   const ocrFieldsTotal = Math.max(ocrResults.length, 1);
   const ocrFieldsMatched = ocrResults.filter((r) => r.match === true).length;
-  const ocrFieldsFilled = ocrResults.filter((r) => r.extracted && r.extracted !== "No text detected").length;
+  const ocrFieldsFilled = ocrResults.filter(
+    (r) => r.extracted && r.extracted !== "No text detected"
+  ).length;
   const ocrAccuracyPct = (ocrFieldsMatched / ocrFieldsTotal) * 100;
   const ocrCompletenessPct = (ocrFieldsFilled / ocrFieldsTotal) * 100;
 
-  // Filtered reports
   const filteredReports = useMemo(() => {
     let r = [...reportsList];
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
-      r = r.filter((x) => x.caseId?.toLowerCase().includes(q) || x.partNumber?.toLowerCase().includes(q) || x.commodity?.toLowerCase().includes(q));
+      r = r.filter(
+        (x) =>
+          x.caseId?.toLowerCase().includes(q) ||
+          x.partNumber?.toLowerCase().includes(q) ||
+          x.commodity?.toLowerCase().includes(q)
+      );
     }
     if (riskFilter !== "all") {
       r = r.filter((x) => {
         const s = x.riskScore ?? 0;
-        return riskFilter === "high" ? s >= 70 : riskFilter === "medium" ? s >= 40 && s < 70 : riskFilter === "low" ? s < 40 : true;
+        return riskFilter === "high"
+          ? s >= 70
+          : riskFilter === "medium"
+          ? s >= 40 && s < 70
+          : riskFilter === "low"
+          ? s < 40
+          : true;
       });
     }
-    r.sort((a, b) => sortBy === "risk" ? (b.riskScore ?? 0) - (a.riskScore ?? 0) : sortBy === "name" ? (a.partNumber ?? "").localeCompare(b.partNumber ?? "") : new Date(b.createdAt ?? 0) - new Date(a.createdAt ?? 0));
+    r.sort((a, b) =>
+      sortBy === "risk"
+        ? (b.riskScore ?? 0) - (a.riskScore ?? 0)
+        : sortBy === "name"
+        ? (a.partNumber ?? "").localeCompare(b.partNumber ?? "")
+        : new Date(b.createdAt ?? 0) - new Date(a.createdAt ?? 0)
+    );
     return r;
   }, [reportsList, searchQuery, riskFilter, sortBy]);
 
   const handleDownloadPDF = () => {
     if (!id) return;
-    window.open(`http://127.0.0.1:8000/api/reports/${id}/pdf?token=${encodeURIComponent(localStorage.getItem("fraudshield_auth_token") || "")}`, "_blank");
+    window.open(
+      `http://127.0.0.1:8000/api/reports/${id}/pdf?token=${encodeURIComponent(
+        localStorage.getItem("fraudshield_auth_token") || ""
+      )}`,
+      "_blank"
+    );
   };
 
   const handleDelete = (eOrCaseId, caseId) => {
@@ -299,205 +264,181 @@ export default function InspectionDetailPage() {
     }
   };
 
-  /* ═══════════════════════════════════════════════════════════
-     LOADING
-     ═══════════════════════════════════════════════════════════ */
   if (loading) {
-    return <Layout>{id ? <DetailSkeleton /> : <div className="flex flex-col items-center justify-center py-32"><Loader fullPage={false} label="Loading reports…" /></div>}</Layout>;
+    return (
+      <Layout>
+        {id ? (
+          <DetailSkeleton />
+        ) : (
+          <Loader fullPage={false} label="Fetching inspection archive records…" />
+        )}
+      </Layout>
+    );
   }
 
-  /* ═══════════════════════════════════════════════════════════
-     EMPTY
-     ═══════════════════════════════════════════════════════════ */
   if (isEmpty) {
     return (
       <Layout>
-        <div className="flex flex-col items-center justify-center py-24 text-center px-6">
-          <div className="relative mb-8">
-            <div className="absolute inset-0 bg-cyan-500/5 blur-3xl rounded-full" />
-            <div className="relative h-28 w-28 rounded-2xl bg-gradient-to-br from-slate-900 to-slate-950 border border-slate-800 flex items-center justify-center shadow-2xl">
-              <EmptyIllustration />
-            </div>
+        <div className="flex flex-col items-center justify-center py-20 text-center px-4">
+          <div className="h-16 w-16 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center text-slate-400 mb-4">
+            <FileText size={28} />
           </div>
-          <h2 className="text-2xl font-extrabold text-slate-100 mb-2">No Inspection Reports Found</h2>
-          <p className="text-sm text-slate-400 max-w-md leading-relaxed mb-8">Run your first AI-powered compliance check to generate automated inspection reports.</p>
-          <div className="flex items-center gap-4">
-            <button onClick={() => navigate(ROUTES.TRIAGE)} className="px-6 py-3 bg-gradient-to-r from-cyan-500 via-blue-600 to-purple-600 text-white rounded-xl font-bold text-sm hover:shadow-[0_0_30px_rgba(6,182,212,0.3)] transition-all flex items-center gap-2">
-              <Zap size={16} /> Launch AI Inspection Console
-            </button>
-            <button onClick={() => navigate(ROUTES.LANDING)} className="px-6 py-3 bg-slate-900/80 border border-slate-800 text-slate-300 rounded-xl font-semibold text-sm hover:bg-slate-800/80 transition-all">Back to Dashboard</button>
-          </div>
+          <h2 className="text-base font-bold text-slate-800 dark:text-slate-200">No Inspection Reports Found</h2>
+          <p className="text-xs text-slate-500 max-w-sm mt-1 mb-6">
+            Run a hardware diagnostic scan to record audit data.
+          </p>
+          <Button variant="primary" size="md" onClick={() => navigate(ROUTES.TRIAGE)} icon={<Zap size={15} />}>
+            Launch Inspection Triage Console
+          </Button>
         </div>
       </Layout>
     );
   }
 
-  /* ═══════════════════════════════════════════════════════════
-     LIST VIEW (no ID)
-     ═══════════════════════════════════════════════════════════ */
+  /* LIST ARCHIVE VIEW (No ID) */
   if (!id) {
     return (
-      <Layout title="Inspection Reports Archive">
-        {/* Hero */}
-        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#0c1929] via-[#0f172a] to-[#0a0f1d] border border-slate-800/80 p-8 mb-8">
-          <div className="absolute top-0 right-0 w-96 h-96 bg-cyan-500/5 blur-[120px] rounded-full" />
-          <div className="absolute bottom-0 left-0 w-64 h-64 bg-purple-500/5 blur-[100px] rounded-full" />
-          <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
-            <div className="flex items-center gap-3">
-              <div className="p-2.5 rounded-xl bg-gradient-to-br from-cyan-500/20 to-blue-600/20 border border-cyan-500/20"><FileText size={20} className="text-cyan-400" /></div>
-              <div>
-                <h1 className="text-2xl font-black text-slate-100 tracking-tight">Inspection Reports Archive</h1>
-                <p className="text-sm text-slate-400 mt-1">Review historical compliance records and multi-agent audit trails.</p>
-              </div>
+      <Layout title="Inspection Reports Archive" subtitle="Review historical RMA compliance reports & audit trails">
+        <div className="lab-card p-4 mb-4 flex flex-col md:flex-row justify-between items-center gap-3">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-sky-500/10 text-sky-600 dark:text-sky-400 border border-sky-500/20">
+              <FileText size={20} />
             </div>
-            <div className="flex items-center gap-3">
-              <div className="px-4 py-2 bg-cyan-500/10 border border-cyan-500/20 rounded-xl text-center">
-                <p className="text-2xl font-black text-cyan-400 font-tech-code">{reportsList.length}</p>
-                <p className="text-[10px] text-cyan-400/70 font-bold uppercase tracking-widest">Total Scans</p>
-              </div>
-              <button onClick={() => navigate(ROUTES.TRIAGE)} className="px-5 py-2.5 bg-gradient-to-r from-cyan-500 to-blue-600 text-white rounded-xl font-bold text-xs hover:shadow-[0_0_25px_rgba(6,182,212,0.25)] transition-all flex items-center gap-2">
-                <Zap size={14} /> New Inspection
-              </button>
+            <div>
+              <h2 className="text-sm font-bold text-slate-900 dark:text-slate-100">Audit Reports Library</h2>
+              <p className="text-xs text-slate-500 font-mono">{reportsList.length} Archived Case Scans</p>
             </div>
           </div>
+          <Button variant="primary" size="sm" onClick={() => navigate(ROUTES.TRIAGE)} icon={<Zap size={14} />}>
+            New Inspection
+          </Button>
         </div>
 
-        {/* Search & Filters */}
-        <div className="bg-[#0f172a]/40 border border-slate-800/80 rounded-xl p-4 mb-6 backdrop-blur-xl">
-          <div className="flex flex-col md:flex-row gap-4">
+        {/* Search & Filter Toolbar */}
+        <div className="lab-card p-3 mb-4 space-y-3">
+          <div className="flex flex-col md:flex-row gap-3">
             <div className="relative flex-1">
-              <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
-              <input type="text" placeholder="Search by case ID, part number, commodity..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-2.5 bg-slate-900/80 border border-slate-800 rounded-lg text-sm text-slate-200 placeholder:text-slate-500 focus:border-cyan-500/40 focus:outline-none focus:ring-1 focus:ring-cyan-500/20 transition-all" />
-              {searchQuery && <button onClick={() => setSearchQuery("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300"><XCircle size={14} /></button>}
+              <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+              <input
+                type="text"
+                placeholder="Search by case ID, part code, commodity..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full h-8 pl-9 pr-8 text-xs lab-input"
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery("")}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                >
+                  <XCircle size={14} />
+                </button>
+              )}
             </div>
+
             <div className="flex items-center gap-2">
-              <button onClick={() => setShowFilters(!showFilters)} className={`flex items-center gap-2 px-3.5 py-2.5 rounded-lg border text-xs font-semibold transition-all ${showFilters || riskFilter !== "all" ? "bg-cyan-500/10 border-cyan-500/30 text-cyan-400" : "bg-slate-900/80 border-slate-800 text-slate-400"}`}>
-                <Filter size={13} /> Filters {riskFilter !== "all" && <span className="h-2 w-2 rounded-full bg-cyan-400 animate-pulse" />}
-              </button>
-              <div className="flex border border-slate-800 rounded-lg overflow-hidden">
-                <button onClick={() => setViewMode("grid")} className={`p-2.5 transition-all ${viewMode === "grid" ? "bg-cyan-500/15 text-cyan-400" : "bg-slate-900/80 text-slate-500"}`}><Grid size={14} /></button>
-                <button onClick={() => setViewMode("list")} className={`p-2.5 transition-all ${viewMode === "list" ? "bg-cyan-500/15 text-cyan-400" : "bg-slate-900/80 text-slate-500"}`}><List size={14} /></button>
-              </div>
-              <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className="px-3 py-2.5 bg-slate-900/80 border border-slate-800 rounded-lg text-xs text-slate-300 font-semibold focus:border-cyan-500/40 focus:outline-none cursor-pointer">
-                <option value="newest">Newest</option>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowFilters(!showFilters)}
+                icon={<Filter size={13} />}
+              >
+                Filters
+              </Button>
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value)}
+                className="h-8 px-3 text-xs lab-input font-bold"
+              >
+                <option value="newest">Newest First</option>
                 <option value="risk">Highest Risk</option>
-                <option value="name">By Part</option>
+                <option value="name">Part Code</option>
               </select>
             </div>
           </div>
+
           {showFilters && (
-            <div className="flex items-center gap-4 mt-4 pt-4 border-t border-slate-800/60">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Risk:</span>
-              {[{ id: "all", label: "All" }, { id: "high", label: "Critical" }, { id: "medium", label: "Warning" }, { id: "low", label: "Clean" }].map(({ id: fId, label }) => {
-                const isActive = riskFilter === fId;
-                const cm = { red: "from-red-500/20 to-red-600/10 border-red-500/30 text-red-400", amber: "from-amber-500/20 to-amber-600/10 border-amber-500/30 text-amber-400", emerald: "from-emerald-500/20 to-emerald-600/10 border-emerald-500/30 text-emerald-400", slate: "from-cyan-500/10 to-blue-600/10 border-cyan-500/20 text-cyan-400" };
-                const c = fId === "high" ? "red" : fId === "medium" ? "amber" : fId === "low" ? "emerald" : "slate";
-                return <button key={fId} onClick={() => setRiskFilter(fId)} className={`px-3.5 py-1.5 rounded-lg text-[11px] font-bold border transition-all ${isActive ? `bg-gradient-to-br ${cm[c]}` : "bg-slate-900/60 border-slate-800 text-slate-500"}`}>{label}</button>;
-              })}
+            <div className="flex items-center gap-3 pt-2 border-t border-slate-200 dark:border-slate-800 text-xs">
+              <span className="text-[10px] font-bold text-slate-500 uppercase">Risk Level:</span>
+              {[
+                { id: "all", label: "All" },
+                { id: "high", label: "Critical" },
+                { id: "medium", label: "Warning" },
+                { id: "low", label: "Clean" },
+              ].map(({ id: fId, label }) => (
+                <button
+                  key={fId}
+                  onClick={() => setRiskFilter(fId)}
+                  className={`px-2.5 py-0.5 rounded font-mono text-[10px] font-bold border transition ${
+                    riskFilter === fId
+                      ? "bg-sky-600 text-white border-sky-500"
+                      : "border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
             </div>
           )}
         </div>
 
-        {/* Count */}
-        <div className="flex items-center justify-between mb-4">
-          <p className="text-xs text-slate-500">Showing <span className="text-slate-300 font-bold">{filteredReports.length}</span> of <span className="text-slate-300 font-bold">{reportsList.length}</span> reports</p>
-          <button onClick={() => { setLoading(true); getTriageQueue({ page: 1, pageSize: 100 }).then((res) => { if (res?.items) setReportsList(res.items); }).finally(() => setLoading(false)); }} className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-cyan-400 transition-colors"><RefreshCw size={12} /> Refresh</button>
-        </div>
+        {/* Reports Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {filteredReports.map((r) => {
+            const score = r.riskScore ?? 0;
+            return (
+              <div
+                key={r.id}
+                onClick={() => navigate(`${ROUTES.CASE_DETAIL}/${r.caseId}`)}
+                className="lab-card p-4 space-y-3 cursor-pointer hover:border-sky-500/40 transition"
+              >
+                <div className="flex justify-between items-start">
+                  <div>
+                    <p className="font-mono font-bold text-xs text-slate-900 dark:text-slate-100">{r.caseId}</p>
+                    <p className="text-[10px] text-slate-500 font-mono uppercase">{r.commodity || "N/A"}</p>
+                  </div>
+                  <Badge status={r.status} size="sm" />
+                </div>
 
-        {/* Grid */}
-        {viewMode === "grid" ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-            {filteredReports.map((r) => {
-              const score = r.riskScore ?? 0;
-              const isHigh = score >= 70;
-              const isClean = score < 30;
-              const riskColor = isClean ? "from-emerald-500/10 to-teal-600/5 border-emerald-500/20" : isHigh ? "from-red-500/10 to-rose-600/5 border-red-500/20" : "from-amber-500/10 to-orange-600/5 border-amber-500/20";
-              return (
-                <div key={r.id} onClick={() => navigate(`${ROUTES.CASE_DETAIL}/${r.caseId}`)} className="group relative bg-gradient-to-br from-[#0f172a]/70 to-[#0a0f1d]/70 border border-slate-800/80 rounded-xl p-5 cursor-pointer transition-all duration-300 hover:scale-[1.02] hover:-translate-y-1 overflow-hidden" style={{ boxShadow: "0 4px 30px rgba(0,0,0,0.3)" }}>
-                  <div className="absolute inset-0 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-500" style={{ background: "radial-gradient(600px circle at 50% 50%, rgba(6,182,212,0.06), transparent 40%)" }} />
-                  <div className="relative z-10">
-                    <div className="flex items-start justify-between mb-3">
-                      <div className="flex items-center gap-2.5">
-                        <div className={`p-2 rounded-lg bg-gradient-to-br ${riskColor}`}>
-                          {isHigh ? <AlertTriangle size={14} className="text-red-400" /> : isClean ? <CheckCircle2 size={14} className="text-emerald-400" /> : <AlertCircle size={14} className="text-amber-400" />}
-                        </div>
-                        <div>
-                          <p className="text-sm font-bold text-slate-200 group-hover:text-cyan-400 transition-colors font-tech-code">{r.caseId}</p>
-                          <p className="text-[10px] text-slate-500 font-medium uppercase tracking-wider">{r.commodity || "N/A"}</p>
-                        </div>
-                      </div>
-                      <StatusBadge status={r.status} fraudScore={score} />
-                    </div>
-                    <div className="flex items-center gap-2 mb-4"><Hash size={11} className="text-slate-500" /><span className="text-xs font-medium text-slate-400">{r.partNumber}</span></div>
-                    <div className="mb-4"><MetricBar label="Fraud Risk" value={score} max={100} suffix="%" /></div>
-                    <div className="flex items-center justify-between pt-3 border-t border-slate-800/60">
-                      <div className="flex items-center gap-1.5 text-[10px] text-slate-500"><Clock size={10} />{r.createdAt ? new Date(r.createdAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "N/A"}</div>
-                      <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-                        <button onClick={(e) => handleDelete(e, r.caseId)} disabled={deletingId === r.caseId} className="p-1.5 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition-all"><Trash2 size={12} /></button>
-                        <button className="flex items-center gap-1 text-[10px] font-bold text-cyan-400 group-hover:text-cyan-300 transition-colors uppercase tracking-wider">Details <ArrowRight size={11} /></button>
-                      </div>
-                    </div>
+                <div className="flex items-center gap-1.5 text-xs text-slate-700 dark:text-slate-300">
+                  <Hash size={12} className="text-slate-400" />
+                  <span className="font-mono">{r.partNumber}</span>
+                </div>
+
+                <MetricBar label="Risk Score" value={score} max={100} suffix="%" />
+
+                <div className="flex justify-between items-center pt-2 border-t border-slate-200 dark:border-slate-800 text-[10px] text-slate-500">
+                  <span className="font-mono"><Clock size={10} className="inline mr-1" />{r.createdAt || "Recent"}</span>
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={(e) => handleDelete(e, r.caseId)}
+                      className="p-1 text-slate-400 hover:text-rose-500 transition"
+                    >
+                      <Trash2 size={12} />
+                    </button>
+                    <span className="text-sky-600 dark:text-sky-400 font-bold uppercase flex items-center">
+                      Details <ArrowRight size={10} />
+                    </span>
                   </div>
                 </div>
-              );
-            })}
-            {filteredReports.length === 0 && (
-              <div className="col-span-full flex flex-col items-center justify-center py-16 text-center">
-                <div className="h-14 w-14 rounded-full bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-500 mb-4"><Search size={24} /></div>
-                <h3 className="text-base font-bold text-slate-300 mb-1">No matching reports</h3>
-                <p className="text-xs text-slate-500 max-w-xs">Try adjusting your search or filters.</p>
-                <button onClick={() => { setSearchQuery(""); setRiskFilter("all"); }} className="mt-4 px-4 py-2 bg-slate-900 border border-slate-800 text-slate-400 rounded-lg text-xs font-semibold hover:text-slate-200 transition-colors">Clear filters</button>
               </div>
-            )}
-          </div>
-        ) : (
-          /* List */
-          <div className="bg-[#0f172a]/40 border border-slate-800/80 rounded-xl overflow-hidden">
-            <div className="grid grid-cols-[2fr_1.5fr_1fr_1fr_1fr_auto] gap-4 px-6 py-3.5 bg-slate-900/60 border-b border-slate-800/80 text-[10px] font-black uppercase tracking-widest text-slate-500">
-              <span>Case / Part</span><span>Commodity</span><span>Risk</span><span>Verdict</span><span>Date</span><span className="text-right">Actions</span>
-            </div>
-            <div className="divide-y divide-slate-800/50">
-              {filteredReports.map((r) => {
-                const score = r.riskScore ?? 0;
-                const isHigh = score >= 70;
-                const isClean = score < 30;
-                const rc = isClean ? "text-emerald-400 bg-emerald-500/10" : isHigh ? "text-red-400 bg-red-500/10" : "text-amber-400 bg-amber-500/10";
-                return (
-                  <div key={r.id} onClick={() => navigate(`${ROUTES.CASE_DETAIL}/${r.caseId}`)} className="grid grid-cols-[2fr_1.5fr_1fr_1fr_1fr_auto] gap-4 px-6 py-4 items-center hover:bg-slate-900/30 cursor-pointer transition-all group">
-                    <div>
-                      <p className="text-sm font-bold text-slate-200 group-hover:text-cyan-400 transition-colors font-tech-code">{r.caseId}</p>
-                      <p className="text-[11px] text-slate-500 font-medium">{r.partNumber}</p>
-                    </div>
-                    <span className="text-xs text-slate-400 capitalize font-medium">{r.commodity}</span>
-                    <div><span className={`px-2.5 py-1 rounded-lg text-[11px] font-bold font-tech-code ${rc}`}>{score}%</span></div>
-                    <div><StatusBadge status={r.status} fraudScore={score} /></div>
-                    <span className="text-[11px] text-slate-500 font-tech-code">{r.createdAt ? new Date(r.createdAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "2-digit" }) : "—"}</span>
-                    <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-                      <button onClick={(e) => handleDelete(e, r.caseId)} disabled={deletingId === r.caseId} className="p-1.5 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition-all"><Trash2 size={13} /></button>
-                      <button className="text-cyan-400 group-hover:text-cyan-300 font-bold flex items-center gap-1 text-[10px] uppercase tracking-wider transition-all">View <ArrowRight size={12} /></button>
-                    </div>
-                  </div>
-                );
-              })}
-              {filteredReports.length === 0 && <div className="px-6 py-12 text-center"><p className="text-sm text-slate-500">No reports match your criteria</p></div>}
-            </div>
-          </div>
-        )}
+            );
+          })}
+        </div>
 
-        {/* ── CUSTOM DELETE CONFIRMATION MODAL FOR QUEUE VIEW ──────── */}
         <Modal
           open={Boolean(deleteTargetId)}
           onClose={() => setDeleteTargetId(null)}
           title="Confirm Report Deletion"
           size="sm"
           footer={
-            <div className="flex items-center justify-end gap-3 w-full">
-              <Button variant="ghost" onClick={() => setDeleteTargetId(null)}>
+            <div className="flex items-center justify-end gap-2 w-full">
+              <Button variant="outline" size="sm" onClick={() => setDeleteTargetId(null)}>
                 Cancel
               </Button>
               <Button
                 variant="danger"
+                size="sm"
                 loading={Boolean(deletingId)}
                 onClick={executeDelete}
                 icon={<Trash2 size={14} />}
@@ -507,346 +448,224 @@ export default function InspectionDetailPage() {
             </div>
           }
         >
-          <div className="p-4 flex items-start gap-4">
-            <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 shrink-0">
-              <AlertTriangle size={24} />
-            </div>
-            <div>
-              <h4 className="text-sm font-extrabold text-slate-100 mb-1">Delete Inspection Report?</h4>
-              <p className="text-xs text-slate-400 leading-relaxed">
-                Are you sure you want to permanently delete report <span className="font-tech-code text-red-400 font-bold">{deleteTargetId}</span>? This action is permanent and cannot be undone.
-              </p>
-            </div>
+          <div className="space-y-2 text-xs">
+            <p className="font-bold text-slate-800 dark:text-slate-200">
+              Are you sure you want to delete inspection report <span className="font-mono text-rose-500">{deleteTargetId}</span>?
+            </p>
+            <p className="text-slate-500">This action will remove the case and evidence log permanently.</p>
           </div>
         </Modal>
       </Layout>
     );
   }
 
-  /* ═══════════════════════════════════════════════════════════
-     ERROR
-     ═══════════════════════════════════════════════════════════ */
   if (error) {
     return (
       <Layout>
-        <div className="flex flex-col items-center justify-center py-24 gap-6 text-center px-4">
-          <div className="relative">
-            <div className="absolute inset-0 bg-red-500/10 blur-3xl rounded-full" />
-            <div className="relative h-20 w-20 rounded-2xl bg-gradient-to-br from-red-500/20 to-rose-600/20 border border-red-500/30 flex items-center justify-center"><AlertTriangle size={36} className="text-red-400" /></div>
-          </div>
-          <div>
-            <h2 className="text-xl font-black text-slate-200 mb-2">Failed to Load Report</h2>
-            <p className="text-sm text-slate-400 max-w-sm">{error}</p>
-          </div>
-          <div className="flex items-center gap-3">
-            <button onClick={() => navigate(ROUTES.CASE_DETAIL)} className="px-5 py-2.5 bg-gradient-to-r from-cyan-500 to-blue-600 text-white rounded-xl font-bold text-xs hover:shadow-[0_0_20px_rgba(6,182,212,0.2)] transition-all">Back to Reports</button>
-            <button onClick={() => window.location.reload()} className="px-5 py-2.5 bg-slate-900 border border-slate-800 text-slate-300 rounded-xl font-semibold text-xs hover:bg-slate-800 transition-all flex items-center gap-1.5"><RefreshCw size={12} /> Retry</button>
-          </div>
+        <div className="p-8 text-center space-y-4">
+          <AlertTriangle size={32} className="mx-auto text-rose-500" />
+          <h2 className="text-sm font-bold text-slate-800 dark:text-slate-200">Report Ingestion Error</h2>
+          <p className="text-xs text-slate-500">{error}</p>
+          <Button variant="outline" size="sm" onClick={() => navigate(ROUTES.CASE_DETAIL)}>
+            Back to Archive
+          </Button>
         </div>
       </Layout>
     );
   }
 
-  /* ═══════════════════════════════════════════════════════════
-     DETAIL VIEW (ID present) — ALL DATA FROM BACKEND
-     ═══════════════════════════════════════════════════════════ */
+  /* SINGLE CASE AUDIT DETAIL VIEW */
   return (
     <Layout>
-      {/* ── 1. HERO HEADER ───────────────────────────── */}
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#0c1929] via-[#0f172a] to-[#0a0f1d] border border-slate-800/80 p-6 md:p-8 mb-6">
-        <div className="absolute -top-20 -right-20 w-80 h-80 bg-cyan-500/5 blur-[120px] rounded-full" />
-        <div className="absolute -bottom-20 -left-20 w-60 h-60 bg-purple-500/5 blur-[100px] rounded-full" />
-        <div className="relative z-10">
-          <button onClick={() => navigate(ROUTES.CASE_DETAIL)} className="flex items-center gap-1.5 text-[11px] font-bold text-slate-500 hover:text-cyan-400 transition-colors mb-4 group">
-            <ArrowRight size={13} className="rotate-180 group-hover:-translate-x-1 transition-transform" /> Back to Reports
+      {/* Header Banner */}
+      <div className="lab-card p-4 mb-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => navigate(ROUTES.CASE_DETAIL)}
+              className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-xs font-bold font-mono"
+            >
+              ← Reports Archive
+            </button>
+            <span className="text-slate-400">/</span>
+            <span className="font-mono font-bold text-xs text-sky-600 dark:text-sky-400">#{merged.id}</span>
+            <Badge status={merged.status} size="sm" />
+          </div>
+          <h1 className="text-base font-bold text-slate-900 dark:text-slate-100">
+            Audit Report: <span className="font-mono">{merged.partCode}</span>
+          </h1>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={handleDownloadPDF} icon={<Download size={13} />}>
+            PDF Report
+          </Button>
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={() => navigate(`${ROUTES.HUMAN_REVIEW}?caseId=${merged.id}`)}
+            icon={<ShieldAlert size={13} />}
+          >
+            QA Review
+          </Button>
+          <button
+            onClick={() => handleDelete(merged.id)}
+            className="p-1.5 rounded border border-slate-200 dark:border-slate-800 text-slate-400 hover:text-rose-500"
+          >
+            <Trash2 size={14} />
           </button>
-          <div className="flex flex-col md:flex-row md:items-start justify-between gap-5">
-            <div className="flex items-start gap-4">
-              <div className="p-3 rounded-xl bg-gradient-to-br from-cyan-500/20 to-blue-600/20 border border-cyan-500/20 hidden md:flex items-center justify-center">
-                <FileText size={24} className="text-cyan-400" />
-              </div>
-              <div>
-                <div className="flex items-center gap-3 flex-wrap mb-1.5">
-                  <h1 className="text-2xl md:text-3xl font-black text-slate-100 tracking-tight">Inspection Report</h1>
-                  <span className="font-tech-code text-cyan-400 text-sm font-bold bg-cyan-950/30 px-3 py-1 border border-cyan-500/20 rounded-lg">#{merged.id}</span>
-                  <StatusBadge fraudScore={fraudScore} />
-                </div>
-                <div className="flex items-center gap-4 flex-wrap mt-1">
-                  {merged.partCode && <span className="flex items-center gap-1.5 text-xs text-slate-400 font-tech-code"><Hash size={11} className="text-slate-500" />{merged.partCode}</span>}
-                  {merged.commodity && <span className="flex items-center gap-1.5 text-xs text-slate-400"><Cpu size={11} className="text-slate-500" />{merged.commodity}</span>}
-                  {merged.updatedAt && <span className="flex items-center gap-1.5 text-xs text-slate-500"><Clock size={11} />{new Date(merged.updatedAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}</span>}
-                </div>
-              </div>
-            </div>
-            <div className="flex items-center gap-2.5 flex-shrink-0">
-              <button onClick={handleDownloadPDF} className="px-4 py-2.5 bg-slate-900/80 border border-slate-800 hover:border-cyan-500/30 text-slate-300 hover:text-cyan-400 rounded-xl text-xs font-bold transition-all flex items-center gap-2"><Download size={13} /> PDF</button>
-              <button onClick={() => navigate(`${ROUTES.HUMAN_REVIEW}?caseId=${merged.id}`)} className="px-5 py-2.5 bg-gradient-to-r from-cyan-500 to-blue-600 text-white rounded-xl text-xs font-bold transition-all hover:scale-[1.02] hover:shadow-[0_0_25px_rgba(6,182,212,0.25)] flex items-center gap-2"><ShieldAlert size={13} /> Human Review <ArrowRight size={12} /></button>
-              <button onClick={() => handleDelete(merged.id)} className="p-2.5 bg-slate-900/80 border border-slate-800 hover:border-red-500/30 text-slate-500 hover:text-red-400 rounded-xl transition-all" title="Delete"><Trash2 size={14} /></button>
-            </div>
-          </div>
         </div>
       </div>
 
-      {/* ── 2. EXECUTIVE STATS ────────────────────────── */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-6">
-        <StatCard icon={Gauge} label="Fraud Risk" value={`${fraudScore}/100`} sublabel={fraudScore >= 70 ? "Critical" : fraudScore >= 40 ? "Warning" : "Passed"} color={fraudScore >= 70 ? "red" : fraudScore >= 40 ? "amber" : "emerald"} />
-        <StatCard icon={BarChart3} label="SSIM Score" value={`${(ssim * 100).toFixed(1)}%`} sublabel={ssim >= 0.8 ? "Within tolerance" : ssim >= 0.5 ? "Below threshold" : "Deviated"} color={ssim >= 0.8 ? "emerald" : ssim >= 0.5 ? "amber" : "red"} />
-        <StatCard icon={Zap} label="Vector Embedding" value={`${vectorMatchScore.toFixed(1)}%`} sublabel={vectorMatchScore >= 80 ? "512-Dim Match" : "Descriptor Loss"} color={vectorMatchScore >= 80 ? "cyan" : vectorMatchScore >= 60 ? "amber" : "red"} />
-        <StatCard icon={ScanLine} label="Keypoint Match" value={`${(keypoint * 100).toFixed(1)}%`} sublabel={keypoint >= 0.5 ? "Adequate" : keypoint >= 0.3 ? "Limited" : "Poor"} color={keypoint >= 0.5 ? "emerald" : keypoint >= 0.3 ? "amber" : "red"} />
-        <StatCard icon={CheckCircle2} label="OCR" value={ocrMatch ? "PASSED" : "FAILED"} sublabel={ocrMatch ? "Text matched" : `Expected "${ocrExpected}"`} color={ocrMatch ? "emerald" : "red"} />
+      {/* KPI Stats Row */}
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-4">
+        <StatCard
+          icon={Gauge}
+          label="Fraud Score"
+          value={`${fraudScore}/100`}
+          sublabel={fraudScore >= 70 ? "Critical Risk" : fraudScore >= 40 ? "Warning" : "Passed"}
+          color={fraudScore >= 70 ? "rose" : fraudScore >= 40 ? "amber" : "emerald"}
+        />
+        <StatCard
+          icon={BarChart3}
+          label="SSIM Score"
+          value={`${(ssim * 100).toFixed(1)}%`}
+          sublabel={ssim >= 0.8 ? "Match" : "Structural Diff"}
+          color={ssim >= 0.8 ? "emerald" : "amber"}
+        />
+        <StatCard
+          icon={Zap}
+          label="Vector Sim"
+          value={`${vectorMatchScore.toFixed(1)}%`}
+          sublabel="512-Dim Cosine"
+          color="sky"
+        />
+        <StatCard
+          icon={ScanLine}
+          label="Keypoint Match"
+          value={`${(keypoint * 100).toFixed(1)}%`}
+          sublabel="ORB Descriptors"
+          color="sky"
+        />
+        <StatCard
+          icon={CheckCircle2}
+          label="OCR Label"
+          value={ocrMatch ? "PASS" : "FAIL"}
+          sublabel={ocrMatch ? "Serial Verified" : "Mismatch Detected"}
+          color={ocrMatch ? "emerald" : "rose"}
+        />
       </div>
 
-      {/* ── 3. AI VERDICT + FRAUD GAUGE ──────────────── */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 mb-6">
+      {/* Decision Judge Banner */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 mb-4">
         <div className="lg:col-span-8">
-          <div className="relative overflow-hidden rounded-xl border border-slate-800/80 bg-gradient-to-br from-[#0f172a]/70 to-[#0a0f1d]/70 p-6 h-full">
-            <div className="absolute top-0 right-0 w-64 h-64 bg-cyan-500/3 blur-[80px]" />
-            <RecommendationCard recommendation={recDecision} confidence={aiConfidence} reasoning={recommendation.reasoning || "AI confidence is below the auto-decide threshold. Manual review required."} flags={recommendation.flags || []} />
-          </div>
+          <RecommendationCard
+            recommendation={recDecision}
+            confidence={aiConfidence}
+            reasoning={recommendation.reasoning || "AI confidence score requires operator verification."}
+            flags={recommendation.flags || []}
+          />
         </div>
-        <div className="lg:col-span-4">
-          <div className="relative overflow-hidden rounded-xl border border-slate-800/80 bg-gradient-to-br from-[#0f172a]/70 to-[#0a0f1d]/70 p-6 h-full flex flex-col items-center justify-center">
-            <div className="absolute top-0 right-0 w-48 h-48 bg-purple-500/3 blur-[80px]" />
-            <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-4">Overall Risk</h3>
-            <FraudScore score={fraudScore} size="lg" showLabel={true} />
+        <div className="lg:col-span-4 lab-card p-4 flex flex-col items-center justify-center">
+          <p className="text-[10px] font-bold font-mono text-slate-500 uppercase mb-2">Overall Risk Gauge</p>
+          <FraudScore score={fraudScore} size="md" showLabel={false} />
+        </div>
+      </div>
+
+      {/* Image Comparison */}
+      <div className="mb-4">
+        <ImageComparison
+          goldenUrl={merged.goldenImageUrl}
+          uploadedUrl={merged.uploadedImageUrl}
+          imageHash={merged.imageHash}
+        />
+      </div>
+
+      {/* Heatmap + Reasoning */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+        <HeatmapViewer
+          imageUrl={merged.uploadedImageUrl}
+          heatmapUrl={heatmapUrl}
+          label={heatmapUrl ? "SSIM Anomaly Heatmap Overlay" : "AI Region of Interest"}
+        />
+
+        <div className="lab-card p-4 space-y-3">
+          <h3 className="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider flex items-center gap-2">
+            <FileText size={16} className="text-sky-500" /> AI Audit Narrative &amp; Justification
+          </h3>
+          <div className="p-3 rounded-lg bg-slate-100 dark:bg-slate-900 text-xs text-slate-700 dark:text-slate-300 leading-relaxed font-sans">
+            {recommendation.reasoning || "Diagnostic complete."}
+          </div>
+          <div className="text-[10px] text-slate-500 font-mono">
+            Pipeline method: Multi-agent SSIM alignment + EasyOCR serial verification + Vector Embedding Cosine search.
           </div>
         </div>
       </div>
 
-      {/* ── 4. MULTI-ANGLE FUSION INTELLIGENCE BANNER & VISUAL GALLERY (ONLY FOR MULTI-ANGLE RUNS) ──────── */}
-      {((merged.multiAngleViews && merged.multiAngleViews.length > 1) || (recommendation.reasoning && recommendation.reasoning.includes("MULTI-ANGLE FUSION"))) && (
-        <div className="mb-6 rounded-xl border border-cyan-500/30 bg-gradient-to-r from-cyan-950/40 via-slate-900/80 to-blue-950/40 p-5 shadow-[0_0_25px_rgba(6,182,212,0.1)] space-y-4">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-cyan-500/15 pb-3.5">
-            <div className="flex items-center gap-3">
-              <div className="p-2.5 rounded-xl bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 shrink-0">
-                <Zap size={18} />
-              </div>
-              <div>
-                <p className="text-xs font-black uppercase tracking-wider text-cyan-400 flex items-center gap-2">
-                  Multi-Angle Risk Fusion System
-                  <span className="px-2 py-0.5 rounded-full text-[9px] font-extrabold bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 uppercase tracking-widest">
-                    Multi-View Active ✨
-                  </span>
-                </p>
-                <p className="text-[11px] text-slate-400 mt-0.5">
-                  Evaluated across complementary camera angles • Joint multi-angle risk assessment compiled.
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Fused Risk:</span>
-              <StatusBadge fraudScore={fraudScore} size="sm" />
-            </div>
-          </div>
-
-          {/* 3-Card Visual Comparison Evidence Grid: Golden Standard | Top View | Side View */}
-          <div>
-            <p className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 mb-3 flex items-center gap-1.5">
-              <ScanLine size={13} className="text-cyan-400" />
-              Cross-Angle Visual Inspection Evidence (3 Reference Cards)
-            </p>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {/* Card 1: OEM Golden Standard */}
-              <div className="p-3.5 rounded-xl bg-slate-950/70 border border-emerald-500/30 space-y-2.5 hover:border-emerald-500/50 transition-all">
-                <div className="flex items-center justify-between">
-                  <span className="px-2 py-0.5 rounded text-[9px] font-extrabold bg-emerald-950 text-emerald-300 border border-emerald-500/30 uppercase tracking-wider flex items-center gap-1">
-                    ⭐ OEM GOLDEN STANDARD
-                  </span>
-                  <span className="text-[11px] font-tech-code font-bold text-emerald-400">PASSED</span>
-                </div>
-                <div className="aspect-video rounded-lg bg-slate-900 border border-slate-800 overflow-hidden relative group">
-                  <img src={merged.goldenImageUrl} alt="OEM Golden Standard" className="w-full h-full object-contain" />
-                  <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity p-2 flex items-end justify-between">
-                    <span className="text-[9px] text-slate-300 font-bold uppercase">Master Reference Standard</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Card 2: Primary Scan (Top View) */}
-              <div className="p-3.5 rounded-xl bg-slate-950/70 border border-cyan-500/30 space-y-2.5 hover:border-cyan-500/50 transition-all">
-                <div className="flex items-center justify-between">
-                  <span className="px-2 py-0.5 rounded text-[9px] font-extrabold bg-cyan-950 text-cyan-300 border border-cyan-500/30 uppercase tracking-wider">
-                    📷 TOP VIEW (PRIMARY)
-                  </span>
-                  <span className="text-[11px] font-tech-code font-bold text-red-400">{fraudScore}/100</span>
-                </div>
-                <div className="aspect-video rounded-lg bg-slate-900 border border-slate-800 overflow-hidden relative group">
-                  <img src={merged.uploadedImageUrl} alt="Primary Top View Scan" className="w-full h-full object-contain" />
-                  <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity p-2 flex items-end justify-between">
-                    <span className="text-[9px] text-slate-300 font-bold uppercase">Top Angle Target Scan</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Card 3: Secondary Scan (Side View) */}
-              {(() => {
-                const secondaryView = (merged.multiAngleViews || []).find(v => v.caseId !== merged.id || (v.angle && v.angle.toLowerCase() !== "top")) || (merged.multiAngleViews || [])[1] || {};
-                const secAngle = secondaryView.angle ? secondaryView.angle.toUpperCase() : "SIDE";
-                const secScore = secondaryView.fraudScore !== undefined ? secondaryView.fraudScore : fraudScore;
-                const secUrl = secondaryView.uploadedUrl || merged.uploadedImageUrl;
-                return (
-                  <div className="p-3.5 rounded-xl bg-slate-950/70 border border-indigo-500/30 space-y-2.5 hover:border-indigo-500/50 transition-all">
-                    <div className="flex items-center justify-between">
-                      <span className="px-2 py-0.5 rounded text-[9px] font-extrabold bg-indigo-950 text-indigo-300 border border-indigo-500/30 uppercase tracking-wider">
-                        📷 {secAngle} VIEW (SECONDARY)
-                      </span>
-                      <span className="text-[11px] font-tech-code font-bold text-amber-400">{secScore}/100</span>
-                    </div>
-                    <div className="aspect-video rounded-lg bg-slate-900 border border-slate-800 overflow-hidden relative group">
-                      <img src={secUrl} alt="Secondary View Scan" className="w-full h-full object-contain" />
-                      <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity p-2 flex items-end justify-between">
-                        <span className="text-[9px] text-slate-300 font-bold uppercase">{secAngle} Angle Target Scan</span>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })()}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ── 5. IMAGE COMPARISON ──────────────────────── */}
-      <div className="mb-6">
-        <ImageComparison goldenUrl={merged.goldenImageUrl} uploadedUrl={merged.uploadedImageUrl} imageHash={merged.imageHash} />
-      </div>
-
-      {/* ── 5. HEATMAP + AI EXPLANATION ──────────────── */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-6">
-        <HeatmapViewer imageUrl={merged.uploadedImageUrl} heatmapUrl={heatmapUrl} label={heatmapUrl ? "SSIM Anomaly Heatmap" : "AI Attention Region"} />
-        <div className="rounded-xl border border-slate-800/80 bg-gradient-to-br from-[#0f172a]/70 to-[#0a0f1d]/70 p-6 flex flex-col">
-          <h3 className="text-xs font-black uppercase tracking-widest text-slate-400 mb-4 flex items-center gap-2"><FileText size={14} className="text-cyan-400" /> AI Explanation</h3>
-          <div className="flex-1 bg-slate-950/60 border border-slate-800/60 rounded-xl p-5">
-            <p className="text-sm text-slate-300 leading-relaxed font-medium">{recommendation.reasoning || "AI confidence is below the auto-decide threshold. Manual review required."}</p>
-          </div>
-          <div className="mt-4 text-[11px] text-slate-500 bg-slate-900/40 p-4 rounded-xl border border-slate-800/50">
-            <p className="font-bold text-slate-400 mb-1 uppercase tracking-wider text-[10px]">Method</p>
-            Combines SSIM deviations, template alignments, and OCR string matching against OEM golden standards.
-          </div>
-        </div>
-      </div>
-
-      {/* ── 6. KEY METRICS ────────────────────────────── */}
-      <div className="rounded-xl border border-slate-800/80 bg-gradient-to-br from-[#0f172a]/70 to-[#0a0f1d]/70 p-6 mb-6">
-        <h3 className="text-xs font-black uppercase tracking-widest text-slate-400 mb-5 flex items-center gap-2"><Activity size={14} className="text-cyan-400" /> Key Metrics</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-5">
-          <MetricBar label="SSIM Structural Alignment" value={ssim * 100} icon={Image} color={ssim >= 0.8 ? "" : ssim >= 0.5 ? "from-amber-500 to-orange-600" : "from-red-500 to-rose-600"} />
-          <MetricBar label="Vector Embedding Match" value={vectorMatchScore} icon={Zap} color={vectorMatchScore >= 80 ? "from-cyan-500 to-blue-600" : vectorMatchScore >= 60 ? "from-amber-500 to-orange-600" : "from-red-500 to-rose-600"} />
-          <MetricBar label="Keypoint Descriptor Match" value={keypoint * 100} icon={ScanLine} color={keypoint >= 0.5 ? "" : keypoint >= 0.3 ? "from-amber-500 to-orange-600" : "from-red-500 to-rose-600"} />
-          <MetricBar label="OCR String Accuracy" value={ocrAccuracyPct} icon={Text} color={ocrMatch ? "" : "from-red-500 to-rose-600"} />
-          <MetricBar label="AI Pipeline Confidence" value={aiConfidence} icon={BarChart3} color={aiConfidence >= 70 ? "" : aiConfidence >= 40 ? "from-amber-500 to-orange-600" : "from-red-500 to-rose-600"} />
-        </div>
-      </div>
-
-      {/* ── 7. OCR RESULTS + AI CLASSIFICATION ────────── */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 mb-6">
+      {/* OCR + Classification */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 mb-4">
         <div className="lg:col-span-7">
-          <div className="rounded-xl border border-slate-800/80 bg-gradient-to-br from-[#0f172a]/70 to-[#0a0f1d]/70 p-6 h-full">
-            <h3 className="text-xs font-black uppercase tracking-widest text-slate-400 mb-1 flex items-center gap-2"><Text size={14} className="text-cyan-400" /> OCR Results</h3>
-            <p className="text-[11px] text-slate-500 mb-5">Character recognition comparison</p>
-            <div className={`flex items-center gap-3 px-4 py-3 rounded-xl mb-5 ${ocrMatch ? "bg-emerald-500/10 border border-emerald-500/20 text-emerald-400" : "bg-red-500/10 border border-red-500/20 text-red-400"}`}>
-              {ocrMatch ? <CheckCircle2 size={18} /> : <XCircle size={18} />}
-              <div>
-                <p className="font-bold text-sm">{ocrMatch ? "OCR Passed" : "OCR Failed"}</p>
-                <p className="text-[11px] opacity-80">{ocrMatch ? "Text matches golden reference." : `Expected "${ocrExpected}", got "${ocrText}"`}</p>
-              </div>
-            </div>
-            <OCRResults results={ocrResults} />
-          </div>
+          <OCRResults results={ocrResults} />
         </div>
-        <div className="lg:col-span-5 flex flex-col gap-5">
-          {/* OCR Comparison — all values computed from backend data */}
-          <div className="rounded-xl border border-slate-800/80 bg-gradient-to-br from-[#0f172a]/70 to-[#0a0f1d]/70 p-6">
-            <h3 className="text-xs font-black uppercase tracking-widest text-slate-400 mb-4 flex items-center gap-2"><BarChart3 size={14} className="text-cyan-400" /> OCR Analysis</h3>
-            <div className="space-y-4">
-              <MetricBar label="Text Match" value={ocrAccuracyPct} icon={Text} color={ocrMatch ? "from-emerald-500 to-teal-600" : "from-red-500 to-rose-600"} />
-              <MetricBar label="Field Completeness" value={ocrCompletenessPct} icon={FileText} color={ocrCompletenessPct >= 80 ? "from-emerald-500 to-teal-600" : ocrCompletenessPct >= 50 ? "from-amber-500 to-orange-600" : "from-red-500 to-rose-600"} />
-              <MetricBar label="AI Confidence" value={aiConfidence} icon={BarChart3} color={aiConfidence >= 70 ? "from-emerald-500 to-teal-600" : aiConfidence >= 40 ? "from-amber-500 to-orange-600" : "from-red-500 to-rose-600"} />
+        <div className="lg:col-span-5 lab-card p-4 space-y-3">
+          <h3 className="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider flex items-center gap-2">
+            <FileText size={16} className="text-sky-500" /> Pipeline Verdict Classification
+          </h3>
+          <div className="grid grid-cols-2 gap-3 font-mono text-xs">
+            <div className="p-2.5 rounded bg-slate-100 dark:bg-slate-900">
+              <span className="text-[10px] font-bold text-slate-500 uppercase block">Verdict</span>
+              <span className="font-bold text-sky-600 dark:text-sky-400 uppercase">{aiClassification}</span>
             </div>
-          </div>
-          
-          {/* AI Classification Insights — from backend verdict & recommended_action */}
-          <div className="rounded-xl border border-slate-800/80 bg-gradient-to-br from-[#0f172a]/70 to-[#0a0f1d]/70 p-6 flex-1">
-            <h3 className="text-xs font-black uppercase tracking-widest text-slate-400 mb-4 flex items-center gap-2"><FileText size={14} className="text-cyan-400" /> AI Classification Insights</h3>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="bg-slate-950/60 border border-slate-800/60 rounded-xl p-4 flex flex-col justify-center">
-                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">Verdict</p>
-                <p className={`text-base font-black uppercase tracking-wide ${
-                  ["tampered", "missing", "mismatched", "reused"].includes(aiClassification?.toLowerCase())
-                    ? "text-red-400"
-                    : aiClassification?.toLowerCase() === "clean"
-                      ? "text-emerald-400"
-                      : "text-slate-400"
-                }`}>{aiClassification}</p>
-              </div>
-              <div className="bg-slate-950/60 border border-slate-800/60 rounded-xl p-4 flex flex-col justify-center">
-                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">Recommended Action</p>
-                <p className={`text-sm font-bold ${
-                  aiCategory === "Accept"
-                    ? "text-emerald-400"
-                    : aiCategory?.includes("Escalate") || aiCategory?.includes("Quarantine")
-                      ? "text-red-400"
-                      : aiCategory === "UNKNOWN"
-                        ? "text-slate-400"
-                        : "text-amber-400"
-                }`}>{aiCategory}</p>
-              </div>
+            <div className="p-2.5 rounded bg-slate-100 dark:bg-slate-900">
+              <span className="text-[10px] font-bold text-slate-500 uppercase block">Action</span>
+              <span className="font-bold text-slate-800 dark:text-slate-200 uppercase">{aiCategory}</span>
             </div>
           </div>
         </div>
       </div>
 
-      {/* ── 8. DETECTOR METRICS + METADATA ────────────── */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 mb-6">
-        <div className="lg:col-span-7"><DetectorMetrics metrics={merged.metrics || []} /></div>
-        <div className="lg:col-span-5"><MetadataCard caseData={merged} /></div>
-      </div>
-
-      {/* ── 9. EXECUTION TELEMETRY ────────────────────── */}
-      <div className="rounded-xl border border-slate-800/80 bg-gradient-to-br from-[#0f172a]/70 to-[#0a0f1d]/70 overflow-hidden mb-6">
-        <div className="px-6 py-4 border-b border-slate-800/80 bg-slate-900/50 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-cyan-500/10 border border-cyan-500/20"><Terminal size={16} className="text-cyan-400" /></div>
-            <div>
-              <h3 className="text-sm font-bold text-slate-200">Execution Telemetry</h3>
-              <p className="text-[10px] text-slate-500">Multi-agent pipeline log</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-emerald-500 animate-ping" /><span className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider">Complete</span></div>
+      {/* Metrics & Metadata */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 mb-4">
+        <div className="lg:col-span-7">
+          <DetectorMetrics metrics={merged.metrics || []} />
         </div>
-        <div className="p-6 bg-slate-950 font-tech-code text-[12px] leading-loose">
-          <div className="space-y-2">
-            <p className="text-slate-500"><span className="text-slate-600">[</span><span className="text-cyan-400">SYSTEM</span><span className="text-slate-600">]</span> Pipeline Active at <span className="text-slate-400">{merged.updatedAt || "N/A"}</span></p>
-            <p className="text-cyan-400"><span className="text-slate-500">{">"}</span> [Agent-1] Aspect ratio & resolution check <span className="text-emerald-400 font-bold">[PASSED]</span></p>
-            <p className="text-cyan-400"><span className="text-slate-500">{">"}</span> [Agent-1] Classified as <span className="text-yellow-400">"{merged.commodity || "N/A"}"</span></p>
-            <p className="text-emerald-400"><span className="text-slate-500">{">"}</span> [Agent-2] Keypoints Match Rate: <span className="font-bold">{(keypoint * 100).toFixed(1)}%</span></p>
-            <p className="text-purple-400"><span className="text-slate-500">{">"}</span> [Agent-3] SSIM index: <span className="font-bold">{ssim.toFixed(2)}</span></p>
-            <p className={`font-bold ${ocrMatch ? "text-green-400" : "text-red-400"}`}><span className="text-slate-500">{">"}</span> [Agent-3] OCR: Expected <span className="text-yellow-400">"{ocrExpected}"</span> | Got <span className="text-yellow-400">"{ocrText}"</span> | {ocrMatch ? "PASSED" : "FAILED"}</p>
-            <p className="text-blue-400"><span className="text-slate-500">{">"}</span> [Agent-4] Fraud Score: <span className="font-bold">{fraudScore}%</span> | Confidence: <span className="font-bold">{aiConfidence}%</span></p>
-            <p className="text-indigo-400"><span className="text-slate-500">{">"}</span> [Agent-4] Verdict: <span className="text-yellow-400">"{aiClassification}"</span> | Action: <span className="text-yellow-400">"{aiCategory}"</span></p>
-            <p className="text-indigo-400"><span className="text-slate-500">{">"}</span> [Agent-5] Narrative: <span className="text-slate-300">"{recommendation.reasoning || "Audit complete."}"</span></p>
-            <p className="text-slate-500 pt-2 border-t border-slate-800/60"><span className="text-slate-600">[</span><span className="text-cyan-400">SYSTEM</span><span className="text-slate-600">]</span> Execution complete.</p>
-          </div>
+        <div className="lg:col-span-5">
+          <MetadataCard caseData={merged} />
         </div>
       </div>
 
-      {/* ── 10. EVIDENCE TIMELINE ─────────────────────── */}
-      <div className="mb-6"><EvidenceTimeline events={merged.timeline || []} /></div>
+      {/* Telemetry Log */}
+      <div className="lab-card p-4 space-y-2 mb-4 font-mono text-xs">
+        <div className="flex items-center gap-2 text-slate-700 dark:text-slate-300 font-bold border-b border-slate-200 dark:border-slate-800 pb-2">
+          <Terminal size={14} className="text-sky-500" /> Execution Log
+        </div>
+        <div className="bg-slate-950 text-slate-300 p-3 rounded text-[11px] space-y-1 overflow-x-auto">
+          <p className="text-slate-500">&gt; Session: {merged.updatedAt || "Active"}</p>
+          <p className="text-sky-400">&gt; Agent-1: Ingest &amp; aspect ratio check OK</p>
+          <p className="text-emerald-400">&gt; Agent-2: Keypoints Match: {(keypoint * 100).toFixed(1)}%</p>
+          <p className="text-sky-400">&gt; Agent-3: SSIM Coefficient: {ssim.toFixed(2)}</p>
+          <p className="text-rose-400">&gt; Agent-3: OCR: Expected "{ocrExpected}" vs Got "{ocrText}"</p>
+          <p className="text-amber-400">&gt; Agent-4: Risk Score: {fraudScore}% | Confidence: {aiConfidence}%</p>
+          <p className="text-emerald-400">&gt; Agent-5: Rationale summary compiled.</p>
+        </div>
+      </div>
 
-      {/* ── 11. CUSTOM DELETE CONFIRMATION MODAL ──────── */}
+      {/* Timeline */}
+      <EvidenceTimeline events={merged.timeline || []} />
+
       <Modal
         open={Boolean(deleteTargetId)}
         onClose={() => setDeleteTargetId(null)}
         title="Confirm Report Deletion"
         size="sm"
         footer={
-          <div className="flex items-center justify-end gap-3 w-full">
-            <Button variant="ghost" onClick={() => setDeleteTargetId(null)}>
+          <div className="flex items-center justify-end gap-2 w-full">
+            <Button variant="outline" size="sm" onClick={() => setDeleteTargetId(null)}>
               Cancel
             </Button>
             <Button
               variant="danger"
+              size="sm"
               loading={Boolean(deletingId)}
               onClick={executeDelete}
               icon={<Trash2 size={14} />}
@@ -856,16 +675,10 @@ export default function InspectionDetailPage() {
           </div>
         }
       >
-        <div className="p-4 flex items-start gap-4">
-          <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 shrink-0">
-            <AlertTriangle size={24} />
-          </div>
-          <div>
-            <h4 className="text-sm font-extrabold text-slate-100 mb-1">Delete Inspection Report?</h4>
-            <p className="text-xs text-slate-400 leading-relaxed">
-              Are you sure you want to permanently delete report <span className="font-tech-code text-red-400 font-bold">{deleteTargetId}</span>? This action is permanent and cannot be undone.
-            </p>
-          </div>
+        <div className="space-y-2 text-xs">
+          <p className="font-bold text-slate-800 dark:text-slate-200">
+            Permanently delete report <span className="font-mono text-rose-500">{deleteTargetId}</span>?
+          </p>
         </div>
       </Modal>
     </Layout>

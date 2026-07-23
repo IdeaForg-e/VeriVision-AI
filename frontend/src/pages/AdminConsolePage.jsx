@@ -1,7 +1,14 @@
-// AdminConsolePage.jsx — REDESIGNED: Now hosts the Admin tuning panel and pipeline calibration console.
 import { Layout } from "../components/Layout.jsx";
-import { PerceptionThresholds, BusinessPolicyRouting, PrivacySecurity, AdjustmentHistory, SavePipelineButton, RegisterProductCard } from "../components/Feedback.jsx";
+import {
+  PerceptionThresholds,
+  BusinessPolicyRouting,
+  PrivacySecurity,
+  AdjustmentHistory,
+  SavePipelineButton,
+  RegisterProductCard,
+} from "../components/Feedback.jsx";
 import { useFeedbackConfig } from "../hooks/useFeedbackConfig.js";
+import { Loader } from "../components/Common.jsx";
 
 export default function AdminConsolePage() {
   const { config, history, loading, saveState, updateThreshold, togglePrivacy, addRoutingRule, save } =
@@ -9,25 +16,19 @@ export default function AdminConsolePage() {
 
   if (loading || !config) {
     return (
-      <Layout>
-        <div className="flex items-center justify-center h-64 text-on-surface-variant">Loading pipeline config…</div>
+      <Layout title="Admin Calibration Console" subtitle="System parameters & pipeline tuning">
+        <Loader label="Loading pipeline configuration…" />
       </Layout>
     );
   }
 
   return (
-    <Layout>
-      <div className="flex justify-between items-end mb-8">
-        <div className="space-y-1">
-          <h1 className="font-headline-lg text-headline-lg text-on-background">Admin Console — Pipeline Tuning</h1>
-          <p className="font-body-md text-on-surface-variant">
-            Calibrate computer vision thresholds and business logic routing parameters as an administrator.
-          </p>
-        </div>
-        <SavePipelineButton state={saveState} onSave={save} />
-      </div>
-
-      <div className="grid grid-cols-12 gap-gutter">
+    <Layout
+      title="Admin Calibration Console"
+      subtitle="Calibrate perception engine thresholds, business routing rules, and OEM reference catalog"
+      actions={<SavePipelineButton state={saveState} onSave={save} />}
+    >
+      <div className="grid grid-cols-12 gap-4">
         <RegisterProductCard />
         <PerceptionThresholds thresholds={config.thresholds} onChange={updateThreshold} />
         <BusinessPolicyRouting rules={config.routingRules} onAddRule={addRoutingRule} />

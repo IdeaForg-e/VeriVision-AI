@@ -1,12 +1,12 @@
 import { Layout } from "../components/Layout.jsx";
+import { Construction } from "lucide-react";
 
-/** Placeholder for pages owned by Jagruti / joint Case Detail work, so nav links don't 404 during local dev. */
 export default function StubPage({ title }) {
   return (
-    <Layout>
-      <div className="flex flex-col items-center justify-center h-64 text-on-surface-variant gap-2">
-        <span className="material-symbols-outlined text-4xl">construction</span>
-        <p>{title} — not part of this build.</p>
+    <Layout title={title} subtitle="Module status">
+      <div className="flex flex-col items-center justify-center py-20 text-center gap-2 text-slate-500">
+        <Construction size={32} />
+        <p className="text-xs font-bold font-mono">{title} — Under Development</p>
       </div>
     </Layout>
   );

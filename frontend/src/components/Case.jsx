@@ -1,27 +1,31 @@
-// Consolidated components for case
-import { REVIEW_DECISION } from "../utils/constants.js";
-import { formatDateTime } from "../utils/formatDate.js";
-import { formatFraudScore } from "../utils/formatScore.js";
-import { formatScore } from "../utils/formatScore.js";
 import { useState } from "react";
+import { formatDateTime } from "../utils/formatDate.js";
+import { formatScore } from "../utils/formatScore.js";
+import { REVIEW_DECISION } from "../utils/constants.js";
+import {
+  BarChart2,
+  Clock,
+  CheckCircle2,
+  AlertTriangle,
+  XCircle,
+  Activity,
+  FileText,
+  Thermometer,
+  Eye,
+  EyeOff,
+  ZoomIn,
+  X,
+  Sparkles,
+} from "lucide-react";
 
-// DetectorMetrics.jsx — Displays per-detector scores from the AI pipeline
-
-/**
- * Props:
- *  metrics  {Array<{name, score, unit, icon, description}>}
- *           score is 0-1 (SSIM, keypoint) or 0-100 (fraud score %)
- *           unit  optional — e.g. "%" or "" (defaults to showing raw score)
- */
 export function DetectorMetrics({ metrics = [] }) {
   if (!metrics.length) {
     return (
-      <div className="cyber-card bg-[#0f172a]/55 border-slate-800 p-card-padding shadow-lg">
-        <h3 className="font-headline-sm text-headline-sm flex items-center gap-2 mb-3">
-          <span className="material-symbols-outlined text-cyan-400">bar_chart</span>
-          Detector Metrics
+      <div className="lab-card p-4">
+        <h3 className="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider flex items-center gap-2 mb-2">
+          <BarChart2 size={16} className="text-sky-500" /> Detector Metrics
         </h3>
-        <p className="text-slate-450 text-body-sm italic">No detector metrics available.</p>
+        <p className="text-slate-500 text-xs italic">No detector metrics logged.</p>
       </div>
     );
   }
@@ -31,96 +35,47 @@ export function DetectorMetrics({ metrics = [] }) {
     const isRisk = name.toLowerCase().includes("fraud");
     const isConfidence = name.toLowerCase().includes("confidence");
 
-    if (isConfidence) {
-      return "bg-gradient-to-r from-cyan-500 to-blue-500 shadow-[0_0_8px_rgba(6,182,212,0.35)]";
-    }
+    if (isConfidence) return "bg-sky-500";
 
     if (isRisk) {
-      if (val >= 70) return "bg-gradient-to-r from-red-500 to-rose-600 shadow-[0_0_8px_rgba(239,68,68,0.45)]";
-      if (val >= 40) return "bg-gradient-to-r from-amber-400 to-orange-500 shadow-[0_0_8px_rgba(245,158,11,0.35)]";
-      return "bg-gradient-to-r from-emerald-400 to-teal-500 shadow-[0_0_8px_rgba(16,185,129,0.35)]";
+      if (val >= 70) return "bg-rose-500";
+      if (val >= 40) return "bg-amber-500";
+      return "bg-emerald-500";
     } else {
-      // Quality/similarity metrics (SSIM, Keypoint Match) - low is bad
-      if (val < 50) return "bg-gradient-to-r from-red-500 to-rose-600 shadow-[0_0_8px_rgba(239,68,68,0.45)]";
-      if (val < 80) return "bg-gradient-to-r from-amber-400 to-orange-500 shadow-[0_0_8px_rgba(245,158,11,0.35)]";
-      return "bg-gradient-to-r from-emerald-400 to-teal-500 shadow-[0_0_8px_rgba(16,185,129,0.35)]";
-    }
-  }
-
-  function getTextColor(name, score, max) {
-    const val = (score / max) * 100;
-    const isRisk = name.toLowerCase().includes("fraud");
-    const isConfidence = name.toLowerCase().includes("confidence");
-
-    if (isConfidence) return "text-cyan-400 font-bold";
-
-    if (isRisk) {
-      if (val >= 70) return "text-red-400 font-bold";
-      if (val >= 40) return "text-amber-400 font-bold";
-      return "text-emerald-400 font-bold";
-    } else {
-      if (val < 50) return "text-red-400 font-bold";
-      if (val < 80) return "text-amber-400 font-bold";
-      return "text-emerald-400 font-bold";
-    }
-  }
-
-  function getIconColor(name, score, max) {
-    const val = (score / max) * 100;
-    const isRisk = name.toLowerCase().includes("fraud");
-    const isConfidence = name.toLowerCase().includes("confidence");
-
-    if (isConfidence) return "text-cyan-400";
-
-    if (isRisk) {
-      if (val >= 70) return "text-red-400";
-      if (val >= 40) return "text-amber-400";
-      return "text-emerald-400";
-    } else {
-      if (val < 50) return "text-red-400";
-      if (val < 80) return "text-amber-400";
-      return "text-emerald-400";
+      if (val < 50) return "bg-rose-500";
+      if (val < 80) return "bg-amber-500";
+      return "bg-emerald-500";
     }
   }
 
   return (
-    <div className="cyber-card bg-[#0f172a]/55 border-slate-800 p-card-padding shadow-lg">
-      <h3 className="font-headline-sm text-headline-sm flex items-center gap-2 mb-4">
-        <span className="material-symbols-outlined text-cyan-400">bar_chart</span>
-        Detector Metrics
+    <div className="lab-card p-4 space-y-3">
+      <h3 className="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider flex items-center gap-2">
+        <BarChart2 size={16} className="text-sky-500" /> Perception Pipeline Metrics
       </h3>
 
-      <div className="flex flex-col gap-4">
+      <div className="space-y-3">
         {metrics.map((m) => {
           const max = m.unit === "%" ? 100 : 1;
           const pct = Math.min((m.score / max) * 100, 100);
           const barStyle = getBarStyles(m.name, m.score, max);
-          const textColor = getTextColor(m.name, m.score, max);
-          const iconColor = getIconColor(m.name, m.score, max);
 
           return (
-            <div key={m.name}>
-              <div className="flex items-center justify-between mb-1">
-                <div className="flex items-center gap-1.5">
-                  {m.icon && (
-                    <span className={`material-symbols-outlined text-[18px] ${iconColor}`}>{m.icon}</span>
-                  )}
-                  <span className="text-body-sm font-semibold text-slate-200">{m.name}</span>
-                </div>
-                <span className={`font-tech-code text-body-sm ${textColor}`}>
+            <div key={m.name} className="space-y-1">
+              <div className="flex justify-between items-center text-xs font-mono">
+                <span className="font-semibold text-slate-700 dark:text-slate-300">{m.name}</span>
+                <span className="font-bold text-slate-900 dark:text-slate-100">
                   {m.unit === "%" ? `${Math.round(m.score)}%` : formatScore(m.score)}
                   {m.unit && m.unit !== "%" ? ` ${m.unit}` : ""}
                 </span>
               </div>
-              <div className="w-full h-1.5 bg-slate-900 border border-slate-850 rounded-full overflow-hidden">
+              <div className="w-full h-1.5 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden">
                 <div
-                  className={`h-full rounded-full transition-all duration-700 ${barStyle}`}
+                  className={`h-full rounded-full transition-all duration-500 ${barStyle}`}
                   style={{ width: `${pct}%` }}
                 />
               </div>
-              {m.description && (
-                <p className="text-[10px] text-slate-450 mt-1 italic">{m.description}</p>
-              )}
+              {m.description && <p className="text-[10px] text-slate-500">{m.description}</p>}
             </div>
           );
         })}
@@ -129,371 +84,190 @@ export function DetectorMetrics({ metrics = [] }) {
   );
 }
 
-// ==========================================
-
-// EvidenceTimeline.jsx — Chronological log of events for a case (status changes, comments, decisions)
-
-const EVENT_CONFIG = {
-  created: { icon: "add_circle", color: "text-cyan-400", bg: "bg-cyan-500/10 text-cyan-400 border border-cyan-500/20" },
-  retake_requested: { icon: "history", color: "text-amber-600", bg: "bg-amber-500/10 border border-amber-500/20" },
-  resubmitted: { icon: "publish", color: "text-cyan-400", bg: "bg-cyan-500/10" },
-  reviewed: { icon: "rate_review", color: "text-cyan-400", bg: "bg-cyan-500/10 text-cyan-400 border border-cyan-500/20" },
-  approved: { icon: "check_circle", color: "text-green-600", bg: "bg-emerald-500/10 border border-emerald-500/20" },
-  rejected: { icon: "cancel", color: "text-red-600", bg: "bg-red-500/10 border border-red-500/20" },
-  needs_evidence: { icon: "radio_button_checked", color: "text-amber-600", bg: "bg-amber-500/10 border border-amber-500/20" },
-  final_decision: { icon: "fact_check", color: "text-green-700", bg: "bg-emerald-500/10 border border-emerald-500/20" },
-  comment: { icon: "chat", color: "text-slate-450", bg: "bg-surface-container" },
-};
-
-function getConfig(type) {
-  return EVENT_CONFIG[type] ?? { icon: "circle", color: "text-slate-450", bg: "bg-surface-container" };
-}
-
-/**
- * Props:
- *  events {Array<{id, type, label, description, user, timestamp}>}
- */
 export function EvidenceTimeline({ events = [] }) {
   if (!events.length) {
     return (
-      <div className="cyber-card bg-[#0f172a]/55 border-slate-800 p-card-padding shadow-lg">
-        <h3 className="font-headline-sm text-headline-sm flex items-center gap-2 mb-3">
-          <span className="material-symbols-outlined text-cyan-400">timeline</span>
-          Evidence Timeline
+      <div className="lab-card p-4">
+        <h3 className="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider flex items-center gap-2 mb-2">
+          <Activity size={16} className="text-sky-500" /> Evidence Audit Timeline
         </h3>
-        <p className="text-slate-450 text-body-sm italic">No events recorded yet.</p>
+        <p className="text-slate-500 text-xs italic">No timeline events recorded.</p>
       </div>
     );
   }
 
   return (
-    <div className="cyber-card bg-[#0f172a]/55 border-slate-800 p-card-padding shadow-lg">
-      <h3 className="font-headline-sm text-headline-sm flex items-center gap-2 mb-5">
-        <span className="material-symbols-outlined text-cyan-400">timeline</span>
-        Evidence Timeline
+    <div className="lab-card p-4 space-y-3">
+      <h3 className="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider flex items-center gap-2">
+        <Activity size={16} className="text-sky-500" /> Audit Trail Timeline
       </h3>
 
-      <ol className="relative flex flex-col gap-0">
-        {events.map((event, i) => {
-          const cfg = getConfig(event.type);
-          const isLast = i === events.length - 1;
-
-          return (
-            <li key={event.id ?? i} className="flex gap-4 relative">
-              {/* Connector line */}
-              {!isLast && (
-                <div className="absolute left-[15px] top-10 bottom-0 w-[2px] bg-outline-variant" />
-              )}
-
-              {/* Icon bubble */}
-              <div
-                className={`flex-shrink-0 w-8 h-8 rounded-full ${cfg.bg} flex items-center justify-center z-10 mt-0.5`}
-              >
-                <span className={`material-symbols-outlined text-[18px] ${cfg.color}`}>{cfg.icon}</span>
-              </div>
-
-              {/* Content */}
-              <div className={`flex-1 pb-5 ${isLast ? "" : ""}`}>
-                <div className="flex items-center justify-between flex-wrap gap-1">
-                  <span className={`text-body-sm font-semibold ${cfg.color}`}>{event.label}</span>
-                  <span className="text-[11px] text-slate-450 font-tech-code">
-                    {formatDateTime(event.timestamp)}
-                  </span>
-                </div>
-                {event.description && (
-                  <p className="text-body-sm text-slate-450 mt-0.5">{event.description}</p>
-                )}
-                {event.user && (
-                  <p className="text-[11px] text-slate-450 mt-0.5">
-                    by <span className="font-medium">{event.user}</span>
-                  </p>
-                )}
-              </div>
-            </li>
-          );
-        })}
+      <ol className="relative border-l border-slate-200 dark:border-slate-800 ml-2 space-y-4 pl-4 text-xs">
+        {events.map((event, i) => (
+          <li key={event.id ?? i} className="relative">
+            <span className="absolute -left-[21px] top-1 w-2.5 h-2.5 rounded-full bg-sky-500 border-2 border-white dark:border-slate-900" />
+            <div className="flex justify-between items-baseline">
+              <span className="font-bold text-slate-800 dark:text-slate-200">{event.label}</span>
+              <span className="font-mono text-[10px] text-slate-500">{formatDateTime(event.timestamp)}</span>
+            </div>
+            {event.description && <p className="text-[11px] text-slate-500 mt-0.5">{event.description}</p>}
+            {event.user && <p className="text-[10px] text-slate-400 font-mono mt-0.5">Inspector: {event.user}</p>}
+          </li>
+        ))}
       </ol>
     </div>
   );
 }
 
-// ==========================================
-
-// FraudScore.jsx — Circular gauge displaying the AI fraud risk score (0-100)
-
-function getRingColor(score) {
-  if (score >= 75) return "#ef4444"; // red — high risk
-  if (score >= 50) return "#f59e0b"; // amber — medium risk
-  return "#22c55e";                  // green — low risk
-}
-
-function getRiskLabel(score) {
-  if (score >= 75) return { text: "High Risk", bg: "bg-red-500/10 border border-red-500/20", text_: "text-red-700" };
-  if (score >= 50) return { text: "Medium Risk", bg: "bg-amber-500/10 border border-amber-500/20", text_: "text-amber-700" };
-  return { text: "Low Risk", bg: "bg-emerald-500/10 border border-emerald-500/20", text_: "text-green-700" };
-}
-
-/**
- * Props:
- *  score        {number} 0-100   fraud score from the AI detector
- *  showLabel    {boolean}        show a "High/Medium/Low Risk" pill
- *  size         {"sm"|"md"|"lg"}
- */
 export function FraudScore({ score = 0, showLabel = true, size = "md" }) {
   const normalised = Math.min(Math.max(score, 0), 100);
-  const radius = 40;
+  const radius = 36;
   const circ = 2 * Math.PI * radius;
   const progress = circ * (1 - normalised / 100);
-  const color = getRingColor(normalised);
-  const risk = getRiskLabel(normalised);
 
-  const dims = size === "sm" ? "w-20 h-20" : size === "lg" ? "w-36 h-36" : "w-28 h-28";
+  const getScoreColor = (val) => {
+    if (val >= 75) return "#ef4444";
+    if (val >= 50) return "#f97316";
+    if (val >= 25) return "#f59e0b";
+    return "#10b981";
+  };
+
+  const color = getScoreColor(normalised);
+  const dims = size === "sm" ? "w-16 h-16" : size === "lg" ? "w-32 h-32" : "w-24 h-24";
 
   return (
-    <div className="flex flex-col items-center gap-2">
+    <div className="flex flex-col items-center gap-1.5">
       <div className={`${dims} relative`}>
-        <svg viewBox="0 0 100 100" className="w-full h-full -rotate-90" aria-hidden="true">
-          {/* Track */}
-          <circle cx="50" cy="50" r={radius} fill="none" stroke="#e5e7eb" strokeWidth="10" />
-          {/* Progress */}
+        <svg viewBox="0 0 90 90" className="w-full h-full -rotate-90">
+          <circle cx="45" cy="45" r={radius} fill="none" stroke="currentColor" strokeWidth="8" className="text-slate-200 dark:text-slate-800" />
           <circle
-            cx="50"
-            cy="50"
+            cx="45"
+            cy="45"
             r={radius}
             fill="none"
             stroke={color}
-            strokeWidth="10"
+            strokeWidth="8"
             strokeLinecap="round"
             strokeDasharray={circ}
             strokeDashoffset={progress}
-            style={{ transition: "stroke-dashoffset 0.7s ease" }}
+            style={{ transition: "stroke-dashoffset 0.5s ease" }}
           />
         </svg>
-        {/* Center label */}
-        <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span className="font-bold leading-none" style={{ color, fontSize: size === "sm" ? "1rem" : "1.5rem" }}>
-            {formatFraudScore(normalised)}
-          </span>
-          <span className="text-[10px] text-slate-450">/100</span>
+        <div className="absolute inset-0 flex flex-col items-center justify-center font-mono">
+          <span className="font-extrabold text-sm text-slate-900 dark:text-slate-100">{Math.round(normalised)}</span>
+          <span className="text-[9px] text-slate-400 uppercase">/100</span>
         </div>
       </div>
-
       {showLabel && (
-        <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${risk.bg} ${risk.text_}`}>
-          {risk.text}
+        <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-slate-500">
+          Risk Score
         </span>
       )}
     </div>
   );
 }
 
-// ==========================================
-
-// HeatmapViewer.jsx — Overlays a heat-map highlight on a part image to show AI attention regions
-
-/**
- * Props:
- *  imageUrl     {string}   — the uploaded image URL
- *  heatmapUrl   {string}   — optional: separate heatmap image URL (overlay mode)
- *  region       {object}   — { x, y, w, h } percentages (used when no heatmapUrl)
- *  alt          {string}
- *  label        {string}   — caption below the viewer
- */
 export function HeatmapViewer({
   imageUrl,
   heatmapUrl,
   region,
   alt = "Part under review",
-  label = "AI Attention Region",
+  label = "AI Attention Hotspot",
 }) {
   const [showOverlay, setShowOverlay] = useState(true);
 
   return (
-    <div className="cyber-card bg-[#0f172a]/55 border-slate-800 p-card-padding shadow-lg">
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="font-headline-sm text-headline-sm flex items-center gap-2">
-          <span className="material-symbols-outlined text-cyan-400">thermostat</span>
-          Heatmap Viewer
+    <div className="lab-card p-4 space-y-3">
+      <div className="flex items-center justify-between">
+        <h3 className="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider flex items-center gap-2">
+          <Thermometer size={16} className="text-sky-500" /> Visual SSIM Heatmap Overlay
         </h3>
         <button
           onClick={() => setShowOverlay((v) => !v)}
-          className="flex items-center gap-1.5 text-body-sm text-slate-450 hover:text-cyan-400 transition-colors px-3 py-1 rounded-lg border border-slate-800 hover:bg-primary/5"
+          className="flex items-center gap-1 text-[10px] font-bold uppercase text-slate-600 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400"
         >
-          <span className="material-symbols-outlined text-[18px]">
-            {showOverlay ? "visibility_off" : "visibility"}
-          </span>
-          {showOverlay ? "Hide" : "Show"} Overlay
+          {showOverlay ? <EyeOff size={13} /> : <Eye size={13} />}
+          {showOverlay ? "Hide Heatmap" : "Show Heatmap"}
         </button>
       </div>
 
-      <div className="relative aspect-square bg-slate-950/80 rounded-lg overflow-hidden border border-slate-800 select-none">
-        {/* Base image */}
-        <img
-          src={imageUrl}
-          alt={alt}
-          className="w-full h-full object-contain"
-        />
-
-        {/* Heatmap Overlay */}
+      <div className="relative aspect-square bg-slate-950 rounded-lg overflow-hidden border border-slate-800 flex items-center justify-center p-2">
+        <img src={imageUrl} alt={alt} className="w-full h-full object-contain" />
         {heatmapUrl && (
           <img
             src={heatmapUrl}
-            alt="Heatmap Overlay"
-            className={`absolute inset-0 w-full h-full object-contain transition-opacity duration-300 pointer-events-none ${showOverlay ? 'opacity-100' : 'opacity-0'}`}
+            alt="Heatmap overlay"
+            className={`absolute inset-0 w-full h-full object-contain transition-opacity ${
+              showOverlay ? "opacity-100" : "opacity-0"
+            }`}
           />
         )}
-
-        {/* Overlay: fallback bounding box region if separate heatmapUrl is not used */}
         {showOverlay && !heatmapUrl && region && (
           <div
-            className="absolute border-2 border-red-500 rounded shadow-lg"
+            className="absolute border-2 border-rose-500 rounded bg-rose-500/20 shadow-md"
             style={{
               left: `${region.x}%`,
               top: `${region.y}%`,
               width: `${region.w}%`,
               height: `${region.h}%`,
-              background: "rgba(239, 68, 68, 0.15)",
-              boxShadow: "0 0 0 9999px rgba(0,0,0,0.25), 0 0 8px rgba(239, 68, 68, 0.5)",
-              pointerEvents: "none",
             }}
           />
         )}
       </div>
 
-      {label && (
-        <p className="text-center text-body-sm text-slate-400 font-semibold mt-3">{label}</p>
-      )}
-
-      {/* Visual Legend / Key Guide */}
-      <div className="mt-4 pt-4 border-t border-slate-800/80 space-y-3">
-        <div className="bg-slate-900/40 border border-slate-850 p-3 rounded-lg text-[11px] leading-relaxed text-slate-400">
-          <span className="font-extrabold text-slate-200 block mb-1 uppercase tracking-wider text-[9px] text-cyan-400">What is this showing?</span>
-          This viewer highlights the deviations between the uploaded part and the OEM Golden Standard using an AI SSIM comparison.
-        </div>
-
-        <div className="grid grid-cols-2 gap-2 text-[10px]">
-          {/* Neon Box */}
-          <div className="flex items-start gap-2.5 p-2 bg-[#090d16]/60 border border-slate-850 rounded-lg">
-            <span className="h-3 w-3 rounded border-2 border-red-500 bg-red-500/20 shrink-0 mt-0.5" />
-            <div>
-              <span className="block font-bold text-slate-250">Red Alert Boxes</span>
-              <span className="text-slate-500 leading-normal block mt-0.5">High-probability anomaly candidate zones (missing parts, text mismatches, modified layouts).</span>
-            </div>
-          </div>
-
-          {/* Heat scale */}
-          <div className="flex items-start gap-2.5 p-2 bg-[#090d16]/60 border border-slate-850 rounded-lg">
-            <div className="w-1.5 h-10 rounded-full bg-gradient-to-t from-blue-600 via-green-500 via-yellow-400 to-red-600 shrink-0" />
-            <div>
-              <span className="block font-bold text-slate-250">Thermal Heat Intensity</span>
-              <span className="text-slate-500 leading-normal block mt-0.5">Shows structural difference weights. Red indicates heavy mismatch; green/yellow is minor; transparent/blue represents perfect alignment.</span>
-            </div>
-          </div>
-        </div>
-      </div>
+      {label && <p className="text-center text-xs font-mono text-slate-500">{label}</p>}
     </div>
   );
 }
 
-// ==========================================
-
-// ImageComparison.jsx — Side-by-side golden vs uploaded image viewer with optional diff overlay
-
-/**
- * Props:
- *  goldenUrl    {string}  — OEM reference image URL
- *  uploadedUrl  {string}  — uploaded/defective image URL
- *  altGolden    {string}
- *  altUploaded  {string}
- *  imageHash    {string}  — shown as a tech code label
- */
-export function ImageComparison({
-  goldenUrl,
-  uploadedUrl,
-  altGolden = "Golden reference image",
-  altUploaded = "Uploaded image",
-  imageHash,
-}) {
-  const [zoom, setZoom] = useState(null); // null | "golden" | "uploaded"
+export function ImageComparison({ goldenUrl, uploadedUrl, imageHash }) {
+  const [zoom, setZoom] = useState(null);
 
   return (
-    <div className="cyber-card bg-[#0f172a]/55 border-slate-800 p-card-padding shadow-lg">
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="font-headline-sm text-headline-sm flex items-center gap-2">
-          <span className="material-symbols-outlined text-cyan-400">compare</span>
-          Image Comparison
+    <div className="lab-card p-4 space-y-3">
+      <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-2.5">
+        <h3 className="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider flex items-center gap-2">
+          <Sparkles size={16} className="text-sky-500" /> Side-by-Side Ingestion View
         </h3>
-        {imageHash && (
-          <span className="font-tech-code text-body-sm text-slate-450 bg-surface-container-low px-2 py-1 rounded">
-            {imageHash}
-          </span>
-        )}
+        {imageHash && <span className="font-mono text-[10px] text-slate-500">{imageHash}</span>}
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
-        {/* Golden */}
-        <div className="flex flex-col gap-2">
-          <span className="font-label-caps text-[10px] uppercase text-slate-450">
-            Golden Reference (OEM)
-          </span>
+      <div className="grid grid-cols-2 gap-3">
+        <div className="space-y-1">
+          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Golden Reference</span>
           <div
-            className="relative aspect-square rounded-lg overflow-hidden border border-slate-800 bg-slate-950/80 cursor-zoom-in group"
-            onClick={() => setZoom(zoom === "golden" ? null : "golden")}
+            onClick={() => setZoom("golden")}
+            className="relative aspect-square rounded-lg bg-slate-950 border border-slate-800 p-2 cursor-pointer group"
           >
-            <img
-              src={goldenUrl}
-              alt={altGolden}
-              className="w-full h-full object-contain transition-all duration-300"
-            />
-            <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-              <span className="material-symbols-outlined text-white text-3xl drop-shadow-lg">zoom_in</span>
-            </div>
-            <div className="absolute bottom-2 left-2 bg-[#090d16]/90 backdrop-blur px-2 py-0.5 rounded-full text-[10px] font-bold border border-slate-800 text-slate-300 uppercase">
-              Source: Master_DB
+            <img src={goldenUrl} alt="Golden" className="w-full h-full object-contain" />
+            <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition text-white">
+              <ZoomIn size={20} />
             </div>
           </div>
         </div>
 
-        {/* Uploaded */}
-        <div className="flex flex-col gap-2">
-          <span className="font-label-caps text-[10px] uppercase text-slate-450">
-            Uploaded (Review Required)
-          </span>
+        <div className="space-y-1">
+          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Unit Under Test</span>
           <div
-            className="relative aspect-square rounded-lg overflow-hidden border border-slate-800 bg-slate-950/80 cursor-zoom-in group"
-            onClick={() => setZoom(zoom === "uploaded" ? null : "uploaded")}
+            onClick={() => setZoom("uploaded")}
+            className="relative aspect-square rounded-lg bg-slate-950 border border-slate-800 p-2 cursor-pointer group"
           >
-            <img
-              src={uploadedUrl}
-              alt={altUploaded}
-              className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-300"
-            />
-            <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-              <span className="material-symbols-outlined text-white text-3xl drop-shadow-lg">zoom_in</span>
-            </div>
-            <div className="absolute top-2 right-2 bg-error text-white px-2 py-0.5 rounded-full text-[10px] font-bold uppercase">
-              Flagged
+            <img src={uploadedUrl} alt="Uploaded" className="w-full h-full object-contain" />
+            <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition text-white">
+              <ZoomIn size={20} />
             </div>
           </div>
         </div>
       </div>
 
-      {/* Lightbox */}
       {zoom && (
         <div
-          className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-8 cursor-zoom-out animate-fade-in"
+          className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-6 cursor-pointer"
           onClick={() => setZoom(null)}
         >
-          <img
-            src={zoom === "golden" ? goldenUrl : uploadedUrl}
-            alt={zoom === "golden" ? altGolden : altUploaded}
-            className="max-w-full max-h-full object-contain rounded-lg shadow-2xl"
-          />
-          <button
-            className="absolute top-4 right-4 text-white p-2 rounded-full bg-white/10 hover:bg-white/20"
-            onClick={() => setZoom(null)}
-          >
-            <span className="material-symbols-outlined">close</span>
+          <img src={zoom === "golden" ? goldenUrl : uploadedUrl} alt="Zoom" className="max-w-full max-h-full object-contain rounded" />
+          <button className="absolute top-4 right-4 text-white p-2" onClick={() => setZoom(null)}>
+            <X size={24} />
           </button>
         </div>
       )}
@@ -501,15 +275,6 @@ export function ImageComparison({
   );
 }
 
-// ==========================================
-
-// MetadataCard.jsx — Displays structured case/part metadata in a two-column grid
-
-/**
- * Props:
- *  caseData {object}  — the case object from caseService / reviewService
- *  extra    {Array<{label, value}>}  — optional additional rows
- */
 export function MetadataCard({ caseData = {}, extra = [] }) {
   const rows = [
     { label: "Case ID", value: caseData.id },
@@ -523,16 +288,15 @@ export function MetadataCard({ caseData = {}, extra = [] }) {
   ].filter((r) => r.value !== undefined && r.value !== null);
 
   return (
-    <div className="cyber-card bg-[#0f172a]/55 border-slate-800 p-card-padding shadow-lg">
-      <h3 className="font-headline-sm text-headline-sm flex items-center gap-2 mb-4">
-        <span className="material-symbols-outlined text-cyan-400">info</span>
-        Case Metadata
+    <div className="lab-card p-4 space-y-3">
+      <h3 className="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider flex items-center gap-2">
+        <FileText size={16} className="text-sky-500" /> Case Inspection Metadata
       </h3>
-      <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-3">
+      <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2 text-xs">
         {rows.map(({ label, value }) => (
-          <div key={label} className="flex flex-col gap-0.5">
-            <dt className="font-label-caps text-slate-450 uppercase text-[11px]">{label}</dt>
-            <dd className="font-tech-code text-slate-250 text-body-sm break-all">{value ?? "—"}</dd>
+          <div key={label}>
+            <dt className="text-[10px] font-bold text-slate-500 uppercase">{label}</dt>
+            <dd className="font-mono text-slate-800 dark:text-slate-200 truncate">{value ?? "—"}</dd>
           </div>
         ))}
       </dl>
@@ -540,147 +304,72 @@ export function MetadataCard({ caseData = {}, extra = [] }) {
   );
 }
 
-// ==========================================
-
-// OCRResults.jsx — Shows OCR-extracted text from a part label vs the expected value
-/**
- * Props:
- *  results  {Array<{field, extracted, expected, match}>}
- *           field     — e.g. "Part Number", "Batch Code"
- *           extracted — what the OCR engine read
- *           expected  — golden/reference value (optional)
- *           match     — true | false | null (unknown)
- */
 export function OCRResults({ results = [] }) {
   if (!results.length) {
     return (
-      <div className="cyber-card bg-[#0f172a]/55 border-slate-800 p-card-padding shadow-lg">
-        <h3 className="font-headline-sm text-headline-sm flex items-center gap-2 mb-3">
-          <span className="material-symbols-outlined text-cyan-400">text_fields</span>
-          OCR Results
+      <div className="lab-card p-4">
+        <h3 className="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider flex items-center gap-2 mb-2">
+          <FileText size={16} className="text-sky-500" /> OCR Label Verification
         </h3>
-        <p className="text-slate-450 text-body-sm italic">No OCR data available for this case.</p>
+        <p className="text-slate-500 text-xs italic">No OCR fields detected.</p>
       </div>
     );
   }
 
   return (
-    <div className="cyber-card bg-[#0f172a]/55 border-slate-800 p-card-padding shadow-lg">
-      <h3 className="font-headline-sm text-headline-sm flex items-center gap-2 mb-4">
-        <span className="material-symbols-outlined text-cyan-400">text_fields</span>
-        OCR Results
+    <div className="lab-card p-4 space-y-3">
+      <h3 className="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider flex items-center gap-2">
+        <FileText size={16} className="text-sky-500" /> OCR Serial Verification
       </h3>
 
-      <div className="flex flex-col gap-3">
-        {results.map((row, i) => {
-          const matchIcon = row.match === true ? "check_circle" : row.match === false ? "cancel" : "help";
-          const matchColor =
-            row.match === true ? "text-green-600" : row.match === false ? "text-red-500" : "text-slate-450";
-
-          return (
-            <div
-              key={i}
-              className="grid grid-cols-[1fr_1fr_auto] gap-3 items-center border-b border-slate-800 pb-3 last:border-0 last:pb-0"
-            >
-              {/* Field */}
-              <div>
-                <p className="font-label-caps text-[10px] uppercase text-slate-450 mb-0.5">{row.field}</p>
-                <p className="font-tech-code text-body-sm text-slate-250">{row.extracted ?? "—"}</p>
-              </div>
-              {/* Expected */}
-              <div>
-                <p className="font-label-caps text-[10px] uppercase text-slate-450 mb-0.5">Expected</p>
-                <p className="font-tech-code text-body-sm text-slate-450">{row.expected ?? "—"}</p>
-              </div>
-              {/* Match icon */}
-              <span className={`material-symbols-outlined text-[22px] ${matchColor}`}>{matchIcon}</span>
+      <div className="divide-y divide-slate-200 dark:divide-slate-800/60 text-xs">
+        {results.map((row, i) => (
+          <div key={i} className="py-2 flex items-center justify-between gap-2">
+            <div>
+              <p className="text-[10px] font-bold text-slate-500 uppercase">{row.field}</p>
+              <p className="font-mono font-bold text-slate-800 dark:text-slate-200">{row.extracted ?? "—"}</p>
             </div>
-          );
-        })}
+            <div className="text-right">
+              <p className="text-[10px] font-bold text-slate-500 uppercase">Expected</p>
+              <p className="font-mono text-slate-500">{row.expected ?? "—"}</p>
+            </div>
+            {row.match === true ? (
+              <CheckCircle2 size={16} className="text-emerald-500 shrink-0" />
+            ) : row.match === false ? (
+              <XCircle size={16} className="text-rose-500 shrink-0" />
+            ) : (
+              <AlertTriangle size={16} className="text-amber-500 shrink-0" />
+            )}
+          </div>
+        ))}
       </div>
     </div>
   );
 }
 
-// ==========================================
-
-// RecommendationCard.jsx — AI-generated next-step recommendation for a case
-
-const DECISION_CONFIG = {
-  [REVIEW_DECISION.APPROVED]: {
-    icon: "check_circle",
-    title: "Approve Part",
-    color: "text-green-700",
-    bg: "bg-emerald-500/10 border border-emerald-500/20",
-    border: "border-green-200",
-    badge: "bg-green-100 text-green-800",
-  },
-  [REVIEW_DECISION.REJECTED]: {
-    icon: "cancel",
-    title: "Reject Part",
-    color: "text-red-700",
-    bg: "bg-red-500/10 border border-red-500/20",
-    border: "border-red-200",
-    badge: "bg-red-100 text-red-800",
-  },
-  [REVIEW_DECISION.NEEDS_MORE_EVIDENCE]: {
-    icon: "find_in_page",
-    title: "Request More Evidence",
-    color: "text-amber-700",
-    bg: "bg-amber-500/10 border border-amber-500/20",
-    border: "border-amber-200",
-    badge: "bg-amber-100 text-amber-800",
-  },
-};
-
-/**
- * Props:
- *  recommendation  {string}  — one of REVIEW_DECISION values
- *  confidence      {number}  — 0-100 confidence in the recommendation
- *  reasoning       {string}  — human-readable explanation from the AI
- *  flags           {string[]} — list of short flag strings ("OCR Mismatch", "Low SSIM")
- */
-export function RecommendationCard({
-  recommendation,
-  confidence,
-  reasoning,
-  flags = [],
-}) {
-  const cfg = DECISION_CONFIG[recommendation] ?? {
-    icon: "lightbulb",
-    title: recommendation ?? "AI Recommendation",
-    color: "text-cyan-400",
-    bg: "bg-primary/5",
-    border: "border-primary/20",
-    badge: "bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 text-cyan-400",
-  };
-
+export function RecommendationCard({ recommendation, confidence, reasoning, flags = [] }) {
   return (
-    <div className={`rounded-xl border ${cfg.border} ${cfg.bg} p-card-padding shadow-sm`}>
-      <div className="flex items-start gap-3 mb-3">
-        <span className={`material-symbols-outlined text-3xl ${cfg.color} flex-shrink-0`}>
-          {cfg.icon}
-        </span>
-        <div className="flex-1">
-          <div className="flex items-center gap-2 flex-wrap">
-            <h3 className={`font-headline-sm text-headline-sm ${cfg.color}`}>{cfg.title}</h3>
-            {confidence !== undefined && (
-              <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${cfg.badge}`}>
-                {Math.round(confidence)}% confidence
-              </span>
-            )}
-          </div>
+    <div className="lab-card p-4 space-y-2 border-l-4 border-l-sky-500">
+      <div className="flex justify-between items-start">
+        <div>
+          <span className="text-[10px] font-bold font-mono text-sky-600 dark:text-sky-400 uppercase">
+            AI Decision Judge
+          </span>
+          <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 uppercase">
+            {recommendation || "Pending Evaluation"}
+          </h3>
         </div>
+        {confidence !== undefined && (
+          <span className="font-mono text-xs font-bold px-2 py-0.5 rounded bg-sky-500/10 text-sky-600 dark:text-sky-400">
+            {Math.round(confidence)}% confidence
+          </span>
+        )}
       </div>
-
+      {reasoning && <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">{reasoning}</p>}
       {flags.length > 0 && (
-        <div className="flex flex-wrap gap-2 mt-2">
+        <div className="flex flex-wrap gap-1.5 pt-1">
           {flags.map((flag) => (
-            <span
-              key={flag}
-              className="flex items-center gap-1 px-2.5 py-0.5 bg-slate-900 border border-slate-800 rounded-full text-[11px] font-medium text-slate-400"
-            >
-              <span className="material-symbols-outlined text-[14px] text-amber-500">warning</span>
+            <span key={flag} className="px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-[10px] font-mono text-slate-600 dark:text-slate-300">
               {flag}
             </span>
           ))}

@@ -1,657 +1,475 @@
-// AnalyticsDashboardPage.jsx — Pure backend data, zero mock/simulation data
 import { useState, useEffect } from "react";
 import { Layout } from "../components/Layout.jsx";
 import { getTriageStats, getTriageQueue } from "../services/triageService.js";
 import { getCases } from "../services/caseService.js";
 import {
-    getVendorAnalytics,
-    getVendorDetail,
-    getSiteAnalytics,
-    getRepeatOffenders,
-    getMonthlyTrend,
-    getMonthlyBreakdown
+  getVendorAnalytics,
+  getVendorDetail,
+  getSiteAnalytics,
+  getRepeatOffenders,
+  getMonthlyTrend,
 } from "../services/analyticsService.js";
 import {
-    BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
-    PieChart, Pie, Cell, AreaChart, Area
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
 } from "recharts";
 import {
-    TrendingUp, AlertTriangle, CheckCircle, Activity, BarChart3,
-    PieChart as PieChartIcon, Database, Layers, Eye, Download, RefreshCw,
-    Truck, Cpu, FileText, Sliders, ChevronDown, ChevronUp, ChevronRight, Calendar, ShieldAlert
+  TrendingUp,
+  AlertTriangle,
+  Activity,
+  Database,
+  Layers,
+  Eye,
+  Download,
+  RefreshCw,
+  ChevronRight,
+  ShieldAlert,
+  X,
 } from "lucide-react";
-
-const COLORS = ["#10b981", "#ef4444", "#f59e0b", "#8b5cf6", "#3b82f6", "#64748b"];
+import { Button, Loader, Badge } from "../components/Common.jsx";
 
 const CustomTooltip = ({ active, payload, label }) => {
-    if (active && payload && payload.length) {
-        return (
-            <div className="bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 shadow-2xl backdrop-blur-md">
-                <p className="text-xs font-bold text-slate-300 mb-2">{label}</p>
-                {payload.map((p, i) => (
-                    <div key={i} className="flex items-center gap-2 text-xs">
-                        <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: p.color }} />
-                        <span className="text-slate-400">{p.name}:</span>
-                        <span className="font-bold text-slate-200">{p.value}</span>
-                    </div>
-                ))}
-            </div>
-        );
-    }
-    return null;
-};
-
-const getCategoryIcon = (category) => {
-    const name = category?.toLowerCase() || "";
-    if (name.includes("motherboard") || name.includes("pcb")) return <Database className="text-cyan-400" size={14} />;
-    if (name.includes("cpu") || name.includes("processor") || name.includes("microchip")) return <Cpu className="text-purple-400" size={14} />;
-    if (name.includes("label") || name.includes("sticker")) return <FileText className="text-emerald-400" size={14} />;
-    return <Sliders className="text-blue-400" size={14} />;
-};
-
-function StatCard({ label, value, icon: Icon, color, sublabel }) {
+  if (active && payload && payload.length) {
     return (
-        <div className="relative group">
-            <div className="absolute inset-0 bg-gradient-to-br from-slate-800/50 to-transparent rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-            <div className="relative bg-[#0f172a]/45 border border-slate-800/80 p-5 rounded-xl hover:border-slate-700/60 transition-all duration-300">
-                <div className="absolute top-0 left-4 right-4 h-[1.5px] bg-gradient-to-r from-transparent via-cyan-500/20 to-transparent" />
-                <div className="flex items-start justify-between">
-                    <div className="space-y-1.5">
-                        <p className="text-[10px] uppercase tracking-[0.15em] text-slate-500 font-semibold">{label}</p>
-                        <h3 className="text-2xl font-extrabold tracking-tight text-slate-100 font-tech-code">{value}</h3>
-                        {sublabel && (
-                            <p className="text-[11px] text-slate-500 flex items-center gap-1">
-                                <span className="w-1.5 h-1.5 rounded-full bg-slate-700" />
-                                {sublabel}
-                            </p>
-                        )}
-                    </div>
-                    <div className={`h-10 w-10 rounded-xl flex items-center justify-center border transition-all duration-300 ${color === 'cyan' ? 'bg-cyan-950/20 border-cyan-500/20 text-cyan-400 group-hover:shadow-[0_0_15px_rgba(6,182,212,0.15)]' : ''} ${color === 'red' ? 'bg-red-950/20 border-red-500/20 text-red-400' : ''} ${color === 'amber' ? 'bg-amber-950/20 border-amber-500/20 text-amber-400' : ''} ${color === 'emerald' ? 'bg-emerald-950/20 border-emerald-500/20 text-emerald-400 group-hover:shadow-[0_0_15px_rgba(16,185,129,0.15)]' : ''}`}>
-                        <Icon size={20} />
-                    </div>
-                </div>
-            </div>
-        </div>
+      <div className="lab-card p-3 font-mono text-xs space-y-1">
+        <p className="font-bold text-slate-700 dark:text-slate-300 uppercase">{label}</p>
+        {payload.map((p, i) => (
+          <div key={i} className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full" style={{ backgroundColor: p.color }} />
+            <span className="text-slate-500">{p.name}:</span>
+            <span className="font-bold text-slate-900 dark:text-slate-100">{p.value}</span>
+          </div>
+        ))}
+      </div>
     );
+  }
+  return null;
+};
+
+function StatCard({ label, value, icon: Icon, color = "sky", sublabel }) {
+  const c = {
+    sky: "text-sky-600 dark:text-sky-400",
+    rose: "text-rose-600 dark:text-rose-400",
+    amber: "text-amber-600 dark:text-amber-400",
+    emerald: "text-emerald-600 dark:text-emerald-400",
+  }[color] || "text-sky-600 dark:text-sky-400";
+
+  return (
+    <div className="lab-card p-4 flex flex-col justify-between">
+      <div className="flex items-start justify-between">
+        <div>
+          <p className="text-[10px] font-bold font-mono text-slate-500 uppercase tracking-wider">{label}</p>
+          <h3 className={`text-2xl font-bold font-mono mt-1 ${c}`}>{value}</h3>
+        </div>
+        <div className="p-2 rounded bg-slate-100 dark:bg-slate-800">
+          <Icon size={18} className={c} />
+        </div>
+      </div>
+      {sublabel && <p className="text-[10px] text-slate-500 font-mono mt-2 pt-2 border-t border-slate-200 dark:border-slate-800">{sublabel}</p>}
+    </div>
+  );
 }
 
-function ChartCard({ title, icon: Icon, iconColor, children, badge, badgeColor }) {
-    return (
-        <div className="relative group">
-            <div className="absolute -inset-0.5 bg-gradient-to-r from-cyan-500/5 to-purple-500/5 rounded-2xl blur opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-            <div className="relative bg-[#0f172a]/55 border border-slate-800/80 p-6 rounded-xl shadow-lg">
-                <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-blue-500/20 to-transparent" />
-                <div className="flex items-center justify-between mb-6">
-                    <div className="flex items-center gap-2.5">
-                        <div className={`h-8 w-8 rounded-lg flex items-center justify-center border ${iconColor}`}>
-                            <Icon size={16} />
-                        </div>
-                        <div>
-                            <h2 className="text-xs font-extrabold uppercase tracking-wider text-slate-200">{title}</h2>
-                        </div>
-                    </div>
-                    {badge && (
-                        <span className={`text-[9px] font-bold px-2.5 py-1 rounded-full border ${badgeColor || 'bg-slate-900 border-slate-800 text-slate-500'}`}>
-                            {badge}
-                        </span>
-                    )}
-                </div>
-                {children}
-            </div>
+function ChartCard({ title, icon: Icon, children, badge }) {
+  return (
+    <div className="lab-card p-4 space-y-4">
+      <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
+        <div className="flex items-center gap-2">
+          <Icon size={16} className="text-sky-500" />
+          <h2 className="text-xs font-bold uppercase tracking-wider text-slate-900 dark:text-slate-100">{title}</h2>
         </div>
-    );
+        {badge && (
+          <span className="font-mono text-[9px] font-bold px-2 py-0.5 rounded bg-sky-500/10 text-sky-600 dark:text-sky-400 border border-sky-500/20 uppercase">
+            {badge}
+          </span>
+        )}
+      </div>
+      {children}
+    </div>
+  );
 }
 
 export default function AnalyticsDashboardPage() {
-    const [queueItems, setQueueItems] = useState([]);
-    const [cases, setCases] = useState([]);
-    const [stats, setStats] = useState(null);
-    const [loading, setLoading] = useState(true);
+  const [queueItems, setQueueItems] = useState([]);
+  const [stats, setStats] = useState(null);
+  const [loading, setLoading] = useState(true);
 
-    // New backend data states
-    const [vendors, setVendors] = useState([]);
-    const [sites, setSites] = useState([]);
-    const [repeatOffenders, setRepeatOffenders] = useState([]);
-    const [monthlyTrend, setMonthlyTrend] = useState([]);
-    const [monthlyBreakdown, setMonthlyBreakdown] = useState([]);
+  const [vendors, setVendors] = useState([]);
+  const [sites, setSites] = useState([]);
+  const [repeatOffenders, setRepeatOffenders] = useState([]);
+  const [monthlyTrend, setMonthlyTrend] = useState([]);
 
-    // Interactive selected vendor details state
-    const [selectedVendor, setSelectedVendor] = useState(null);
-    const [vendorDetailLoading, setVendorDetailLoading] = useState(false);
-    const [vendorDetails, setVendorDetails] = useState(null);
+  const [selectedVendor, setSelectedVendor] = useState(null);
+  const [vendorDetailLoading, setVendorDetailLoading] = useState(false);
+  const [vendorDetails, setVendorDetails] = useState(null);
 
-    // Interactive selected site details state
-    const [selectedSite, setSelectedSite] = useState(null);
-    const [siteDetails, setSiteDetails] = useState(null);
+  const [selectedSite, setSelectedSite] = useState(null);
+  const [siteDetails, setSiteDetails] = useState(null);
 
-    const fetchData = async () => {
-        setLoading(true);
-        try {
-            const [
-                queueResult,
-                statsData,
-                casesData,
-                vendorData,
-                siteData,
-                offendersData,
-                trendData,
-                breakdownData
-            ] = await Promise.all([
-                getTriageQueue({ page: 1, pageSize: 1000, filters: {} }),
-                getTriageStats(),
-                getCases(),
-                getVendorAnalytics(),
-                getSiteAnalytics(),
-                getRepeatOffenders(),
-                getMonthlyTrend(),
-                getMonthlyBreakdown()
-            ]);
-            setQueueItems(Array.isArray(queueResult?.items) ? queueResult.items : []);
-            setCases(casesData || []);
-            setStats(statsData);
-            setVendors(vendorData || []);
-            setSites(siteData || []);
-            setRepeatOffenders(offendersData || []);
-            setMonthlyTrend(trendData || []);
-            setMonthlyBreakdown(breakdownData || []);
-        } catch (err) {
-            console.error("Failed to load analytics data:", err);
-        } finally {
-            setLoading(false);
-        }
-    };
+  const fetchData = async () => {
+    setLoading(true);
+    try {
+      const [
+        queueResult,
+        statsData,
+        casesData,
+        vendorData,
+        siteData,
+        offendersData,
+        trendData,
+      ] = await Promise.all([
+        getTriageQueue({ page: 1, pageSize: 1000, filters: {} }),
+        getTriageStats(),
+        getCases(),
+        getVendorAnalytics(),
+        getSiteAnalytics(),
+        getRepeatOffenders(),
+        getMonthlyTrend(),
+      ]);
+      setQueueItems(Array.isArray(queueResult?.items) ? queueResult.items : []);
+      setStats(statsData);
+      setVendors(vendorData || []);
+      setSites(siteData || []);
+      setRepeatOffenders(offendersData || []);
+      setMonthlyTrend(trendData || []);
+    } catch (err) {
+      console.error("Failed to load analytics data:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    useEffect(() => {
-        fetchData();
-    }, []);
+  useEffect(() => {
+    fetchData();
+  }, []);
 
-    const handleVendorClick = async (vendorName) => {
-        if (selectedVendor === vendorName) {
-            setSelectedVendor(null);
-            setVendorDetails(null);
-            return;
-        }
-        setSelectedVendor(vendorName);
-        setVendorDetailLoading(true);
-        try {
-            const detail = await getVendorDetail(vendorName);
-            setVendorDetails(detail);
-        } catch (err) {
-            console.error("Failed to load vendor detail:", err);
-        } finally {
-            setVendorDetailLoading(false);
-        }
-    };
+  const handleVendorClick = async (vendorName) => {
+    if (selectedVendor === vendorName) {
+      setSelectedVendor(null);
+      setVendorDetails(null);
+      return;
+    }
+    setSelectedVendor(vendorName);
+    setVendorDetailLoading(true);
+    try {
+      const detail = await getVendorDetail(vendorName);
+      setVendorDetails(detail);
+    } catch (err) {
+      console.error("Failed to load vendor detail:", err);
+    } finally {
+      setVendorDetailLoading(false);
+    }
+  };
 
-    const handleSiteClick = (siteName, fraudCases) => {
-        if (selectedSite === siteName) {
-            setSelectedSite(null);
-            setSiteDetails(null);
-            return;
-        }
-        setSelectedSite(siteName);
-        setSiteDetails({ site: siteName, fraud_cases: fraudCases });
-    };
+  const handleSiteClick = (siteName, fraudCases) => {
+    if (selectedSite === siteName) {
+      setSelectedSite(null);
+      setSiteDetails(null);
+      return;
+    }
+    setSelectedSite(siteName);
+    setSiteDetails({ site: siteName, fraud_cases: fraudCases });
+  };
 
-    // CSV Export function — downloads current queue data as .csv file
-    const exportToCSV = () => {
-        if (!queueItems.length) {
-            alert("No data available to export.");
-            return;
-        }
-
-        const headers = [
-            "Case ID", "Part Number", "Commodity", "Capture Site",
-            "Risk Score", "Status", "Reason", "Confidence",
-            "Recommended Action", "Timestamp"
-        ];
-
-        const rows = queueItems.map(item => [
-            item.caseId || "",
-            item.partNumber || "",
-            item.commodity || "",
-            item.captureSite || "",
-            item.riskScore || 0,
-            item.status || "",
-            item.reason || "",
-            item.confidence || 0,
-            item.recommendedAction || "",
-            item.createdAt || ""
-        ]);
-
-        const csvContent = [
-            headers.join(","),
-            ...rows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(","))
-        ].join("\n");
-
-        const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement("a");
-        link.href = url;
-        link.download = `verivision_analytics_${new Date().toISOString().split("T")[0]}.csv`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
-    };
-
-    // --- ALL DATA DERIVED FROM BACKEND ONLY ---
-
-    // Fraud distribution from queue items
-    const fraudDist = { clean: 0, tampered: 0, missing: 0, mismatched: 0, reused: 0, pending: 0 };
-    queueItems.forEach(item => {
-        const reason = item.reason?.toLowerCase() || "";
-        if (reason.includes("clean") || reason.includes("passed")) fraudDist.clean++;
-        else if (reason.includes("tamper")) fraudDist.tampered++;
-        else if (reason.includes("miss")) fraudDist.missing++;
-        else if (reason.includes("mismatch")) fraudDist.mismatched++;
-        else if (reason.includes("reuse")) fraudDist.reused++;
-        else fraudDist.pending++;
-    });
-
-    const pieData = Object.entries(fraudDist)
-        .filter(([_, v]) => v > 0)
-        .map(([name, value]) => ({ name: name.charAt(0).toUpperCase() + name.slice(1), value }));
-
-    const totalCases = queueItems.length;
-    const fraudCases = fraudDist.tampered + fraudDist.missing + fraudDist.mismatched + fraudDist.reused;
-    const fraudRate = totalCases > 0 ? ((fraudCases / totalCases) * 100).toFixed(1) : "0.0";
-
-    // Commodity breakdown from queue items
-    const commodityData = Object.values(
-        queueItems.reduce((acc, item) => {
-            const com = item.commodity || "Unknown";
-            if (!acc[com]) acc[com] = { commodity: com, total: 0, fraud: 0 };
-            acc[com].total++;
-            if (item.status === "QUARANTINE") acc[com].fraud++;
-            return acc;
-        }, {})
-    );
-
-    if (loading) {
-        return (
-            <Layout title="Fraud Analytics Dashboard" subtitle="Real-time fraud intelligence from inspection data">
-                <div className="flex items-center justify-center h-96">
-                    <div className="flex flex-col items-center gap-4">
-                        <div className="h-10 w-10 border-2 border-cyan-500/30 border-t-cyan-400 rounded-full animate-spin" />
-                        <p className="text-xs text-slate-500 font-semibold tracking-wider uppercase">Loading analytics...</p>
-                    </div>
-                </div>
-            </Layout>
-        );
+  const exportToCSV = () => {
+    if (!queueItems.length) {
+      alert("No data available to export.");
+      return;
     }
 
+    const headers = [
+      "Case ID",
+      "Part Number",
+      "Commodity",
+      "Capture Site",
+      "Risk Score",
+      "Status",
+      "Reason",
+      "Confidence",
+      "Recommended Action",
+      "Timestamp",
+    ];
+
+    const rows = queueItems.map((item) => [
+      item.caseId || "",
+      item.partNumber || "",
+      item.commodity || "",
+      item.captureSite || "",
+      item.riskScore || 0,
+      item.status || "",
+      item.reason || "",
+      item.confidence || 0,
+      item.recommendedAction || "",
+      item.createdAt || "",
+    ]);
+
+    const csvContent = [
+      headers.join(","),
+      ...rows.map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(",")),
+    ].join("\n");
+
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `verivision_analytics_${new Date().toISOString().split("T")[0]}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  const fraudDist = { clean: 0, tampered: 0, missing: 0, mismatched: 0, reused: 0, pending: 0 };
+  queueItems.forEach((item) => {
+    const reason = item.reason?.toLowerCase() || "";
+    if (reason.includes("clean") || reason.includes("passed")) fraudDist.clean++;
+    else if (reason.includes("tamper")) fraudDist.tampered++;
+    else if (reason.includes("miss")) fraudDist.missing++;
+    else if (reason.includes("mismatch")) fraudDist.mismatched++;
+    else if (reason.includes("reuse")) fraudDist.reused++;
+    else fraudDist.pending++;
+  });
+
+  const totalCases = queueItems.length;
+  const fraudCases = fraudDist.tampered + fraudDist.missing + fraudDist.mismatched + fraudDist.reused;
+  const fraudRate = totalCases > 0 ? ((fraudCases / totalCases) * 100).toFixed(1) : "0.0";
+
+  if (loading) {
     return (
-        <Layout
-            title="Fraud Analytics Dashboard"
-            subtitle={
-                <span>
-                    Real-time fraud intelligence across <span className="text-cyan-400 font-bold">{totalCases}</span> inspection cases ·
-                    <span className="text-red-400 font-bold ml-1">{fraudCases}</span> fraud incidents detected
-                </span>
-            }
-            actions={
-                <div className="flex items-center gap-2">
-                    <button
-                        onClick={fetchData}
-                        className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg border border-slate-800 bg-slate-900/60 text-slate-400 hover:text-cyan-400 hover:border-cyan-500/30 text-[10px] font-extrabold uppercase tracking-wider transition-all"
-                    >
-                        <RefreshCw size={13} />
-                        Refresh
-                    </button>
-                    <button
-                        onClick={exportToCSV}
-                        className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg border border-cyan-500/30 bg-cyan-950/30 text-cyan-400 hover:bg-cyan-900/50 text-[10px] font-extrabold uppercase tracking-wider transition-all"
-                    >
-                        <Download size={13} />
-                        Export CSV
-                    </button>
-                </div>
-            }
-        >
-            {/* Repeat Offender Alerts (Top Prominent Banner) */}
-            {repeatOffenders.length > 0 && (
-                <div className="space-y-3 mb-8">
-                    {repeatOffenders.map((offender) => (
-                        <div
-                            key={offender.vendor}
-                            className="relative group overflow-hidden rounded-xl border border-red-500/20 bg-gradient-to-r from-red-950/40 via-red-950/20 to-slate-950/50 p-4 shadow-[0_0_20px_rgba(239,68,68,0.05)]"
-                        >
-                            <div className="absolute top-0 left-0 bottom-0 w-1 bg-red-500" />
-                            <div className="flex items-center justify-between flex-wrap gap-4">
-                                <div className="flex items-center gap-3">
-                                    <div className="h-9 w-9 rounded-lg bg-red-500/10 border border-red-500/20 flex items-center justify-center text-red-400">
-                                        <ShieldAlert size={18} />
-                                    </div>
-                                    <div>
-                                        <h4 className="text-xs font-black tracking-wider text-red-400 uppercase">
-                                            {offender.status === "Repeat Offender" ? "⚠️ Repeat Offender Flagged" : "⚠️ Watch List Vendor"}
-                                        </h4>
-                                        <p className="text-[11px] text-slate-400 mt-0.5">
-                                            Vendor <span className="font-extrabold text-slate-200">{offender.vendor}</span> has registered{" "}
-                                            <span className="font-extrabold text-red-400">{offender.fraud_cases} fraud cases</span> within the last {offender.days_window} days.
-                                        </p>
-                                    </div>
-                                </div>
-                                <span className="text-[9px] font-black tracking-widest uppercase px-3 py-1 rounded bg-red-950/40 border border-red-500/30 text-red-400">
-                                    {offender.status}
-                                </span>
-                            </div>
-                        </div>
-                    ))}
-                </div>
-            )}
-
-            {/* KPI Cards — All Backend Data */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-                <StatCard label="Total Cases Inspected" value={totalCases} icon={Layers} color="cyan" sublabel={`${stats?.autoApproved || 0} auto-approved`} />
-                <StatCard label="Fraud Incidents" value={fraudCases} icon={AlertTriangle} color="red" sublabel="Requires investigation" />
-                <StatCard label="Fraud Detection Rate" value={`${fraudRate}%`} icon={TrendingUp} color="amber" sublabel="Of total inspections" />
-                <StatCard label="Pending Review" value={stats?.pendingReview || 0} icon={Activity} color="emerald" sublabel="Awaiting human review" />
-            </div>
-
-            {/* Vendor Performance Table */}
-            <div className="mb-8 relative group">
-                <div className="relative bg-[#0f172a]/55 border border-slate-800/80 rounded-xl shadow-lg overflow-hidden">
-                    <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-blue-500/20 to-transparent" />
-                    <div className="px-6 py-4 border-b border-slate-800 bg-[#0d1527]/50 flex items-center justify-between">
-                        <div className="flex items-center gap-2.5">
-                            <div className="h-7 w-7 rounded-lg bg-blue-950/20 border border-blue-500/20 flex items-center justify-center text-blue-400">
-                                <Database size={14} />
-                            </div>
-                            <h2 className="text-xs font-extrabold uppercase tracking-wider text-slate-200">Vendor Performance Overview</h2>
-                        </div>
-                    </div>
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-xs">
-                            <thead>
-                                <tr className="border-b border-slate-800 bg-slate-900/30">
-                                    <th className="text-left px-6 py-3.5 text-[10px] font-extrabold uppercase tracking-wider text-slate-500">Vendor</th>
-                                    <th className="text-center px-6 py-3.5 text-[10px] font-extrabold uppercase tracking-wider text-slate-500">Components Supplied</th>
-                                    <th className="text-center px-6 py-3.5 text-[10px] font-extrabold uppercase tracking-wider text-slate-500">Fraud Cases</th>
-                                    <th className="text-right px-6 py-3.5 text-[10px] font-extrabold uppercase tracking-wider text-slate-500 pr-12">Fraud Rate</th>
-                                    <th className="text-center px-6 py-3.5 text-[10px] font-extrabold uppercase tracking-wider text-slate-500">Trust Score</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-800/60">
-                                {vendors.map((vendor, i) => (
-                                    <tr
-                                        key={i}
-                                        onClick={() => handleVendorClick(vendor.vendor)}
-                                        className="group hover:bg-blue-950/20 transition-all duration-300 cursor-pointer border-l-2 border-l-transparent hover:border-l-blue-500"
-                                    >
-                                        <td className="px-6 py-4 flex items-center gap-2">
-                                            <span className="text-blue-400 font-bold text-xs underline underline-offset-4 decoration-blue-500/40 group-hover:decoration-blue-400 group-hover:text-blue-300 transition-all duration-300">
-                                                {vendor.vendor}
-                                            </span>
-                                            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 translate-x-[-8px] group-hover:translate-x-0 transition-all duration-300">
-                                                <span className="text-[8px] font-bold text-blue-400/80 uppercase tracking-wider">View</span>
-                                                <ChevronRight size={12} className="text-blue-400" />
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-4 text-center text-slate-300 font-tech-code">{vendor.components_supplied}</td>
-                                        <td className="px-6 py-4 text-center text-red-400 font-bold font-tech-code">{vendor.fraud_cases}</td>
-                                        <td className="px-6 py-4 text-right pr-12 font-tech-code">
-                                            <span className={parseFloat(vendor.fraud_rate) > 10 ? "text-red-400 font-extrabold" : "text-emerald-400 font-bold"}>
-                                                {vendor.fraud_rate}%
-                                            </span>
-                                        </td>
-                                        <td className="px-6 py-4 text-center text-slate-300 font-tech-code">{vendor.trust_score}</td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-
-            {/* Site Performance Table — full width like Vendor */}
-            <div className="mb-8 relative group">
-                <div className="relative bg-[#0f172a]/55 border border-slate-800/80 rounded-xl shadow-lg overflow-hidden">
-                    <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-cyan-500/20 to-transparent" />
-                    <div className="px-6 py-4 border-b border-slate-800 bg-[#0d1527]/50 flex items-center gap-2.5">
-                        <div className="h-7 w-7 rounded-lg bg-cyan-950/20 border border-cyan-500/20 flex items-center justify-center text-cyan-400">
-                            <Activity size={14} />
-                        </div>
-                        <h2 className="text-xs font-extrabold uppercase tracking-wider text-slate-200">Site Performance Overview</h2>
-                    </div>
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-xs">
-                            <thead>
-                                <tr className="border-b border-slate-800 bg-slate-900/30">
-                                    <th className="text-left px-6 py-3.5 text-[10px] font-extrabold uppercase tracking-wider text-slate-500">Site</th>
-                                    <th className="text-center px-6 py-3.5 text-[10px] font-extrabold uppercase tracking-wider text-slate-500">Inspections</th>
-                                    <th className="text-center px-6 py-3.5 text-[10px] font-extrabold uppercase tracking-wider text-slate-500">Fraud Cases</th>
-                                    <th className="text-right px-6 py-3.5 text-[10px] font-extrabold uppercase tracking-wider text-slate-500">Fraud Rate</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-800/60">
-                                {sites.map((site, i) => (
-                                    <tr key={i} onClick={() => handleSiteClick(site.site, site.fraud_cases)} className="group hover:bg-blue-950/20 transition-all duration-300 cursor-pointer border-l-2 border-l-transparent hover:border-l-blue-500">
-                                        <td className="px-6 py-4 flex items-center gap-2">
-                                            <span className="text-blue-400 font-bold text-xs underline underline-offset-4 decoration-blue-500/40 group-hover:decoration-blue-400 group-hover:text-blue-300 transition-all duration-300">
-                                                {site.site}
-                                            </span>
-                                            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 translate-x-[-8px] group-hover:translate-x-0 transition-all duration-300">
-                                                <span className="text-[8px] font-bold text-blue-400/80 uppercase tracking-wider">View</span>
-                                                <ChevronRight size={12} className="text-blue-400" />
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-4 text-center text-slate-300 font-tech-code">{site.inspections}</td>
-                                        <td className="px-6 py-4 text-center text-red-400 font-bold font-tech-code">{site.fraud_cases}</td>
-                                        <td className="px-6 py-4 text-right font-tech-code">
-                                            <span className={parseFloat(site.fraud_rate) > 5 ? "text-red-400 font-extrabold" : "text-emerald-400 font-bold"}>
-                                                {site.fraud_rate}%
-                                            </span>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-
-            {/* Charts Row 2 — Month-on-Month Compliance Trend & Granular Table */}
-            <div className="grid grid-cols-1 gap-6 mb-8">
-                <ChartCard
-                    title="Month-on-Month Compliance & Fraud Timeline"
-                    icon={TrendingUp}
-                    iconColor="bg-emerald-950/20 border-emerald-500/20 text-emerald-400"
-                    badge="LIVE TIMELINE"
-                    badgeColor="bg-cyan-950/20 border-cyan-500/20 text-cyan-400"
-                >
-                    {monthlyTrend.length > 0 ? (
-                        <div className="space-y-6">
-                            <ResponsiveContainer width="100%" height={260}>
-                                <BarChart data={monthlyTrend} barGap={4} barCategoryGap="30%">
-                                    <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" strokeOpacity={0.4} />
-                                    <XAxis dataKey="month" stroke="#64748b" fontSize={11} axisLine={false} tickLine={false} />
-                                    <YAxis stroke="#64748b" fontSize={11} axisLine={false} tickLine={false} />
-                                    <Tooltip content={<CustomTooltip />} cursor={{ fill: '#1e293b', opacity: 0.3 }} />
-                                    <Legend
-                                        verticalAlign="bottom"
-                                        height={30}
-                                        iconType="rect"
-                                        iconSize={10}
-                                        formatter={(value) => <span className="text-xs text-slate-400">{value}</span>}
-                                    />
-                                    <Bar dataKey="total_inspections" fill="#3b82f6" name="Total Received" radius={[4, 4, 0, 0]} maxBarSize={45} />
-                                    <Bar dataKey="fraud_cases" fill="#ef4444" name="Fraud Cases" radius={[4, 4, 0, 0]} maxBarSize={45} />
-                                </BarChart>
-                            </ResponsiveContainer>
-
-                        </div>
-                    ) : (
-                        <div className="flex flex-col items-center justify-center h-72 text-slate-500 gap-3">
-                            <Activity size={32} className="text-slate-700" />
-                            <p className="text-xs font-semibold">No historical timeline data recorded yet</p>
-                        </div>
-                    )}
-                </ChartCard>
-            </div>
-
-
-
-            {/* Recent Cases — Card-Based Design */}
-            <div className="relative group">
-                <div className="relative bg-[#0f172a]/55 border border-slate-800/80 rounded-xl shadow-lg overflow-hidden">
-                    <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-emerald-500/20 to-transparent" />
-                    <div className="px-6 py-4 border-b border-slate-800 bg-[#0d1527]/50 flex items-center justify-between">
-                        <div className="flex items-center gap-2.5">
-                            <div className="h-7 w-7 rounded-lg bg-emerald-950/20 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
-                                <Eye size={14} />
-                            </div>
-                            <h2 className="text-xs font-extrabold uppercase tracking-wider text-slate-200">Recent Inspection Outcomes</h2>
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <span className="text-[9px] text-slate-500 bg-slate-900 px-2 py-1 rounded-full border border-slate-800 font-semibold">{queueItems.length} CASES</span>
-                            <span className="text-[9px] text-slate-500 bg-slate-900 px-2 py-1 rounded-full border border-slate-800 font-semibold">{fraudCases} FRAUD</span>
-                        </div>
-                    </div>
-                    <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-3">
-                        {queueItems.slice(0, 8).map((item, i) => (
-                            <div key={item.id || i} className="group/card relative bg-slate-900/40 border border-slate-800/70 rounded-xl p-4 hover:border-emerald-500/30 hover:bg-slate-900/60 transition-all duration-300">
-                                {/* Top gradient line */}
-                                <div className="absolute top-0 left-2 right-2 h-[1.5px] bg-gradient-to-r from-transparent via-emerald-500/20 to-transparent rounded-full" />
-
-                                {/* Header row */}
-                                <div className="flex items-center justify-between mb-2.5">
-                                    <div className="flex items-center gap-2">
-                                        {getCategoryIcon(item.commodity)}
-                                        <span className="font-tech-code text-[10px] text-cyan-400 font-bold tracking-wider">{item.caseId?.slice(0, 10) || "N/A"}</span>
-                                    </div>
-                                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[8px] font-extrabold uppercase tracking-wider ${item.status === 'AUTO-APPROVED' ? 'bg-emerald-950/30 text-emerald-400 border border-emerald-500/20' : item.status === 'QUARANTINE' ? 'bg-red-950/30 text-red-400 border border-red-500/20' : item.status === 'RETAKE REQUESTED' ? 'bg-amber-950/30 text-amber-400 border border-amber-500/20' : 'bg-slate-800 text-slate-400 border border-slate-700'}`}>
-                                        {item.status === 'AUTO-APPROVED' ? <CheckCircle size={8} /> : item.status === 'QUARANTINE' ? <AlertTriangle size={8} /> : null}
-                                        {item.status || "PENDING"}
-                                    </span>
-                                </div>
-
-                                {/* Info rows */}
-                                <div className="space-y-1.5">
-                                    <div className="flex items-center justify-between text-[10px]">
-                                        <span className="text-slate-500 font-semibold">Part / Date</span>
-                                        <span className="text-slate-300 font-semibold">{item.partNumber || "N/A"} · {item.date || "—"}</span>
-                                    </div>
-                                    <div className="flex items-center justify-between text-[10px]">
-                                        <span className="text-slate-500 font-semibold">Commodity</span>
-                                        <span className="text-slate-300">{item.commodity || "Unknown"}</span>
-                                    </div>
-                                    <div className="flex items-center justify-between text-[10px]">
-                                        <span className="text-slate-500 font-semibold">Risk Score</span>
-                                        <div className="flex items-center gap-2">
-                                            <div className="w-14 h-1.5 bg-slate-800 rounded-full overflow-hidden">
-                                                <div
-                                                    className={`h-full rounded-full ${item.riskScore >= 75 ? 'bg-red-500' : item.riskScore >= 50 ? 'bg-amber-500' : 'bg-emerald-500'}`}
-                                                    style={{ width: `${Math.min(item.riskScore || 0, 100)}%` }}
-                                                />
-                                            </div>
-                                            <span className={`text-[10px] font-bold font-tech-code ${item.riskScore >= 75 ? 'text-red-400' : item.riskScore >= 50 ? 'text-amber-400' : 'text-emerald-400'}`}>
-                                                {item.riskScore || 0}
-                                            </span>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* Reason footer */}
-                                <div className="mt-2.5 pt-2 border-t border-slate-800/60 flex items-center justify-between">
-                                    <span className="text-[9px] text-slate-600 font-semibold">Reason</span>
-                                    <span className="text-[9px] text-slate-500 max-w-[60%] truncate text-right">{item.reason || "—"}</span>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                    {queueItems.length > 8 && (
-                        <div className="px-6 py-3 border-t border-slate-800 bg-slate-900/20 text-center">
-                            <button className="text-[10px] font-extrabold uppercase tracking-wider text-emerald-400 hover:text-emerald-300 hover:underline underline-offset-4 transition-all">
-                                View all {queueItems.length} cases →
-                            </button>
-                        </div>
-                    )}
-                </div>
-            </div>
-
-            {/* Footer */}
-            <div className="mt-8 text-center">
-                <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-slate-900/60 border border-slate-800">
-                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                    <span className="text-[9px] text-slate-500 font-semibold tracking-wider uppercase">
-                        All data from backend · {new Date().toLocaleString('en-IN', { hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'short', year: 'numeric' })}
-                    </span>
-                </div>
-            </div>
-            {/* Site Details Modal */}
-            {selectedSite && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-                    <div className="bg-slate-900 border border-slate-700 p-6 rounded-xl shadow-2xl max-w-md w-full relative">
-                        <button onClick={() => setSelectedSite(null)} className="absolute top-4 right-4 text-slate-400 hover:text-white">
-                            ✕
-                        </button>
-                        <div className="flex items-center gap-3 mb-4">
-                            <div className="h-9 w-9 rounded-lg bg-cyan-950/20 border border-cyan-500/20 flex items-center justify-center text-cyan-400">
-                                <Activity size={18} />
-                            </div>
-                            <div>
-                                <h3 className="text-lg font-bold text-white">{siteDetails?.site}</h3>
-                                <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Site Details</p>
-                            </div>
-                        </div>
-                        {siteDetails && (
-                            <div className="space-y-4">
-                                <div className="flex justify-between items-center p-3 rounded-lg bg-slate-800/40 border border-slate-700/60">
-                                    <span className="text-sm text-slate-400 font-semibold">Fraud Cases</span>
-                                    <span className="text-lg font-extrabold text-red-400 font-tech-code">{siteDetails.fraud_cases}</span>
-                                </div>
-                                <p className="text-[10px] text-slate-500 text-center pt-2">Click on another site or close to dismiss</p>
-                            </div>
-                        )}
-                    </div>
-                </div>
-            )}
-            {/* Vendor Details Modal */}
-            {selectedVendor && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-                    <div className="bg-slate-900 border border-slate-700 p-6 rounded-xl shadow-2xl max-w-md w-full relative">
-                        <button onClick={() => setSelectedVendor(null)} className="absolute top-4 right-4 text-slate-400 hover:text-white">
-                            ✕
-                        </button>
-                        {vendorDetailLoading ? (
-                            <div className="flex justify-center py-8">
-                                <div className="h-8 w-8 border-2 border-cyan-500/30 border-t-cyan-400 rounded-full animate-spin" />
-                            </div>
-                        ) : vendorDetails ? (
-                            <>
-                                <h3 className="text-xl font-bold text-white mb-4">{vendorDetails.vendor}</h3>
-                                <div className="mb-6">
-                                    <h4 className="text-sm font-semibold text-slate-300 uppercase mb-2">Monthly Breakdown</h4>
-                                    <div className="space-y-2">
-                                        {vendorDetails.monthly_trend.map((m, i) => (
-                                            <div key={i} className="flex justify-between text-sm font-tech-code">
-                                                <span className="w-12 text-slate-400">{m.month}</span>
-                                                <span className="text-red-400 w-24 font-bold">{m.fraud} Fraud</span>
-                                                <span className="text-emerald-400 w-24">{m.genuine} Genuine</span>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                                <div>
-                                    <h4 className="text-sm font-semibold text-slate-300 uppercase mb-2 border-b border-slate-700 pb-2">Fraud Components Supplied</h4>
-                                    <ul className="text-sm text-slate-400 space-y-1 mt-3 list-disc pl-5">
-                                        {vendorDetails.fraud_components.map((c, i) => (
-                                            <li key={i}>{c}</li>
-                                        ))}
-                                        {vendorDetails.fraud_components.length === 0 && (
-                                            <li>No fraud components on record.</li>
-                                        )}
-                                    </ul>
-                                </div>
-                            </>
-                        ) : (
-                            <div className="text-center py-8 text-slate-400">Failed to load details.</div>
-                        )}
-                    </div>
-                </div>
-            )}
-        </Layout>
+      <Layout title="Fraud Analytics Dashboard" subtitle="Real-time audit intelligence from inspection records">
+        <Loader label="Computing vendor & site risk metrics…" />
+      </Layout>
     );
+  }
+
+  return (
+    <Layout
+      title="Fraud Analytics Dashboard"
+      subtitle="Real-time audit intelligence across all inspection cases & vendor supply chains"
+      actions={
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={fetchData} icon={<RefreshCw size={13} />}>
+            Refresh
+          </Button>
+          <Button variant="primary" size="sm" onClick={exportToCSV} icon={<Download size={13} />}>
+            Export CSV
+          </Button>
+        </div>
+      }
+    >
+      <div className="space-y-6">
+        {/* KPI Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <StatCard label="Total Cases Inspected" value={totalCases} icon={Layers} color="sky" sublabel={`${stats?.autoApproved || 0} auto-approved`} />
+          <StatCard label="Fraud Incidents" value={fraudCases} icon={AlertTriangle} color="rose" sublabel="Requires investigation" />
+          <StatCard label="Fraud Detection Rate" value={`${fraudRate}%`} icon={TrendingUp} color="amber" sublabel="Of total inspections" />
+          <StatCard label="Pending QA Review" value={stats?.pendingReview || 0} icon={Activity} color="emerald" sublabel="Awaiting human sign-off" />
+        </div>
+
+        {/* 2 Column Canvas */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          {/* Left Column (col-span-8) */}
+          <div className="lg:col-span-8 space-y-6">
+            {/* Vendor Table */}
+            <div className="lab-card overflow-hidden">
+              <div className="px-5 py-3.5 border-b border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/40 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Database size={16} className="text-sky-500" />
+                  <h2 className="text-xs font-bold uppercase tracking-wider text-slate-900 dark:text-slate-100">
+                    Vendor Performance & Risk Overview
+                  </h2>
+                </div>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs text-left">
+                  <thead>
+                    <tr className="bg-slate-100/80 dark:bg-slate-900/80 border-b border-slate-200 dark:border-slate-800 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                      <th className="px-4 py-3">Vendor</th>
+                      <th className="px-4 py-3 text-center">Supplied Units</th>
+                      <th className="px-4 py-3 text-center">Fraud Cases</th>
+                      <th className="px-4 py-3 text-right">Fraud Rate</th>
+                      <th className="px-4 py-3 text-center">Trust Score</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-200 dark:divide-slate-800/60 font-mono">
+                    {vendors.map((vendor, i) => (
+                      <tr
+                        key={i}
+                        onClick={() => handleVendorClick(vendor.vendor)}
+                        className="hover:bg-slate-100/50 dark:hover:bg-slate-800/40 transition cursor-pointer"
+                      >
+                        <td className="px-4 py-3 font-bold text-slate-800 dark:text-slate-200">
+                          {vendor.vendor}
+                        </td>
+                        <td className="px-4 py-3 text-center text-slate-800 dark:text-slate-200">{vendor.components_supplied}</td>
+                        <td className="px-4 py-3 text-center font-bold text-rose-600 dark:text-rose-400">{vendor.fraud_cases}</td>
+                        <td className="px-4 py-3 text-right font-bold">
+                          <span className={parseFloat(vendor.fraud_rate) > 10 ? "text-rose-600 dark:text-rose-400" : "text-emerald-600 dark:text-emerald-400"}>
+                            {vendor.fraud_rate}%
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-center text-slate-800 dark:text-slate-200">{vendor.trust_score}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Site Table */}
+            <div className="lab-card overflow-hidden">
+              <div className="px-5 py-3.5 border-b border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/40 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Activity size={16} className="text-sky-500" />
+                  <h2 className="text-xs font-bold uppercase tracking-wider text-slate-900 dark:text-slate-100">
+                    Capture Site Anomaly Breakdown
+                  </h2>
+                </div>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs text-left">
+                  <thead>
+                    <tr className="bg-slate-100/80 dark:bg-slate-900/80 border-b border-slate-200 dark:border-slate-800 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                      <th className="px-4 py-3">Site Location</th>
+                      <th className="px-4 py-3 text-center">Inspections</th>
+                      <th className="px-4 py-3 text-center">Fraud Cases</th>
+                      <th className="px-4 py-3 text-right">Fraud Rate</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-200 dark:divide-slate-800/60 font-mono">
+                    {sites.map((site, i) => (
+                      <tr
+                        key={i}
+                        onClick={() => handleSiteClick(site.site, site.fraud_cases)}
+                        className="hover:bg-slate-100/50 dark:hover:bg-slate-800/40 transition cursor-pointer"
+                      >
+                        <td className="px-4 py-3 font-bold text-slate-800 dark:text-slate-200">
+                          {site.site}
+                        </td>
+                        <td className="px-4 py-3 text-center text-slate-800 dark:text-slate-200">{site.inspections}</td>
+                        <td className="px-4 py-3 text-center font-bold text-rose-600 dark:text-rose-400">{site.fraud_cases}</td>
+                        <td className="px-4 py-3 text-right font-bold">
+                          <span className={parseFloat(site.fraud_rate) > 5 ? "text-rose-600 dark:text-rose-400" : "text-emerald-600 dark:text-emerald-400"}>
+                            {site.fraud_rate}%
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Recharts Chart */}
+            <ChartCard title="Month-on-Month Compliance & Fraud Trend" icon={TrendingUp} badge="Audit Timeline">
+              {monthlyTrend.length > 0 ? (
+                <ResponsiveContainer width="100%" height={240}>
+                  <BarChart data={monthlyTrend} barGap={4} barCategoryGap="30%">
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(148, 163, 184, 0.2)" />
+                    <XAxis dataKey="month" stroke="#64748b" fontSize={11} />
+                    <YAxis stroke="#64748b" fontSize={11} />
+                    <Tooltip content={<CustomTooltip />} />
+                    <Legend />
+                    <Bar dataKey="total_inspections" fill="#0284c7" name="Total Ingested" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="fraud_cases" fill="#ef4444" name="Fraud Cases" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="py-12 text-center text-xs text-slate-400">No monthly timeline data recorded.</div>
+              )}
+            </ChartCard>
+          </div>
+
+          {/* Right Column (col-span-4) */}
+          <div className="lg:col-span-4 space-y-6">
+            {/* Risk Alerts */}
+            {repeatOffenders.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-[10px] font-bold font-mono text-slate-500 uppercase tracking-wider">
+                  High Risk Watchlist Flags
+                </p>
+                {repeatOffenders.map((offender) => (
+                  <div key={offender.vendor} className="lab-card p-3 border-l-4 border-l-rose-500 space-y-1">
+                    <div className="flex items-center gap-1.5 text-xs font-bold text-rose-600 dark:text-rose-400">
+                      <ShieldAlert size={14} />
+                      <span className="uppercase">{offender.status}</span>
+                    </div>
+                    <p className="text-[11px] text-slate-600 dark:text-slate-400">
+                      Vendor <strong className="text-slate-900 dark:text-slate-100">{offender.vendor}</strong> logged{" "}
+                      <strong className="text-rose-500">{offender.fraud_cases} fraud cases</strong> in {offender.days_window} days.
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Recent Outcomes List */}
+            <div className="lab-card overflow-hidden">
+              <div className="px-4 py-3 border-b border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/40 flex items-center justify-between">
+                <h2 className="text-xs font-bold uppercase tracking-wider text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                  <Eye size={14} className="text-sky-500" /> Recent Case Verdicts
+                </h2>
+                <span className="font-mono text-[10px] text-slate-500">{queueItems.length} CASES</span>
+              </div>
+              <div className="divide-y divide-slate-200 dark:divide-slate-800/60 max-h-[500px] overflow-y-auto">
+                {queueItems.slice(0, 10).map((item, i) => (
+                  <div key={item.id || i} className="p-3 text-xs space-y-1">
+                    <div className="flex justify-between items-center font-mono">
+                      <span className="font-bold text-slate-900 dark:text-slate-100">{item.caseId?.slice(0, 12)}</span>
+                      <Badge status={item.status} size="sm" />
+                    </div>
+                    <div className="flex justify-between text-[10px] font-mono text-slate-500">
+                      <span>{item.partNumber}</span>
+                      <span className="font-bold text-rose-500">Risk: {item.riskScore}%</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Vendor Detail Modal */}
+      {selectedVendor && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-xs">
+          <div className="lab-card p-5 max-w-md w-full bg-white dark:bg-[#0e1626] space-y-4">
+            <div className="flex justify-between items-center border-b border-slate-200 dark:border-slate-800 pb-2">
+              <h3 className="text-xs font-bold font-mono text-slate-900 dark:text-slate-100 uppercase">
+                Vendor Audit: {selectedVendor}
+              </h3>
+              <button onClick={() => setSelectedVendor(null)} className="text-slate-400 hover:text-slate-600">
+                <X size={16} />
+              </button>
+            </div>
+            {vendorDetailLoading ? (
+              <Loader label="Fetching vendor logs…" />
+            ) : vendorDetails ? (
+              <div className="space-y-3 text-xs font-mono">
+                <div className="p-3 rounded bg-slate-100 dark:bg-slate-900 space-y-1">
+                  <p className="font-bold text-slate-700 dark:text-slate-300 uppercase">Supplied Parts Summary</p>
+                  <ul className="list-disc pl-4 text-slate-500 space-y-0.5">
+                    {vendorDetails.fraud_components.map((c, i) => (
+                      <li key={i}>{c}</li>
+                    ))}
+                    {vendorDetails.fraud_components.length === 0 && <li>No fraud components recorded.</li>}
+                  </ul>
+                </div>
+              </div>
+            ) : (
+              <p className="text-xs text-slate-400">Failed to load vendor details.</p>
+            )}
+          </div>
+        </div>
+      )}
+    </Layout>
+  );
 }

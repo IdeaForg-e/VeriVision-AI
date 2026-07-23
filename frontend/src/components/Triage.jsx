@@ -1,391 +1,218 @@
-// Consolidated components for triage
-import { Pagination, SearchBar } from "./Common.jsx";
+import { SearchBar, Badge, Button } from "./Common.jsx";
 import { ROUTES } from "../utils/constants.js";
-import { Search, Filter, RefreshCw, Download, AlertTriangle, ShieldAlert, CheckCircle2, Clock3, Activity, ChevronRight, ClipboardCheck, BrainCircuit, TrendingUp } from "lucide-react";
+import {
+  Filter,
+  RefreshCw,
+  Download,
+  AlertTriangle,
+  ShieldAlert,
+  CheckCircle2,
+  Clock3,
+  Activity,
+  ChevronRight,
+  ClipboardCheck,
+  BrainCircuit,
+  TrendingUp,
+} from "lucide-react";
 import { useMemo, useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 
-export function PipelineStatus({
-  alerts = [],
-  activities = [],
-}) {
+export function PipelineStatus({ alerts = [], activities = [] }) {
   return (
-    <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 mt-6">
+    <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 mt-6">
       {/* Recent Alerts */}
-
-      <div className="cyber-card bg-[#0f172a]/55 border-slate-800 shadow-lg overflow-hidden">
-
-        <div className="px-5 py-4 border-b bg-[#0d1527]/50 flex items-center justify-between">
+      <div className="lab-card overflow-hidden">
+        <div className="px-4 py-3 border-b border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/40 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <ShieldAlert className="text-red-500" size={20} />
-            <h2 className="font-semibold text-slate-200">
-              Recent Alerts
-            </h2>
+            <ShieldAlert className="text-rose-500" size={16} />
+            <h2 className="font-bold text-xs text-slate-800 dark:text-slate-200">System Alerts & Notices</h2>
           </div>
-
-          <span className="text-xs text-slate-450">
-            {alerts.length} Alerts
-          </span>
+          <span className="text-[10px] font-mono text-slate-500">{alerts.length} ALERTS</span>
         </div>
 
-        <div className="max-h-80 overflow-y-auto">
-
+        <div className="max-h-72 overflow-y-auto divide-y divide-slate-200 dark:divide-slate-800/60">
           {alerts.length === 0 ? (
-            <div className="p-8 text-center text-slate-450">
-              No alerts available
-            </div>
+            <div className="p-8 text-center text-slate-400 text-xs">No active alerts reported</div>
           ) : (
             alerts.map((alert) => (
-              <div
-                key={alert.id}
-                className="px-5 py-4 border-b border-slate-850 last:border-0 hover:bg-red-950/25 transition"
-              >
-                <div className="flex justify-between items-start">
-
-                  <div className="flex gap-3">
-
-                    <div className="mt-1">
-                      <AlertTriangle
-                        className="text-red-500"
-                        size={18}
-                      />
-                    </div>
-
-                    <div>
-
-                      <p className="font-semibold text-slate-200">
-                        {alert.title}
-                      </p>
-
-                      <p className="text-sm text-slate-450 mt-1">
-                        {alert.message}
-                      </p>
-
-                    </div>
-
+              <div key={alert.id} className="p-3.5 hover:bg-rose-500/5 transition flex items-start justify-between gap-3">
+                <div className="flex gap-2.5 items-start min-w-0">
+                  <AlertTriangle className="text-rose-500 shrink-0 mt-0.5" size={15} />
+                  <div className="min-w-0">
+                    <p className="font-bold text-xs text-slate-800 dark:text-slate-200 truncate">{alert.title}</p>
+                    <p className="text-[11px] text-slate-500 mt-0.5 leading-relaxed">{alert.message}</p>
                   </div>
-
-                  <span className="text-xs text-slate-500 whitespace-nowrap">
-                    {alert.time}
-                  </span>
-
                 </div>
+                <span className="text-[10px] font-mono text-slate-400 shrink-0">{alert.time}</span>
               </div>
             ))
           )}
-
         </div>
       </div>
 
       {/* Recent Activity */}
-
-      <div className="cyber-card bg-[#0f172a]/55 border-slate-800 shadow-lg overflow-hidden">
-
-        <div className="px-5 py-4 border-b bg-[#0d1527]/50 flex items-center justify-between">
-
+      <div className="lab-card overflow-hidden">
+        <div className="px-4 py-3 border-b border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/40 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Activity className="text-cyan-400" size={20} />
-            <h2 className="font-semibold text-slate-200">
-              Recent Activity
-            </h2>
+            <Activity className="text-sky-500" size={16} />
+            <h2 className="font-bold text-xs text-slate-800 dark:text-slate-200">Live Agent Pipeline Activity</h2>
           </div>
-
-          <span className="text-xs text-slate-450">
-            Live Feed
-          </span>
-
+          <span className="text-[10px] font-mono text-slate-500">LIVE FEED</span>
         </div>
 
-        <div className="max-h-80 overflow-y-auto">
-
+        <div className="max-h-72 overflow-y-auto divide-y divide-slate-200 dark:divide-slate-800/60">
           {activities.length === 0 ? (
-            <div className="p-8 text-center text-slate-450">
-              No recent activity
-            </div>
+            <div className="p-8 text-center text-slate-400 text-xs">No recent activity log</div>
           ) : (
             activities.map((activity) => (
-              <div
-                key={activity.id}
-                className="px-5 py-4 border-b border-slate-850 last:border-0 hover:bg-[#0d1527]/50 transition"
-              >
-                <div className="flex justify-between">
-
-                  <div className="flex gap-3">
-
-                    <div className="mt-1">
-                      {activity.status === "SUCCESS" ? (
-                        <CheckCircle2
-                          className="text-green-500"
-                          size={18}
-                        />
-                      ) : (
-                        <Clock3
-                          className="text-yellow-500"
-                          size={18}
-                        />
-                      )}
-                    </div>
-
-                    <div>
-
-                      <p className="font-semibold text-slate-200">
-                        {activity.title}
-                      </p>
-
-                      <p className="text-sm text-slate-450 mt-1">
-                        {activity.description}
-                      </p>
-
-                    </div>
-
+              <div key={activity.id} className="p-3.5 hover:bg-slate-100/50 dark:hover:bg-slate-800/30 transition flex items-start justify-between gap-3">
+                <div className="flex gap-2.5 items-start min-w-0">
+                  {activity.status === "SUCCESS" ? (
+                    <CheckCircle2 className="text-emerald-500 shrink-0 mt-0.5" size={15} />
+                  ) : (
+                    <Clock3 className="text-amber-500 shrink-0 mt-0.5" size={15} />
+                  )}
+                  <div className="min-w-0">
+                    <p className="font-bold text-xs text-slate-800 dark:text-slate-200 truncate">{activity.title}</p>
+                    <p className="text-[11px] text-slate-500 mt-0.5 leading-relaxed">{activity.description}</p>
                   </div>
-
-                  <span className="text-xs text-slate-500 whitespace-nowrap">
-                    {activity.time}
-                  </span>
-
                 </div>
+                <span className="text-[10px] font-mono text-slate-400 shrink-0">{activity.time}</span>
               </div>
             ))
           )}
-
         </div>
       </div>
     </div>
   );
 }
 
-// ==========================================
-
-
-export function QueueFilters({
-  search,
-  setSearch,
-  statusFilter,
-  setStatusFilter,
-  onRefresh,
-  onExport,
-}) {
+export function QueueFilters({ search, setSearch, statusFilter, setStatusFilter, onRefresh, onExport }) {
   return (
-    <div className="cyber-card bg-[#0f172a]/55 border-slate-800 rounded-xl p-4 shadow-sm">
-
-      <div className="flex flex-col lg:flex-row gap-4 justify-between">
-
+    <div className="lab-card p-3 mb-4">
+      <div className="flex flex-col sm:flex-row gap-3 justify-between items-center">
         {/* Search */}
-        <div className="relative flex-1">
-          <SearchBar
-            value={search}
-            onChange={setSearch}
-            placeholder="Search Case ID, Part Number..."
-          />
+        <div className="w-full sm:w-80">
+          <SearchBar value={search} onChange={setSearch} placeholder="Search by case ID or part code..." />
         </div>
 
-        {/* Right Buttons */}
-        <div className="flex gap-3">
-
-          {/* Status filter */}
+        {/* Action Controls */}
+        <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
           <div className="relative">
-
-            <Filter
-              size={16}
-              className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none"
-            />
-
+            <Filter size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="rounded-lg py-2 pl-9 pr-8 h-full cyber-input text-slate-350"
+              className="h-8 py-1 pl-8 pr-7 text-xs lab-input font-semibold"
             >
-              <option value="ALL">All Status</option>
+              <option value="ALL">All Statuses</option>
               <option value="QUARANTINE">Quarantine</option>
               <option value="PENDING QA">Pending QA</option>
               <option value="AUTO-APPROVED">Auto Approved</option>
               <option value="RETAKE REQUESTED">Retake Requested</option>
             </select>
-
           </div>
 
-          {/* Single Refresh button (was duplicated before) */}
-          <button
-            onClick={onRefresh}
-            className="flex items-center gap-2 border border-slate-800 bg-slate-900 text-slate-300 hover:bg-slate-800 hover:text-white px-4 py-2 rounded-lg transition-colors"
-          >
-            <RefreshCw size={16} />
+          <Button variant="outline" size="sm" onClick={onRefresh} icon={<RefreshCw size={13} />}>
             Refresh
-          </button>
+          </Button>
 
-          <button
-            onClick={onExport}
-            className="flex items-center gap-2 bg-gradient-to-r from-cyan-500 to-blue-600 text-white hover:bg-blue-700 px-4 py-2 rounded-lg transition-colors"
-          >
-            <Download size={16} />
-            Export
-          </button>
-
+          <Button variant="primary" size="sm" onClick={onExport} icon={<Download size={13} />}>
+            Export CSV
+          </Button>
         </div>
-
       </div>
-
     </div>
   );
 }
-// ==========================================
 
 export function QueueRow({ item }) {
   const navigate = useNavigate();
 
-  const getStatusStyle = (status) => {
-    switch (status) {
-      case "QUARANTINE":
-        return "bg-red-500/10 text-red-400 border border-red-500/25 shadow-[0_0_10px_rgba(239,68,68,0.05)]";
-      case "PENDING QA":
-        return "bg-amber-500/10 text-amber-400 border border-amber-500/25 shadow-[0_0_10px_rgba(245,158,11,0.05)]";
-      case "AUTO-APPROVED":
-        return "bg-emerald-500/10 text-emerald-400 border border-emerald-500/25 shadow-[0_0_10px_rgba(16,185,129,0.05)]";
-      case "RETAKE REQUESTED":
-        return "bg-cyan-500/10 text-cyan-400 border border-cyan-500/25 shadow-[0_0_10px_rgba(6,182,212,0.05)]";
-      default:
-        return "bg-slate-800/40 text-slate-400 border border-slate-750";
-    }
-  };
-
-  const getRiskColor = (risk) => {
-    if (risk >= 80) return "bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.4)]";
-    if (risk >= 60) return "bg-orange-500 shadow-[0_0_10px_rgba(249,115,22,0.4)]";
-    if (risk >= 40) return "bg-yellow-500 shadow-[0_0_10px_rgba(234,179,8,0.4)]";
-    return "bg-green-500 shadow-[0_0_10px_rgba(34,197,94,0.4)]";
-  };
-
-  const getStatusIcon = (status) => {
-    switch (status) {
-      case "QUARANTINE":
-        return <AlertTriangle size={12} />;
-      case "AUTO-APPROVED":
-        return <CheckCircle2 size={12} />;
-      default:
-        return <Clock3 size={12} />;
-    }
+  const getRiskColorBar = (risk) => {
+    if (risk >= 75) return "bg-rose-500";
+    if (risk >= 50) return "bg-orange-500";
+    if (risk >= 25) return "bg-amber-500";
+    return "bg-emerald-500";
   };
 
   const handleClick = () => navigate(`${ROUTES.CASE_DETAIL}/${item.caseId}`);
 
-  // Format creation time cleanly
-  const formattedTime = (() => {
-    if (!item.createdAt) return "";
-    try {
-      const parts = item.createdAt.split(" ");
-      // If contains AM/PM
-      if (parts.length >= 2) {
-        return `${parts[0]} ${parts[1]}`;
-      }
-      return item.createdAt;
-    } catch {
-      return item.createdAt;
-    }
-  })();
-
-  // Shorten Case ID to keep layout slim
-  const displayCaseId = item.caseId && item.caseId.length > 12 
-    ? `${item.caseId.slice(0, 8)}...${item.caseId.slice(-4)}`
-    : item.caseId;
+  const displayCaseId =
+    item.caseId && item.caseId.length > 14
+      ? `${item.caseId.slice(0, 8)}…${item.caseId.slice(-4)}`
+      : item.caseId;
 
   return (
     <tr
       onClick={handleClick}
-      className="group cursor-pointer border-b border-slate-800/40 last:border-b-0 hover:bg-cyan-500/5 transition-all duration-150"
+      className="group cursor-pointer hover:bg-slate-100/60 dark:hover:bg-slate-800/40 transition-colors border-b border-slate-200 dark:border-slate-800/60 last:border-0 text-xs"
     >
       {/* Case ID */}
-      <td className="px-6 py-3.5">
-        <div className="flex flex-col gap-0.5">
-          <p className="font-tech-code font-bold text-slate-100 text-xs tracking-wider group-hover:text-cyan-400 transition-colors">
-            {displayCaseId}
-          </p>
-          <span className="text-[10px] text-slate-500 font-medium">
-            {formattedTime}
-          </span>
-        </div>
+      <td className="px-4 py-3">
+        <p className="font-mono font-bold text-slate-900 dark:text-slate-100 group-hover:text-sky-600 dark:group-hover:text-sky-400 transition">
+          {displayCaseId}
+        </p>
+        <p className="text-[10px] text-slate-500 font-mono mt-0.5">{item.createdAt || "Just now"}</p>
       </td>
 
       {/* Part */}
-      <td className="px-4 py-3.5">
-        <div>
-          <p className="font-semibold text-slate-200 text-xs">
-            {item.partNumber}
-          </p>
-          <p className="text-[10px] text-slate-500 font-tech-code tracking-wide">
-            {item.batch || "N/A"}
-          </p>
-        </div>
+      <td className="px-4 py-3">
+        <p className="font-semibold text-slate-800 dark:text-slate-200">{item.partNumber}</p>
+        <p className="text-[10px] font-mono text-slate-500">{item.batch || "STANDARD"}</p>
       </td>
 
       {/* Commodity */}
-      <td className="px-4 py-3.5">
-        <span className="px-2 py-0.5 rounded-md bg-slate-900 border border-slate-800 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+      <td className="px-4 py-3">
+        <span className="px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-[10px] font-mono font-semibold text-slate-600 dark:text-slate-300 uppercase">
           {item.commodity}
         </span>
       </td>
 
-      {/* Risk */}
-      <td className="px-4 py-3.5">
+      {/* Risk Score */}
+      <td className="px-4 py-3">
         <div className="w-24 space-y-1">
-          <div className="flex justify-between text-[10px]">
-            <span className="font-bold text-slate-350">{item.riskScore}%</span>
-            <span className="text-slate-500 font-semibold uppercase tracking-wider text-[8px]">Risk</span>
+          <div className="flex justify-between text-[10px] font-mono">
+            <span className="font-bold text-slate-800 dark:text-slate-200">{item.riskScore}%</span>
+            <span className="text-slate-500 uppercase text-[9px]">Score</span>
           </div>
-          <div className="w-full h-1.5 rounded-full bg-slate-800 overflow-hidden">
+          <div className="w-full h-1.5 rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden">
             <div
-              className={`h-full rounded-full transition-all duration-500 ${getRiskColor(item.riskScore)}`}
-              style={{ width: `${item.riskScore}%` }}
+              className={`h-full rounded-full transition-all duration-300 ${getRiskColorBar(item.riskScore)}`}
+              style={{ width: `${Math.min(100, Math.max(0, item.riskScore))}%` }}
             />
           </div>
         </div>
       </td>
 
       {/* Confidence */}
-      <td className="px-4 py-3.5">
-        <span className="font-tech-code font-extrabold text-cyan-400 text-xs">
-          {item.confidence}%
-        </span>
+      <td className="px-4 py-3 font-mono font-bold text-slate-700 dark:text-slate-300">
+        {item.confidence}%
       </td>
 
       {/* Reason */}
-      <td className="px-4 py-3.5 max-w-sm">
-        <p className="text-xs text-slate-400 truncate leading-relaxed group-hover:text-slate-300 transition-colors" title={item.reason}>
+      <td className="px-4 py-3 max-w-xs">
+        <p className="text-slate-600 dark:text-slate-400 truncate text-[11px]" title={item.reason}>
           {item.reason}
         </p>
       </td>
 
       {/* Status */}
-      <td className="px-4 py-3.5 text-center">
-        <div
-          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${getStatusStyle(item.status)}`}
-        >
-          {getStatusIcon(item.status)}
-          <span>{item.status}</span>
-        </div>
+      <td className="px-4 py-3 text-center">
+        <Badge status={item.status} size="sm" />
       </td>
 
-      {/* Arrow */}
-      <td className="px-5 py-3.5 text-right">
-        <ChevronRight
-          className="text-slate-600 group-hover:text-cyan-400 group-hover:translate-x-0.5 transition-all duration-200"
-          size={16}
-        />
+      {/* Action Arrow */}
+      <td className="px-4 py-3 text-right">
+        <ChevronRight size={16} className="text-slate-400 group-hover:text-sky-500 group-hover:translate-x-0.5 transition" />
       </td>
     </tr>
   );
 }
 
-// ==========================================
-
-
 const ROWS_PER_PAGE = 8;
 
-export function QueueTable({
-  cases = [],
-  search,
-  statusFilter,
-}) {
+export function QueueTable({ cases = [], search, statusFilter }) {
   const [currentPage, setCurrentPage] = useState(1);
 
   const filteredCases = useMemo(() => {
@@ -395,9 +222,7 @@ export function QueueTable({
         item.partNumber.toLowerCase().includes(search.toLowerCase()) ||
         item.commodity.toLowerCase().includes(search.toLowerCase());
 
-      const matchesStatus =
-        statusFilter === "ALL" ||
-        item.status === statusFilter;
+      const matchesStatus = statusFilter === "ALL" || item.status === statusFilter;
 
       return matchesSearch && matchesStatus;
     });
@@ -415,144 +240,78 @@ export function QueueTable({
   );
 
   return (
-    <div className="cyber-card bg-[#0f172a]/55 border-slate-800 shadow-lg overflow-hidden">
-
+    <div className="lab-card overflow-hidden">
       {/* Header */}
-
-      <div className="flex justify-between items-center px-6 py-5 border-b border-slate-800 bg-[#0d1527]/50">
-
+      <div className="flex justify-between items-center px-5 py-3.5 border-b border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/40">
         <div>
-
-          <h2 className="text-lg font-bold text-slate-200">
-            Inspection Queue
-          </h2>
-
-          <p className="text-sm text-slate-450">
-            Live inspection cases awaiting processing
-          </p>
-
+          <h2 className="text-sm font-bold text-slate-900 dark:text-slate-100">Live Inspection Queue</h2>
+          <p className="text-xs text-slate-500">Hardware compliance scans logged in database</p>
         </div>
-
-        <div className="bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 px-4 py-1.5 rounded-full text-xs font-semibold font-tech-code tracking-wide">
-
-          {filteredCases.length} ACTIVE
-
-        </div>
-
+        <span className="px-2.5 py-0.5 rounded-full bg-sky-500/10 text-sky-600 dark:text-sky-400 border border-sky-500/20 text-xs font-mono font-bold">
+          {filteredCases.length} RECORDS
+        </span>
       </div>
 
       {/* Table */}
-
       <div className="overflow-x-auto">
-
-        <table className="min-w-full">
-
-          <thead className="bg-[#0a0f1d] border-b border-slate-800">
-
-            <tr className="text-slate-400 text-xs font-semibold tracking-wider uppercase border-b border-slate-800">
-
-              <th className="px-6 py-4 text-left">Case ID</th>
-
-              <th className="px-4 py-4 text-left">Part Number</th>
-
-              <th className="px-4 py-4 text-left">Commodity</th>
-
-              <th className="px-4 py-4 text-left">Risk</th>
-
-              <th className="px-4 py-4 text-left">Confidence</th>
-
-              <th className="px-4 py-4 text-left">Reason</th>
-
-              <th className="px-6 py-4 text-center">Status</th>
-
+        <table className="w-full text-xs text-left border-collapse">
+          <thead>
+            <tr className="bg-slate-100/80 dark:bg-slate-900/80 border-b border-slate-200 dark:border-slate-800 text-[10px] uppercase font-bold text-slate-500 tracking-wider">
+              <th className="px-4 py-3">Case ID</th>
+              <th className="px-4 py-3">Part Number</th>
+              <th className="px-4 py-3">Commodity</th>
+              <th className="px-4 py-3">Risk Score</th>
+              <th className="px-4 py-3">AI Confidence</th>
+              <th className="px-4 py-3">Audit Rationale</th>
+              <th className="px-4 py-3 text-center">Status</th>
+              <th className="px-4 py-3 text-right">View</th>
             </tr>
-
           </thead>
-
-          <tbody>
-
+          <tbody className="divide-y divide-slate-200 dark:divide-slate-800/60">
             {paginatedCases.length === 0 ? (
-
               <tr>
-
-                <td
-                  colSpan="7"
-                  className="py-16 text-center text-slate-450"
-                >
-                  No inspection cases found.
+                <td colSpan="8" className="py-12 text-center text-slate-400 text-xs">
+                  No inspection cases match your filter query.
                 </td>
-
               </tr>
-
             ) : (
-
-              paginatedCases.map((item) => (
-                <QueueRow
-                  key={item.id}
-                  item={item}
-                />
-              ))
-
+              paginatedCases.map((item) => <QueueRow key={item.id} item={item} />)
             )}
-
           </tbody>
-
         </table>
-
       </div>
 
-      {/* Footer */}
-
-      <div className="flex justify-between items-center px-6 py-4 border-t bg-[#0d1527]/50">
-
-        <span className="text-sm text-slate-450">
-
+      {/* Pagination Footer */}
+      <div className="flex justify-between items-center px-5 py-3 border-t border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/30 text-xs">
+        <span className="text-slate-500 font-mono">
           Showing {paginatedCases.length} of {filteredCases.length} cases
-
         </span>
-
         <div className="flex items-center gap-2">
-
-          <button
+          <Button
+            variant="outline"
+            size="sm"
             disabled={currentPage === 1}
             onClick={() => setCurrentPage((p) => p - 1)}
-            className="px-4 py-2 border rounded-lg disabled:opacity-40 hover:bg-slate-800/50"
           >
-            Previous
-          </button>
-
-          <span className="font-medium">
-
+            Prev
+          </Button>
+          <span className="font-mono text-xs font-bold text-slate-700 dark:text-slate-300">
             {currentPage} / {totalPages || 1}
-
           </span>
-
-          <button
+          <Button
+            variant="outline"
+            size="sm"
             disabled={currentPage === totalPages || totalPages === 0}
             onClick={() => setCurrentPage((p) => p + 1)}
-            className="px-4 py-2 border rounded-lg disabled:opacity-40 hover:bg-slate-800/50"
           >
             Next
-          </button>
-
+          </Button>
         </div>
-
       </div>
-
     </div>
   );
 }
 
-// ==========================================
-
-/**
- * Props:
- *  cases {Array} — the raw cases array from DailyTriagePage state.
- *  stats {Object} — optional aggregate values returned by the backend.
- *
- * The dashboard now prefers the backend-provided stats object, but still falls
- * back to deriving values from the cases array when needed.
- */
 export function StatsCards({ cases = [], stats = null }) {
   const derivedTotal = cases.length;
   const derivedPending = cases.filter((c) => c.status === "PENDING QA").length;
@@ -571,84 +330,56 @@ export function StatsCards({ cases = [], stats = null }) {
       title: "TOTAL INSPECTED",
       value: totalInspected,
       icon: ClipboardCheck,
-      color: "text-cyan-400",
-      progress: Math.min(totalInspected * 2, 100), // illustrative bar
-      footer: null,
+      color: "text-sky-600 dark:text-sky-400",
+      footer: "Scans today",
     },
     {
-      title: "PENDING QA",
+      title: "PENDING QA REVIEW",
       value: pendingQA,
       icon: Clock3,
-      color: "text-green-600",
-      progress: null,
-      footer: pendingQA > 0 ? `${pendingQA} awaiting review` : "All clear",
+      color: "text-amber-600 dark:text-amber-400",
+      footer: pendingQA > 0 ? `${pendingQA} awaiting signoff` : "Queue clear",
     },
     {
       title: "QUARANTINE RATE",
       value: `${quarantineRate}%`,
       icon: ShieldAlert,
-      color: "text-red-500",
-      progress: null,
-      footer: "+0.8% from yesterday",
+      color: "text-rose-600 dark:text-rose-400",
+      footer: `${quarantined} quarantined parts`,
       trend: quarantineRate > 0,
     },
     {
-      title: "AUTOPILOT INDEX",
+      title: "AUTOPILOT RATE",
       value: `${autopilotIndex}%`,
       icon: BrainCircuit,
-      color: "text-yellow-500",
-      progress: null,
-      footer: "LLM-VISION CONFIDENCE",
+      color: "text-emerald-600 dark:text-emerald-400",
+      footer: `${autoApproved} auto-approved`,
     },
   ];
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5">
+    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
       {cards.map((card, index) => {
         const Icon = card.icon;
 
         return (
-          <div
-            key={index}
-            className="cyber-card bg-[#0f172a]/55 border-slate-800 p-5 shadow-sm hover:shadow-md transition-all duration-200"
-          >
+          <div key={index} className="lab-card p-4 flex flex-col justify-between">
             <div className="flex justify-between items-start">
               <div>
-                <p className="text-xs font-semibold tracking-widest text-slate-450 uppercase">
+                <p className="text-[10px] font-bold tracking-wider text-slate-500 uppercase font-mono">
                   {card.title}
                 </p>
-
-                <h2 className={`text-4xl font-bold mt-2 ${card.color}`}>
-                  {card.value}
-                </h2>
+                <h2 className={`text-2xl font-bold font-mono mt-1 ${card.color}`}>{card.value}</h2>
               </div>
-
-              <Icon className={`${card.color}`} size={26} />
+              <div className="p-2 rounded-lg bg-slate-100 dark:bg-slate-800/80 shrink-0">
+                <Icon className={card.color} size={20} />
+              </div>
             </div>
 
-            {card.progress !== null && (
-              <div className="mt-5">
-                <div className="w-full h-2 bg-slate-900 border border-slate-800 rounded-full overflow-hidden">
-                  <div
-                    className="bg-cyan-500 h-2 rounded-full"
-                    style={{
-                      width: `${card.progress}%`,
-                    }}
-                  />
-                </div>
-              </div>
-            )}
-
-            {card.footer && (
-              <div
-                className={`flex items-center gap-2 mt-4 text-xs uppercase tracking-wide ${card.trend ? "text-red-500" : "text-slate-450"
-                  }`}
-              >
-                {card.trend && <TrendingUp size={14} />}
-
-                <span>{card.footer}</span>
-              </div>
-            )}
+            <div className="mt-3 pt-2 border-t border-slate-200 dark:border-slate-800 flex items-center gap-1.5 text-[10px] font-mono text-slate-500">
+              {card.trend && <TrendingUp size={12} className="text-rose-500" />}
+              <span>{card.footer}</span>
+            </div>
           </div>
         );
       })}

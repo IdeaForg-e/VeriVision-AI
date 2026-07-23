@@ -1,66 +1,31 @@
-// NotFoundPage.jsx — 404 page shown for unmatched routes
 import { useNavigate } from "react-router-dom";
 import { ROUTES } from "../utils/constants.js";
+import { Button } from "../components/Common.jsx";
+import { ArrowLeft, Home, SearchX } from "lucide-react";
 
 export default function NotFoundPage() {
   const navigate = useNavigate();
 
   return (
-    <div className="min-h-screen bg-background flex flex-col items-center justify-center gap-6 px-4 text-center">
-      {/* Large 404 */}
-      <div className="relative select-none">
-        <span
-          className="text-[160px] font-black leading-none"
-          style={{
-            background: "linear-gradient(135deg, #004ac6 0%, #7c3aed 100%)",
-            WebkitBackgroundClip: "text",
-            WebkitTextFillColor: "transparent",
-          }}
-        >
-          404
-        </span>
-        <span className="material-symbols-outlined text-6xl text-primary/30 absolute -bottom-4 -right-4 rotate-12">
-          search_off
-        </span>
-      </div>
-
-      {/* Message */}
-      <div>
-        <h1 className="font-headline-lg text-headline-lg text-on-surface mb-2">
-          Page Not Found
-        </h1>
-        <p className="text-body-md text-on-surface-variant max-w-sm mx-auto">
-          The route you're looking for doesn't exist or has been moved. Check the URL or navigate back to safety.
+    <div className="min-h-screen bg-app flex flex-col items-center justify-center p-6 text-center font-sans">
+      <div className="space-y-3 max-w-sm">
+        <div className="w-14 h-14 rounded-2xl bg-sky-500/10 text-sky-600 dark:text-sky-400 border border-sky-500/20 flex items-center justify-center mx-auto">
+          <SearchX size={32} />
+        </div>
+        <h1 className="text-4xl font-bold font-mono text-slate-900 dark:text-slate-100">404</h1>
+        <h2 className="text-base font-bold text-slate-800 dark:text-slate-200">Page Not Found</h2>
+        <p className="text-xs text-slate-500 leading-relaxed">
+          The route you are looking for does not exist in the VeriVision audit application.
         </p>
+        <div className="flex justify-center gap-2 pt-3">
+          <Button variant="outline" size="sm" onClick={() => navigate(-1)} icon={<ArrowLeft size={14} />}>
+            Go Back
+          </Button>
+          <Button variant="primary" size="sm" onClick={() => navigate(ROUTES.TRIAGE)} icon={<Home size={14} />}>
+            Inspection Triage
+          </Button>
+        </div>
       </div>
-
-      {/* Actions */}
-      <div className="flex flex-wrap items-center justify-center gap-3 mt-2">
-        <button
-          onClick={() => navigate(-1)}
-          className="flex items-center gap-2 px-5 py-2.5 border border-outline-variant rounded-xl text-on-surface hover:bg-surface-container transition-colors text-body-sm font-medium"
-        >
-          <span className="material-symbols-outlined text-[18px]">arrow_back</span>
-          Go Back
-        </button>
-        <button
-          onClick={() => navigate(ROUTES.TRIAGE)}
-          className="flex items-center gap-2 px-5 py-2.5 bg-primary text-white rounded-xl hover:bg-primary/90 shadow-md transition-all text-body-sm font-medium"
-        >
-          <span className="material-symbols-outlined text-[18px]">home</span>
-          Daily Triage
-        </button>
-      </div>
-
-      {/* Decorative grid */}
-      <div
-        className="fixed inset-0 -z-10 opacity-[0.04] pointer-events-none"
-        style={{
-          backgroundImage:
-            "linear-gradient(rgba(0,74,198,1) 1px, transparent 1px), linear-gradient(90deg, rgba(0,74,198,1) 1px, transparent 1px)",
-          backgroundSize: "40px 40px",
-        }}
-      />
     </div>
   );
 }
