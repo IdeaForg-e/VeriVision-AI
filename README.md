@@ -1,4 +1,8 @@
 <p align="center">
+  <img src="frontend/public/images/banner.png" alt="VeriVision AI Banner" width="100%" />
+</p>
+
+<p align="center">
   <img src="https://img.shields.io/badge/DELL-FutureMind_AI_Hackathon-0076CE?style=for-the-badge&logo=dell&logoColor=white" alt="Dell FutureMind" />
   <img src="https://img.shields.io/badge/Grand_Final-2026-FF6B35?style=for-the-badge" alt="Grand Final" />
   <img src="https://img.shields.io/badge/Team-IDEAFORG--E-8B5CF6?style=for-the-badge" alt="Team IdeaForg-e" />
@@ -87,6 +91,10 @@ No manual pairing. No subjective judgment. No inconsistency between sites.
 ---
 
 ## 🏗️ High-Level System Architecture
+
+<p align="center">
+  <img src="frontend/public/images/architecture.png" alt="VeriVision AI System Architecture" width="100%" />
+</p>
 
 The following diagram illustrates the high-level architecture of **VeriVision AI**, highlighting the flow of data from the User Interface down to the 5-Agent LangGraph State Machine, Parallel Detection Ensemble, and Persistence Layer:
 

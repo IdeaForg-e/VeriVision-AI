@@ -1,4 +1,8 @@
 <p align="center">
+  <img src="frontend/public/images/banner.png" alt="VeriVision AI Banner" width="100%" />
+</p>
+
+<p align="center">
   <img src="https://img.shields.io/badge/DELL-FutureMind_AI_Hackathon-0076CE?style=for-the-badge&logo=dell&logoColor=white" alt="Dell FutureMind" />
   <img src="https://img.shields.io/badge/Team-IDEAFORG--E-8B5CF6?style=for-the-badge" alt="Team IdeaForg-e" />
   <img src="https://img.shields.io/badge/Document-Agents_&_Workflow_Deep_Dive-00C853?style=for-the-badge" alt="Deep Dive Document" />
@@ -31,6 +35,10 @@
 ## 🌐 High-Level Platform Overview
 
 **VeriVision AI** automates hardware quality assurance and return fraud detection across global repair centers and manufacturing lines. By replacing manual visual inspection with an autonomous **5-Agent Computer Vision pipeline**, VeriVision reduces inspection times from hours to milliseconds while capturing subtle fraud indicators like 0-to-O character alterations on serial stickers, missing QC tags, non-OEM replacement covers, and reused boards.
+
+<p align="center">
+  <img src="frontend/public/images/architecture.png" alt="VeriVision AI Architecture Overview" width="100%" />
+</p>
 
 ```mermaid
 flowchart TD
