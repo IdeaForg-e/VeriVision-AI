@@ -124,8 +124,8 @@ flowchart TB
     end
 
     subgraph STORAGE ["🗄️ Persistence & Media Storage Layer"]
-        DB[(SQLite verivision.db\nUsers | Products | GoldenRefs |\nInspections | Results | Reports | AuditLogs)]
-        FS["File System Store\ndata/cases/ | data/golden/ | data/reports/"]
+        DB[("SQLite Database - verivision.db\n7 Relational Tables & Embeddings")]
+        FS["File System Storage\nCases, Golden References & PDF Reports"]
     end
 
     subgraph HITL ["🧠 Human-in-the-Loop Feedback Loop"]
