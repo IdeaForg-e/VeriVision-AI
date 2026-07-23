@@ -1,7 +1,8 @@
 {
-  "name": "fraudguard-frontend",
+  "name": "verivision-ai-frontend",
   "private": true,
   "version": "2.4.0",
+  "description": "VeriVision AI - Industrial Hardware RMA & Quality Audit Frontend SPA",
   "type": "module",
   "scripts": {
     "dev": "vite",

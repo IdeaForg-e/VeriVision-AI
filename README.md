@@ -16,6 +16,7 @@
   <img src="https://img.shields.io/badge/OpenCV-Computer_Vision-5C3EE8?style=flat-square&logo=opencv" />
   <img src="https://img.shields.io/badge/CLIP-ViT_B32-FF6F00?style=flat-square" />
   <img src="https://img.shields.io/badge/EasyOCR-Text_Detection-00C853?style=flat-square" />
+  <img src="https://img.shields.io/badge/PyTorch-Deep_Learning-EE4C2C?style=flat-square&logo=pytorch" />
   <img src="https://img.shields.io/badge/SQLite-Database-003B57?style=flat-square&logo=sqlite" />
 </p>
 
@@ -85,21 +86,135 @@ No manual pairing. No subjective judgment. No inconsistency between sites.
 
 ---
 
-## 🏗️ System Architecture
+## 🛠️ Complete Technology Stack
 
-### High-Level Pipeline Flow
+VeriVision AI is built using a modern, scalable production technology stack split cleanly across microservices and layers:
 
 ```mermaid
-flowchart LR
-    A["📸 Part Image Upload"] --> B["🤖 Agent 1: Selector\n(CLIP Vector Search +\nCommodity Classifier)"]
-    B --> C["🔍 Agent 2: Triage\n(Blur/Lighting Check +\nHomography Alignment)"]
-    C --> D["⚡ Agent 3: Detector\n(6 Parallel CV Methods)"]
-    D --> E["⚖️ Agent 4: Decision\n(Weighted Scoring Matrix)"]
-    E --> F["📝 Agent 5: Explainer\n(LLM + Rule-Based\nAudit Narrative)"]
-    F --> G["📊 Verdict + PDF Report\n+ HITL Review Queue"]
+mindmap
+  root((VeriVision AI Stack))
+    Frontend Layer
+      React 18 SPA
+      Vite Build Tool
+      Tailwind CSS
+      Lucide React Icons
+      Recharts Visualizations
+    Backend API Layer
+      Python 3.10+
+      FastAPI Framework
+      Uvicorn ASGI Server
+      Pydantic Schemas
+      JWT Auth & bcrypt
+    Agentic AI Engine
+      LangGraph State Machine
+      Open_CLIP ViT-B/32
+      PyTorch Tensor Engine
+      OpenRouter Vision LLM
+    Computer Vision Suite
+      OpenCV 4.7
+      scikit-image SSIM
+      EasyOCR Engine
+      NumPy & SciPy
+      RANSAC Homography
+    Storage & Reporting
+      SQLite Database
+      SQLAlchemy 2.0 ORM
+      ReportLab PDF Engine
+      CSV Data Export
 ```
 
-### The 5-Agent LangGraph State Machine
+### Categorized Stack Breakdown
+
+| Layer | Primary Technologies | Key Libraries & Versions | Role in VeriVision AI |
+|:---|:---|:---|:---|
+| **Frontend Framework** | React 18, Vite | `react@18.3.1`, `vite@5.2.0` | High-performance Single Page Application with Hot Module Replacement |
+| **UI & Styling** | Tailwind CSS, Lucide Icons | `tailwindcss@3.4.3`, `lucide-react@0.344.0` | Dark/light mode theme system with industrial QA audit component styling |
+| **Data Visualization** | Recharts | `recharts@3.9.2` | Interactive vendor risk charts, monthly fraud trends, and site breakdowns |
+| **Client Routing & Auth** | React Router v6 | `react-router-dom@6.22.3` | Client-side routing with role-based `ProtectedRoute` wrappers |
+| **Backend API Engine** | FastAPI, Uvicorn | `fastapi>=0.100.0`, `uvicorn[standard]>=0.22.0` | Asynchronous REST API server serving all ingestion, triage, and review endpoints |
+| **Agentic Workflow** | LangGraph | `langgraph>=0.0.1` | StateGraph directed acyclic graph orchestrating the 5-Agent pipeline |
+| **Deep Learning & Vectors** | PyTorch, Open_CLIP | `torch>=2.0.0`, `open_clip_torch>=2.20.0` | ViT-B/32 neural network extracting 512-dim visual embeddings for Cosine Similarity search |
+| **Computer Vision Engine** | OpenCV, scikit-image | `opencv-python-headless>=4.7.0`, `scikit-image>=0.20.0` | RANSAC homography image registration, Laplacian blur checking, and SSIM heatmap generation |
+| **Text Extraction (OCR)** | EasyOCR | `easyocr>=1.7.0` | Optical Character Recognition for serial numbers, date codes, and character diffs |
+| **Multimodal Vision & LLM** | OpenRouter API | `requests>=2.31.0` | Semantic anomaly detection via vision models & audit-ready natural language explanations |
+| **PDF Reporting Engine** | ReportLab | `reportlab>=4.0.0` | Laboratory-grade PDF audit certificate generation with side-by-side images & tables |
+| **Database & ORM** | SQLite, SQLAlchemy | `sqlalchemy>=2.0.0` | Relational persistence with 7 tables, audit logs, and embedding storage |
+| **Security & Auth** | Passlib, PyJWT | `python-jose>=3.3.0`, `passlib[bcrypt]>=1.7.4` | Role-Based Access Control (RBAC) with bcrypt hashed credentials |
+
+---
+
+## 🏗️ High-Level System Architecture
+
+VeriVision AI utilizes a **layered multi-tier system architecture**. The diagram below demonstrates how data flows seamlessly between the React UI, FastAPI Gateway, the 5-Agent LangGraph State Machine, the Parallel Anomaly Detector Suite, and the Persistence Layer:
+
+```mermaid
+flowchart TD
+    subgraph CLIENT_LAYER ["💻 1. Frontend Client Layer (React 18 + Vite)"]
+        UI_AUTH["🔐 Auth & Session (JWT)"]
+        UI_INGEST["📸 Inspection Submission Zone"]
+        UI_TRIAGE["📊 Triage Queue & Search"]
+        UI_WORKBENCH["🔍 Split-Panel Audit Workbench"]
+        UI_HITL["🎨 HITL Review & ROI Canvas"]
+        UI_ANALYTICS["📈 Vendor Analytics (Recharts)"]
+    end
+
+    subgraph API_GATEWAY ["⚡ 2. FastAPI Backend Gateway (/api)"]
+        GW_AUTH["/api/auth (Login/Register/RBAC)"]
+        GW_INSP["/api/inspections (Upload Scan)"]
+        GW_TRIAGE["/api/triage (Queue & Config)"]
+        GW_REVIEW["/api/reviews (HITL Actions)"]
+        GW_ANALYTICS["/api/analytics (Vendor/Site KPIs)"]
+        GW_REPORTS["/api/reports (PDF Certificate Export)"]
+    end
+
+    subgraph LANGGRAPH_ENGINE ["🤖 3. LangGraph 5-Agent State Machine (workflow.py)"]
+        AG1["Agent 1: Selector & Gatekeeper\n(CLIP 512-Dim Vector Search)"]
+        AG2["Agent 2: Ingest & Triage Aligner\n(Blur, Brightness, ORB Homography)"]
+        AG3["Agent 3: Vision-AI Hybrid Inspector\n(Parallel Detector Ensemble)"]
+        AG4["Agent 4: Decision Judge\n(Weighted Scoring Matrix & Multi-Angle Fusion)"]
+        AG5["Agent 5: Audit Explainer\n(LLM Rationale & Fallback Template)"]
+        
+        AG1 -->|Pass Viability| AG2
+        AG2 -->|Pass Quality| AG3
+        AG2 --"Quality Fail"--> RET["⚠️ Retake Requested"]
+        AG3 --> AG4
+        AG4 --> AG5
+    end
+
+    subgraph DETECTOR_ENSEMBLE ["⚡ Agent 3: Parallel CV & Vision-LLM Suite"]
+        D1["1. SSIM Structural Diff\n(skimage metrics)"]
+        D2["2. EasyOCR String Diff\n(Levenshtein Distance)"]
+        D3["3. ORB Keypoint Rate\n(BFMatcher KNN)"]
+        D4["4. Template ROI Check\n(cv2.matchTemplate)"]
+        D5["5. 3D Color Histogram\n(16x16x16 RGB Correlation)"]
+        D6["6. Multimodal Vision LLM\n(OpenRouter API)"]
+    end
+
+    subgraph PERSISTENCE_LAYER ["🗄️ 4. Data & Media Persistence Layer"]
+        DB[(SQLite verivision.db\nUsers | Products | GoldenRefs |\nInspections | Results | Reports | AuditLogs)]
+        FS_CASES["📁 data/cases/\nUploaded Scans & Heatmaps"]
+        FS_GOLDEN["📁 data/golden/\nOEM Golden References"]
+        FS_REPORTS["📁 data/reports/\nReportLab PDF Certificates"]
+    end
+
+    %% Flow Connections
+    UI_INGEST -->|Multipart POST| GW_INSP
+    GW_INSP -->|Invoke StateGraph| AG1
+    AG3 -->|ThreadPoolExecutor| D1 & D2 & D3 & D4 & D5 & D6
+    AG5 -->|Save Case Results| DB
+    AG5 -->|Save Heatmap & PDF| FS_CASES & FS_REPORTS
+    
+    UI_HITL -->|Verdict Override + ROI Notes| GW_REVIEW
+    GW_REVIEW -->|Update AuditLog & Confidence| DB
+    
+    GW_REPORTS -->|Download PDF| UI_WORKBENCH
+    GW_ANALYTICS -->|Query Fraud KPIs| DB
+    DB -->|Supply Data| GW_ANALYTICS -->|Render Graphs| UI_ANALYTICS
+```
+
+---
+
+## 🤖 Detailed Breakdown of the 5 LangGraph Agents
 
 VeriVision's core is a **LangGraph StateGraph** — a directed acyclic graph where each node is a specialized AI agent. The graph supports conditional routing: if triage fails, the pipeline short-circuits to request a retake instead of producing a false verdict.
 
@@ -118,14 +233,14 @@ VeriVision's core is a **LangGraph StateGraph** — a directed acyclic graph whe
 #### Agent 3 — Vision-AI Hybrid Inspector (`agent_3_detector.py`)
 Runs **6 detection methods in parallel** using `ThreadPoolExecutor`:
 
-| # | Method | What It Catches |
-|:--|:---|:---|
-| 1 | **SSIM Structural Diff** | Missing components, physical damage, PCB layout changes |
-| 2 | **EasyOCR + Fuzzy String Matching** | Altered serial numbers (0→O, I→1, S→5), missing labels |
-| 3 | **ORB Keypoint Feature Matching** | Component swaps, assembly differences |
-| 4 | **Template/ROI Presence Check** | Missing QC stickers, warranty seals, logos |
-| 5 | **3D Color Histogram Correlation** | Non-OEM labels, different paint/material |
-| 6 | **Multimodal Vision LLM** | Semantic anomalies (burns, cracks, residue, rotation) via OpenRouter |
+| # | Method | What It Catches | Key Output |
+|:--|:---|:---|:---|
+| 1 | **SSIM Structural Diff** | Missing components, physical damage, PCB layout changes | `ssim_score` (0.0 - 1.0) & JET Heatmap |
+| 2 | **EasyOCR + String Diff** | Altered serial numbers (0→O, I→1, S→5), missing labels | `ocr_similarity` & `ocr_mismatches` array |
+| 3 | **ORB Keypoint Rate** | Component swaps, assembly variations | `keypoint_ratio` score |
+| 4 | **Template/ROI Presence** | Missing QC stickers, warranty seals, logos | `template_match_score` & flag |
+| 5 | **3D Color Histogram** | Non-OEM labels, different paint/material hue | `color_hist_similarity` score |
+| 6 | **Multimodal Vision LLM** | Semantic anomalies (burns, cracks, residue, rotation) | `multimodal_report` narrative text |
 
 Also generates:
 - **SSIM Anomaly Heatmap**: Real image with red bounding box overlays on high-delta regions
@@ -272,36 +387,6 @@ erDiagram
 
 ---
 
-## 🛠️ Technology Stack
-
-### Backend
-| Technology | Purpose |
-|:---|:---|
-| **FastAPI** (Python 3.10+) | High-performance async REST API framework |
-| **LangGraph** | Agentic AI state machine orchestration |
-| **OpenCV** | Image preprocessing, alignment, SSIM computation, heatmap generation |
-| **scikit-image** | Structural Similarity Index (SSIM) metric |
-| **EasyOCR** | Optical Character Recognition for label text extraction |
-| **Open_CLIP** (ViT-B/32) | 512-dimensional visual embedding extraction |
-| **OpenRouter API** | Multimodal vision LLM for semantic anomaly detection + natural language explanations |
-| **ReportLab** | PDF audit report generation with images, tables, and OCR diffs |
-| **SQLAlchemy + SQLite** | ORM-based relational data persistence |
-| **Pillow + NumPy** | Image manipulation and numerical computation |
-| **passlib + python-jose** | JWT authentication with bcrypt password hashing |
-
-### Frontend
-| Technology | Purpose |
-|:---|:---|
-| **React 18** | Component-based SPA framework |
-| **Vite** | Lightning-fast dev server with HMR |
-| **Tailwind CSS** | Utility-first styling with custom design tokens |
-| **Recharts** | Interactive analytics charts (bar, line, pie) |
-| **Lucide React** | Premium icon library |
-| **React Router v6** | Client-side routing with protected route guards |
-| **React Context API** | Global authentication state management |
-
----
-
 ## 📂 Repository Structure
 
 ```
@@ -366,13 +451,15 @@ VeriVision-AI/
 │   │   │   └── AppRoutes.jsx           ← Route definitions + ProtectedRoute wrapper
 │   │   ├── services/                   ← API service layer (fetch wrappers)
 │   │   └── utils/                      ← Utility helpers
+│   ├── package.json                    ← Frontend dependencies & scripts
 │   ├── tailwind.config.js              ← Custom color palette + font configuration
 │   └── vite.config.js                  ← Dev server proxy (port 5173 → 8000)
 │
 ├── Golden_Images/                      ← Seed golden reference images (16 images)
+├── AGENTS.md                           ← Deep dive 5-Agent & Workflow documentation
 ├── verivision.db                       ← SQLite database (auto-created)
 ├── start.bat                           ← One-click Windows launcher script
-└── README.md                           ← This file
+└── README.md                           ← Master system documentation
 ```
 
 ---
@@ -496,7 +583,7 @@ VeriVision is architected for Phase I delivery with explicit design hooks for fu
 | # | Criterion | How VeriVision Addresses It |
 |:--|:---|:---|
 | 1 | Solution Quality | End-to-end pipeline: upload → detect → score → explain → report → review |
-| 2 | Tool Stack Used | LangGraph, CLIP, OpenCV, EasyOCR, OpenRouter LLM, FastAPI, React, Recharts |
+| 2 | Tool Stack Used | LangGraph, CLIP, PyTorch, OpenCV, EasyOCR, OpenRouter LLM, FastAPI, React, Recharts |
 | 3 | Presentation & Pitch | Narrative README, live demo, architecture diagrams |
 | 4 | Feasibility & Integration | REST API design, one-click launcher, configurable thresholds, SQLite portability |
 | 5 | Innovation & Originality | 6-method parallel ensemble, Noisy-OR multi-angle fusion, CLIP auto-reference matching |
@@ -504,7 +591,7 @@ VeriVision is architected for Phase I delivery with explicit design hooks for fu
 | 7 | Impact Potential | Addresses $100B+ electronics fraud problem; scales to any repair/logistics operation |
 | 8 | Testing & Validation | 6 test scenarios covering all fraud categories including false-alarm handling |
 | 9 | User Experience & Design | Dark/light mode, drag-and-drop upload, split-panel workbench, interactive analytics |
-| 10 | Documentation Clarity | This README + inline code documentation + API docs at `/docs` |
+| 10 | Documentation Clarity | This README + `AGENTS.md` + inline code documentation + API docs at `/docs` |
 | 11 | Security & Privacy | JWT auth, RBAC, audit logging, hash provenance, minimal data retention |
 | 12 | Explainability & Transparency | Per-region heatmaps, OCR character diffs, LLM narratives grounded in measured metrics |
 | 13 | Feedback Loop / Learning | HITL Approve/Reject/Override → audit logs → threshold tuning → improved future detections |
