@@ -353,10 +353,10 @@ flowchart LR
 The **Analytics Dashboard** (`frontend/src/pages/AnalyticsDashboardPage.jsx`) provides global supply chain visibility across three core dimensions:
 
 ```mermaid
-grid
-  cell1["🏢 Vendor Risk Rankings\nRates suppliers by fraud frequency & trust scores (0-100)"]
-  cell2["📍 Site Anomaly Breakdown\nTracks defect volumes across global repair sites"]
-  cell3["📈 Monthly Fraud Trends\nVisualizes fraud rates over time using Recharts"]
+flowchart LR
+    A["🏢 Vendor Risk Rankings\n(Fraud frequency & trust scores)"]
+    B["📍 Site Anomaly Breakdown\n(Defect volumes by repair site)"]
+    C["📈 Monthly Fraud Trends\n(Fraud rates over time in Recharts)"]
 ```
 
 ### Key Telemetry Metrics Tracked:
