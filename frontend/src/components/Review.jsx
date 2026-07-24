@@ -209,82 +209,91 @@ export function ReviewerComment({ value, onChange }) {
 
 export function ROIEditor({ region, onChange, onCommit, learningStatus, label = "AI_DETECTION_ROI" }) {
   const containerRef = useRef(null);
-  const dragState = useRef(null);
-  const [active, setActive] = useState(false);
+  const isDraggingRef = useRef(false);
+  const dragStateRef = useRef(null);
+  const [isDragging, setIsDragging] = useState(false);
 
   const clamp = (val, min, max) => Math.max(min, Math.min(val, max));
 
-  const getPoint = (e) => {
-    if (e.touches && e.touches[0]) return { clientX: e.touches[0].clientX, clientY: e.touches[0].clientY };
-    return { clientX: e.clientX, clientY: e.clientY };
-  };
+  const startDrag = (e, mode) => {
+    e.stopPropagation();
+    e.preventDefault();
 
-  const startDrag = useCallback(
-    (e) => {
-      if (e.target.dataset?.resizer) return;
-      const { clientX, clientY } = getPoint(e);
-      dragState.current = { mode: "move", startX: clientX, startY: clientY, startRegion: region };
-      setActive(true);
-    },
-    [region]
-  );
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
 
-  const startResize = useCallback(
-    (e) => {
-      e.stopPropagation();
-      const { clientX, clientY } = getPoint(e);
-      dragState.current = { mode: "resize", startX: clientX, startY: clientY, startRegion: region };
-      setActive(true);
-    },
-    [region]
-  );
+    if (!containerRef.current) return;
+    const rect = containerRef.current.getBoundingClientRect();
 
-  const onMove = useCallback(
-    (e) => {
-      if (!dragState.current || !containerRef.current) return;
-      const { clientX, clientY } = getPoint(e);
-      const rect = containerRef.current.getBoundingClientRect();
-      const dxPct = ((clientX - dragState.current.startX) / rect.width) * 100;
-      const dyPct = ((clientY - dragState.current.startY) / rect.height) * 100;
-      const start = dragState.current.startRegion;
+    dragStateRef.current = {
+      mode, // "move" | "resize"
+      startX: clientX,
+      startY: clientY,
+      startRegion: { ...region },
+      containerWidth: rect.width || 1,
+      containerHeight: rect.height || 1,
+    };
 
-      if (dragState.current.mode === "move") {
+    isDraggingRef.current = true;
+    setIsDragging(true);
+
+    const handleWindowMove = (moveEvent) => {
+      if (!isDraggingRef.current || !dragStateRef.current) return;
+
+      const currentX = moveEvent.touches ? moveEvent.touches[0].clientX : moveEvent.clientX;
+      const currentY = moveEvent.touches ? moveEvent.touches[0].clientY : moveEvent.clientY;
+
+      const dxPct = ((currentX - dragStateRef.current.startX) / dragStateRef.current.containerWidth) * 100;
+      const dyPct = ((currentY - dragStateRef.current.startY) / dragStateRef.current.containerHeight) * 100;
+
+      const start = dragStateRef.current.startRegion;
+
+      if (dragStateRef.current.mode === "move") {
         const x = clamp(start.x + dxPct, 0, 100 - start.w);
         const y = clamp(start.y + dyPct, 0, 100 - start.h);
         onChange({ ...start, x, y });
-      } else {
+      } else if (dragStateRef.current.mode === "resize") {
         const w = clamp(start.w + dxPct, 5, 100 - start.x);
         const h = clamp(start.h + dyPct, 5, 100 - start.y);
         onChange({ ...start, w, h });
       }
-    },
-    [onChange]
-  );
+    };
 
-  const endDrag = useCallback(() => {
-    if (!dragState.current) return;
-    dragState.current = null;
-    setActive(false);
-    onCommit?.(region);
-  }, [onCommit, region]);
+    const handleWindowUp = () => {
+      if (isDraggingRef.current) {
+        isDraggingRef.current = false;
+        setIsDragging(false);
+        if (dragStateRef.current) {
+          onCommit?.(region);
+        }
+        dragStateRef.current = null;
+      }
+      window.removeEventListener("mousemove", handleWindowMove);
+      window.removeEventListener("mouseup", handleWindowUp);
+      window.removeEventListener("touchmove", handleWindowMove);
+      window.removeEventListener("touchend", handleWindowUp);
+    };
+
+    window.addEventListener("mousemove", handleWindowMove);
+    window.addEventListener("mouseup", handleWindowUp);
+    window.addEventListener("touchmove", handleWindowMove, { passive: false });
+    window.addEventListener("touchend", handleWindowUp);
+  };
 
   if (!region) return null;
 
   return (
     <div
       ref={containerRef}
-      className="relative w-full h-full select-none"
-      onMouseMove={onMove}
-      onMouseUp={endDrag}
-      onMouseLeave={endDrag}
-      onTouchMove={onMove}
-      onTouchEnd={endDrag}
+      className="relative w-full h-full select-none touch-none"
     >
       <div
-        className={`absolute border-2 border-dashed shadow-md z-10 cursor-move transition-all ${
-          learningStatus === "learning"
-            ? "border-sky-400 bg-sky-500/20 ring-2 ring-sky-400 animate-pulse"
-            : "border-sky-500 bg-sky-500/10"
+        className={`absolute border-2 border-dashed shadow-2xl z-20 cursor-move rounded ${
+          isDragging
+            ? "border-amber-400 bg-amber-500/25 ring-2 ring-amber-400"
+            : learningStatus === "learning"
+            ? "border-sky-400 bg-sky-500/25 ring-2 ring-sky-400 animate-pulse"
+            : "border-sky-400 bg-sky-500/20 ring-2 ring-sky-500/40 hover:border-sky-300"
         }`}
         style={{
           left: `${region.x}%`,
@@ -292,18 +301,23 @@ export function ROIEditor({ region, onChange, onCommit, learningStatus, label = 
           width: `${region.w}%`,
           height: `${region.h}%`,
         }}
-        onMouseDown={startDrag}
-        onTouchStart={startDrag}
+        onMouseDown={(e) => startDrag(e, "move")}
+        onTouchStart={(e) => startDrag(e, "move")}
       >
-        <div className="absolute -top-5 left-0 bg-sky-600 text-white text-[9px] px-1.5 py-0.5 rounded font-mono font-bold whitespace-nowrap">
-          {label}
+        {/* Label Tag Header */}
+        <div className="absolute -top-6 left-0 bg-sky-600 text-white text-[10px] px-2 py-0.5 rounded font-mono font-bold whitespace-nowrap shadow-md pointer-events-none flex items-center gap-1">
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
+          {label} ({Math.round(region.w)}% × {Math.round(region.h)}%)
         </div>
+
+        {/* Resizer handle bottom-right */}
         <div
-          data-resizer="true"
-          onMouseDown={startResize}
-          onTouchStart={startResize}
-          className="absolute -bottom-1 -right-1 w-3 h-3 bg-sky-600 rounded-full border border-white cursor-se-resize"
-        />
+          onMouseDown={(e) => startDrag(e, "resize")}
+          onTouchStart={(e) => startDrag(e, "resize")}
+          className="absolute -bottom-2 -right-2 w-5 h-5 bg-sky-500 rounded-full border-2 border-white cursor-se-resize shadow-lg flex items-center justify-center hover:scale-125 transition-transform"
+        >
+          <div className="w-1.5 h-1.5 rounded-full bg-white" />
+        </div>
       </div>
     </div>
   );
