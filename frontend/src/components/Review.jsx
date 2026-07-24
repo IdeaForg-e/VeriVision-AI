@@ -84,41 +84,35 @@ export function CaseStatusTracker({ status }) {
 export function EvidencePanel({ caseData, region, onRegionChange, onRegionCommit, learningStatus }) {
   if (!caseData) return null;
 
-  const currentRegion = region || { x: 25, y: 25, w: 30, h: 30 };
+  const currentRegion = region || { x: 30, y: 25, w: 40, h: 45 };
 
   return (
     <div className="lab-card p-4 space-y-4">
       <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
         <h2 className="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider flex items-center gap-2">
-          <Sparkles size={14} className="text-sky-500" /> Evidence Image Comparison &amp; Interactive Anomaly ROI
+          <Sparkles size={14} className="text-sky-500" /> Interactive Anomaly ROI &amp; Active Learning Workbench
         </h2>
         <span className="font-mono text-[10px] text-slate-500">HASH: {caseData.imageHash || "N/A"}</span>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {/* Golden Reference */}
-        <div className="space-y-1.5">
+      {/* Target Inspection Unit (Single Defective Image View with ROI Box) */}
+      <div className="space-y-2">
+        <div className="flex justify-between items-center">
           <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
-            OEM Golden Reference Standard
+            Target Defective Unit Under Inspection
           </span>
-          <div className="relative aspect-square bg-slate-950 rounded-lg overflow-hidden border border-slate-800 p-2 flex items-center justify-center">
-            <img className="w-full h-full object-contain" alt="Golden reference" src={caseData.goldenImageUrl} />
-          </div>
+          <span className="text-[10px] font-mono text-sky-400 font-bold bg-sky-500/10 px-2 py-0.5 rounded border border-sky-500/20">
+            [ Drag &amp; Resize Box to Calibrate AI Training Memory ]
+          </span>
         </div>
-
-        {/* Uploaded / Inspection Scan with Interactive ROI Box */}
-        <div className="space-y-1.5">
-          <div className="flex justify-between items-center">
-            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
-              Target Unit Under Inspection
-            </span>
-            <span className="text-[10px] font-mono text-sky-500 font-bold">
-              [ Drag / Resize ROI Box to Train AI ]
-            </span>
-          </div>
-          <div className="relative aspect-square bg-slate-950 rounded-lg overflow-hidden border border-slate-800 p-2 flex items-center justify-center">
-            <img className="w-full h-full object-contain pointer-events-none" alt="Uploaded target scan" src={caseData.uploadedImageUrl} />
-            <div className="absolute inset-0 p-2">
+        <div className="relative w-full min-h-[380px] max-h-[520px] bg-slate-950 rounded-xl overflow-hidden border border-slate-800 flex items-center justify-center p-3">
+          <div className="relative inline-block max-w-full max-h-full">
+            <img
+              className="max-w-full max-h-[480px] object-contain rounded pointer-events-none select-none"
+              alt="Uploaded target scan"
+              src={caseData.uploadedImageUrl}
+            />
+            <div className="absolute inset-0">
               <ROIEditor
                 region={currentRegion}
                 onChange={onRegionChange}
@@ -135,8 +129,8 @@ export function EvidencePanel({ caseData, region, onRegionChange, onRegionCommit
         <div className="flex gap-2 items-center text-slate-600 dark:text-slate-400">
           <Info size={15} className="text-sky-500 shrink-0" />
           <span>
-            Drag/resize the blue dashed ROI box on target image to mark anomaly region for AI training loop. Model:{" "}
-            <span className="font-mono text-sky-600 dark:text-sky-400 font-bold">{caseData.neuralModel || "ResNet-50"}</span>
+            Drag &amp; resize the blue dashed ROI box to mark defect location. Saved ROIs update active learning training memory. Model:{" "}
+            <span className="font-mono text-sky-600 dark:text-sky-400 font-bold">{caseData.neuralModel || "FraudSense v4.2"}</span>
           </span>
         </div>
         {learningStatus === "learning" && (
