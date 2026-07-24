@@ -546,19 +546,13 @@ def run_anomaly_ensemble(src_img: np.ndarray, ref_img: np.ndarray, roi_config: d
         logger.error(f"Failed to generate side-by-side diagnostic card: {e}")
         errors.append("card_generation_failed")
 
-    # OCR string diff calculation (Dual check: expected serial DB & golden image OCR)
-    ocr_diff = {"similarity": 1.0, "mismatches": []}
-    if ocr_engine_available:
-        diff_expected = calculate_string_diff(detected_text, expected_serial) if expected_serial else {"similarity": 0.0, "mismatches": []}
-        diff_golden = calculate_string_diff(detected_text, golden_text) if golden_text else {"similarity": 0.0, "mismatches": []}
+    # Dynamic Ground-Truth OCR Determination:
+    # Golden Reference Image extracted OCR text is the primary ground truth.
+    master_expected_text = golden_text if (golden_text and len(golden_text.strip()) > 0) else expected_serial
 
-        # Use the highest similarity match (e.g. when identical images are uploaded, diff_golden is 1.0)
-        if diff_golden["similarity"] >= diff_expected["similarity"]:
-            ocr_diff = diff_golden
-            if not expected_serial and golden_text:
-                expected_serial = golden_text
-        else:
-            ocr_diff = diff_expected
+    ocr_diff = {"similarity": 1.0, "mismatches": []}
+    if ocr_engine_available and master_expected_text:
+        ocr_diff = calculate_string_diff(detected_text, master_expected_text)
 
     score_components = [keypoint_results["keypoint_match_score"]]
     checked_components = ["keypoint"]
@@ -580,7 +574,7 @@ def run_anomaly_ensemble(src_img: np.ndarray, ref_img: np.ndarray, roi_config: d
     return {
         "ssim_score": ssim_val,
         "detected_text": detected_text,
-        "expected_text": expected_serial,
+        "expected_text": master_expected_text if master_expected_text else expected_serial,
         "ocr_similarity": ocr_diff["similarity"],
         "ocr_mismatches": ocr_diff["mismatches"],
         "ocr_engine_available": ocr_engine_available,

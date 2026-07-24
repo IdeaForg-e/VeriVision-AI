@@ -190,7 +190,7 @@ def detect_anomalies_node(state: InspectionState) -> Dict[str, Any]:
     return {
         "ssim_score": ensemble_results["ssim_score"],
         "ocr_detected_text": ensemble_results["detected_text"],
-        "ocr_expected_text": state["expected_serial"],
+        "ocr_expected_text": ensemble_results.get("expected_text") or state["expected_serial"],
         "ocr_similarity": ensemble_results["ocr_similarity"],
         "ocr_mismatches": ensemble_results["ocr_mismatches"],
         "keypoint_ratio": ensemble_results["keypoint_ratio"],
