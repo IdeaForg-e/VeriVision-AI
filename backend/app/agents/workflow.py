@@ -44,6 +44,7 @@ class InspectionState(TypedDict):
     # Decision/Policy results
     fraud_score: Optional[int]
     verdict: Optional[str]
+    category: Optional[str]
     confidence: Optional[float]
     recommended_action: Optional[str]
     explanation: Optional[str]
@@ -235,6 +236,7 @@ def decision_node(state: InspectionState) -> Dict[str, Any]:
     return {
         "fraud_score": decision["fraud_score"],
         "verdict": decision["verdict"],
+        "category": decision.get("category"),
         "confidence": decision["confidence"],
         "recommended_action": decision["recommended_action"],
         "triage_detail": decision["reasoning"],

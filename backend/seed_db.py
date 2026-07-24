@@ -53,6 +53,13 @@ def migrate_db():
             cursor.execute("ALTER TABLE golden_references ADD COLUMN embedding_vector TEXT")
             print(f"  [MIGRATE] Added column 'golden_references.embedding_vector' to {os.path.basename(db_path)}")
 
+        # Check existing columns in inspection_results table
+        cursor.execute("PRAGMA table_info(inspection_results)")
+        res_cols = {row[1] for row in cursor.fetchall()}
+        if "category" not in res_cols:
+            cursor.execute("ALTER TABLE inspection_results ADD COLUMN category TEXT")
+            print(f"  [MIGRATE] Added column 'inspection_results.category' to {os.path.basename(db_path)}")
+
         for col_name, col_type in migrations:
             if col_name not in existing_cols:
                 cursor.execute(f"ALTER TABLE inspections ADD COLUMN {col_name} {col_type}")

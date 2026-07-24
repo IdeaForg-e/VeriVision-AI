@@ -86,93 +86,67 @@ def make_decision(ensemble_results: dict) -> dict:
         f"Template: {template_loss:.1f}, Color: {color_loss:.3f}. Weighted Score: {weighted_score:.2f} -> Fraud Score: {fraud_score}"
     )
 
+    category = "Clean (OEM Verified)"
     verdict = "clean"
     recommended_action = "Accept"
     confidence = 0.90
-    reason_note = "All measured metrics fell within tolerance of the golden reference."
+    reason_note = "All measured optical and character features fall within OEM tolerance."
 
-    # 1. Check template/logo presence (High priority)
+    # 1. Missing QC label: Golden shows sticker at known location; defective image has blank region there
     if not temp_found:
+        category = "Missing QC label"
         verdict = "missing"
         recommended_action = "Quarantine & Escalate"
         confidence = 0.98
-        reason_note = "Expected label/logo template was not detected on the part."
-        logger.info(f"Local Decision: Template/logo is MISSING. Verdict forced to {verdict.upper()}.")
+        reason_note = "Missing QC label: Golden reference shows sticker at known location, but defective image has blank region."
+        logger.info(f"Local Decision: Missing QC label. Verdict forced to {verdict.upper()}.")
 
-    # 2. Check structure (ssim loss)
-    elif ssim_loss > (1.0 - ssim_target):
-        if kp_loss > (keypoint_delta / 100.0) or color_loss > 0.40:
-            verdict = "tampered"
-            recommended_action = "Quarantine & Escalate"
-            confidence = 0.95
-            reason_note = f"Structural (SSIM={ssim:.2f}) and keypoint/color deviations exceed tampering thresholds."
-        else:
-            verdict = "reused"
-            recommended_action = "Request Vendor Verification"
-            confidence = 0.85
-            reason_note = f"Structural similarity (SSIM={ssim:.2f}) below target but keypoints/color remain consistent, suggesting wear rather than tampering."
-        logger.info(f"Local Decision: SSIM difference exceeds tuning limit ({1.0 - ssim_target:.2f}). Verdict assigned to {verdict.upper()}.")
-
-    # 3. Check OCR serial text matching
-    elif expected_text and not detected_text.strip():
-        verdict = "missing"
-        recommended_action = "Quarantine & Escalate"
-        confidence = 0.98
-        reason_note = "Expected serial/label text was not readable or absent on the part."
-        logger.info("Local Decision: OCR text mismatch: Label text is empty.")
-
-    elif len(ocr_mismatches) > 0 and (ocr_sim * 100) < ocr_fuzzy:
-        verdict = "mismatched"
+    # 2. Swap detection: Keypoint mismatch suggests a different component installed
+    elif kp_loss > 0.25:
+        category = "Swap detection"
+        verdict = "tampered"
         recommended_action = "Quarantine & Escalate"
         confidence = 0.95
+        reason_note = f"Swap detection: Keypoint mismatch (rate={kp_ratio:.2f}) suggests a different component is installed."
+        logger.info(f"Local Decision: Swap detection triggered. Verdict set to {verdict.upper()}.")
 
-        substitutions = {('O', '0'), ('0', 'O'), ('I', '1'), ('1', 'I'), ('S', '5'), ('5', 'S')}
-        is_minor_leet = all(
-            (m.get("detected"), m.get("expected")) in substitutions
-            for m in ocr_mismatches
-        )
-        if is_minor_leet:
-            recommended_action = "Request Vendor Verification"
-            confidence = 0.80
-            reason_note = f"Detected serial '{detected_text}' differs from expected '{expected_text}' only by minor leet-speak character substitutions."
-            logger.info("Local Decision: Character mismatches detected are minor (leet-speak). Downgraded action to Vendor Verification.")
-        else:
-            reason_note = f"Detected serial '{detected_text}' does not match expected '{expected_text}' ({len(ocr_mismatches)} character mismatches)."
-            logger.info("Local Decision: Critical character mismatch detected in serial number.")
+    # 3. Altered serial number: OCR diff on warranty or rev field — e.g., '0' changed to 'O'
+    elif len(ocr_mismatches) > 0 and (ocr_sim * 100) < ocr_fuzzy:
+        category = "Altered serial number"
+        verdict = "mismatched"
+        recommended_action = "Escalate with evidence"
+        confidence = 0.95
+        reason_note = f"Altered serial number: OCR diff on warranty/rev field — e.g. detected '{detected_text}' vs expected '{expected_text}'."
+        logger.info("Local Decision: Altered serial number detected. Action set to Escalate with evidence.")
 
-    # 4. Check color consistency (Color correlation checks)
+    # 4. Non-OEM label: Label hue/font differs from golden despite correct serial text
     elif color_loss > 0.35:
-        verdict = "tampered"
-        recommended_action = "Request Vendor Verification"
-        confidence = 0.80
-        reason_note = f"Color/material histogram correlation ({color_sim:.2f}) deviates significantly from the golden reference, suggesting non-OEM material."
-        logger.info(f"Local Decision: Color spectrum mismatch detected (non-OEM). Verdict set to {verdict.upper()}.")
-
-    # Fallback bounds adjustments
-    if not temp_found and verdict == "clean":
+        category = "Non-OEM label"
         verdict = "mismatched"
-        recommended_action = "Quarantine & Escalate"
-        confidence = 0.90
-        reason_note = "Borderline template status mismatch correction applied."
-        logger.info("Local Decision: Borderline template status mismatch correction.")
-
-    if color_sim < 0.60 and verdict == "clean":
-        verdict = "mismatched"
-        recommended_action = "Request Vendor Verification"
+        recommended_action = "Escalate to vendor"
         confidence = 0.85
-        reason_note = f"Color similarity ({color_sim:.2f}) fell below the acceptable floor despite other checks passing."
-        logger.info("Local Decision: Borderline color similarity deviation matching correction.")
+        reason_note = f"Non-OEM label: Label hue/font color spectrum ({color_sim:.2f}) differs from golden reference."
+        logger.info(f"Local Decision: Non-OEM label detected. Action set to Escalate to vendor.")
 
-    # Low-confidence adjustment: if SSIM alone sits below the tuning target but
-    # no other rule fired, treat it as likely background noise/reflection rather
-    # than a real defect. Verdict stays 'clean', but confidence is lowered so the
-    # case surfaces for human review instead of auto-accepting silently.
-    if verdict == "clean" and ssim < ssim_target:
+    # 5. Reused board: Layout matches golden but tamper tape is broken and residue is visible
+    elif ssim_loss > (1.0 - ssim_target):
+        category = "Reused board"
+        verdict = "reused"
+        recommended_action = "Request additional angle"
+        confidence = 0.85
+        reason_note = f"Reused board: Layout matches golden but tamper tape/wear residue is visible (SSIM={ssim:.2f})."
+        logger.info(f"Local Decision: Reused board detected. Action set to Request additional angle.")
+
+    # 6. False alarm (lighting): SSIM hotspots caused by exposure differences, not actual tampering
+    elif ssim < ssim_target:
+        category = "False alarm (lighting)"
+        verdict = "clean"
+        recommended_action = "Triage Agent requests retake"
         confidence = 0.60
-        reason_note = f"SSIM ({ssim:.2f}) is below the tuning target ({ssim_target:.2f}) but no other anomaly triggered; likely background noise — confidence lowered for review."
-        logger.info(f"Local Decision: High background noise/reflection (ssim {ssim:.2f} < target {ssim_target:.2f}). Confidence index set to low (0.60).")
+        reason_note = f"False alarm (lighting): SSIM hotspots ({ssim:.2f}) caused by exposure differences, not actual tampering."
+        logger.info(f"Local Decision: False alarm (lighting). Triage Agent requests retake.")
 
-    # 5. Multimodal vision report integration
+    # Multimodal vision report integration
     multimodal_report = ensemble_results.get("multimodal_report", "")
     if multimodal_report and "visual comparison failed" not in multimodal_report.lower() and "visual comparison skipped" not in multimodal_report.lower():
         if "no anomalies detected" in multimodal_report.lower():
@@ -182,8 +156,9 @@ def make_decision(ensemble_results: dict) -> dict:
         else:
             logger.info(f"Multimodal Vision check flagged defects: {multimodal_report}")
             if verdict == "clean":
+                category = "Reused board"
                 verdict = "reused"
-                recommended_action = "Request Vendor Verification"
+                recommended_action = "Request additional angle"
                 confidence = 0.50
                 fraud_score = max(fraud_score, 45)
                 reason_note = f"Mathematical checks passed, but Visual AI flagged discrepancies: {multimodal_report}"
@@ -207,6 +182,7 @@ def make_decision(ensemble_results: dict) -> dict:
     return {
         "fraud_score": fraud_score,
         "verdict": verdict,
+        "category": category,
         "confidence": confidence,
         "recommended_action": recommended_action,
         "reasoning": reason_note,

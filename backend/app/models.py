@@ -79,6 +79,7 @@ class InspectionResult(Base):
     ocr_expected_text = Column(String, nullable=True)
     fraud_score = Column(Integer, default=0)  # 0 to 100
     verdict = Column(String, nullable=False)  # tampered, missing, mismatched, reused, clean
+    category = Column(String, nullable=True)  # Anomaly Test Category
     confidence = Column(Float, nullable=False)
     recommended_action = Column(String, nullable=False)  # Accept, Quarantine & Escalate, Retake, etc.
     explanation = Column(Text, nullable=True)

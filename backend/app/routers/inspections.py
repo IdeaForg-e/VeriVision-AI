@@ -308,6 +308,7 @@ async def create_inspection(
         ocr_expected_text=pipeline_result["ocr_expected_text"],
         fraud_score=pipeline_result["fraud_score"],
         verdict=pipeline_result["verdict"],
+        category=pipeline_result.get("category"),
         confidence=pipeline_result["confidence"],
         recommended_action=pipeline_result["recommended_action"],
         explanation=pipeline_result["explanation"],

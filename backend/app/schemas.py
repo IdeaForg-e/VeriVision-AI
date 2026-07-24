@@ -79,6 +79,7 @@ class InspectionResultResponse(BaseModel):
     ocr_expected_text: Optional[str] = None
     fraud_score: int
     verdict: str
+    category: Optional[str] = None
     confidence: float
     recommended_action: str
     explanation: Optional[str] = None

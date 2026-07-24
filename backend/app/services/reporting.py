@@ -86,11 +86,12 @@ def generate_pdf_report(inspection_id: int, db: Session) -> str:
             verdict_color = '#f59e0b'  # Orange
 
         verdict_data = [
-            [Paragraph("<font size=16 color='white'><b>VERDICT SUMMARY</b></font>", body_style), ""],
+            [Paragraph("<font size=16 color='white'><b>VERDICT & COMPLIANCE SUMMARY</b></font>", body_style), ""],
+            [Paragraph("<b>Anomaly Category:</b>", body_style), Paragraph(f"<b><font color='#1e3a8a'>{getattr(res, 'category', None) or 'Unclassified'}</font></b>", body_style)],
             [Paragraph("<b>Final Verdict:</b>", body_style), Paragraph(f"<font color='{verdict_color}'><b>{res.verdict.upper()}</b></font>", body_style)],
             [Paragraph("<b>Fraud Score:</b>", body_style), Paragraph(f"<b>{res.fraud_score} / 100</b>", body_style)],
             [Paragraph("<b>Confidence Level:</b>", body_style), Paragraph(f"{res.confidence * 100:.1f}%", body_style)],
-            [Paragraph("<b>Next Action Recommended:</b>", body_style), Paragraph(f"<b>{res.recommended_action}</b>", body_style)]
+            [Paragraph("<b>Next Action Recommended:</b>", body_style), Paragraph(f"<b><font color='#0284c7'>{res.recommended_action}</font></b>", body_style)]
         ]
         # Multi-Angle Fusion Indicator in PDF Report
         has_multi = "MULTI-ANGLE FUSION" in (res.explanation or "") or inspection.capture_angle != "top"
@@ -308,10 +309,11 @@ def generate_csv_export(inspections: list) -> str:
     writer.writerow([
         "Case ID", "Product Part Number", "Commodity", 
         "Capture Site", "Capture Angle", "Status", 
-        "Date Created", "Verdict", "Fraud Score", "Action Recommended"
+        "Date Created", "Anomaly Category", "Verdict", "Fraud Score", "Action Recommended"
     ])
     
     for ins in inspections:
+        category = getattr(ins.result, "category", None) if ins.result else "N/A"
         verdict = ins.result.verdict if ins.result else "N/A"
         score = ins.result.fraud_score if ins.result else "N/A"
         action = ins.result.recommended_action if ins.result else "N/A"
@@ -320,7 +322,7 @@ def generate_csv_export(inspections: list) -> str:
             ins.case_id, ins.product.part_number, ins.product.commodity,
             ins.capture_site, ins.capture_angle, ins.status,
             ins.created_at.strftime("%Y-%m-%d %H:%M:%S"),
-            verdict, score, action
+            category or "N/A", verdict, score, action
         ])
         
     return output.getvalue()

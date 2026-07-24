@@ -609,16 +609,24 @@ export default function InspectionDetailPage() {
         </div>
         <div className="lg:col-span-5 lab-card p-4 space-y-3">
           <h3 className="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider flex items-center gap-2">
-            <FileText size={16} className="text-sky-500" /> Pipeline Verdict Classification
+            <FileText size={16} className="text-sky-500" /> Pipeline Verdict &amp; Anomaly Category
           </h3>
-          <div className="grid grid-cols-2 gap-3 font-mono text-xs">
-            <div className="p-2.5 rounded bg-slate-100 dark:bg-slate-900">
-              <span className="text-[10px] font-bold text-slate-500 uppercase block">Verdict</span>
-              <span className="font-bold text-sky-600 dark:text-sky-400 uppercase">{aiClassification}</span>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 font-mono text-xs">
+            <div className="p-2.5 rounded bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+              <span className="text-[9px] font-bold text-slate-500 uppercase block">Anomaly Category</span>
+              <span className="font-bold text-sky-600 dark:text-sky-400 font-sans text-[11px] block truncate mt-0.5" title={merged.result?.category || merged.category || "Clean (OEM Verified)"}>
+                {merged.result?.category || merged.category || "Clean (OEM Verified)"}
+              </span>
             </div>
-            <div className="p-2.5 rounded bg-slate-100 dark:bg-slate-900">
-              <span className="text-[10px] font-bold text-slate-500 uppercase block">Action</span>
-              <span className="font-bold text-slate-800 dark:text-slate-200 uppercase">{aiCategory}</span>
+            <div className="p-2.5 rounded bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+              <span className="text-[9px] font-bold text-slate-500 uppercase block">Verdict</span>
+              <span className="font-bold text-emerald-600 dark:text-emerald-400 uppercase text-[11px] block mt-0.5">{aiClassification}</span>
+            </div>
+            <div className="p-2.5 rounded bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+              <span className="text-[9px] font-bold text-slate-500 uppercase block">Action</span>
+              <span className="font-bold text-amber-600 dark:text-amber-400 font-sans text-[11px] block truncate mt-0.5" title={merged.result?.recommended_action || recommendation.decision || "Accept"}>
+                {merged.result?.recommended_action || recommendation.decision || "Accept"}
+              </span>
             </div>
           </div>
         </div>
