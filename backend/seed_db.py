@@ -11,6 +11,8 @@ Credentials created:
 
 import sys
 import os
+import re
+import shutil
 
 # Ensure the backend root is on the path so app imports work
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -22,39 +24,44 @@ from app import models, utils
 def migrate_db():
     """Safely add new columns to existing tables (SQLite ALTER TABLE)."""
     import sqlite3
-    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "verivision.db")
-    if not os.path.exists(db_path):
-        return  # Fresh install, create_all will handle it
-
-    conn = sqlite3.connect(db_path)
-    cursor = conn.cursor()
-
-    # Check existing columns in inspections table
-    cursor.execute("PRAGMA table_info(inspections)")
-    existing_cols = {row[1] for row in cursor.fetchall()}
-
-    migrations = [
-        ("vendor", "TEXT"),
-        ("component_name", "TEXT"),
-        ("date", "TEXT"),
+    db_paths = [
+        os.path.join(os.path.dirname(os.path.abspath(__file__)), "verivision.db"),
+        os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "verivision.db"))
     ]
 
-    # Check existing columns in golden_references table
-    cursor.execute("PRAGMA table_info(golden_references)")
-    gld_cols = {row[1] for row in cursor.fetchall()}
-    if "embedding_vector" not in gld_cols:
-        cursor.execute("ALTER TABLE golden_references ADD COLUMN embedding_vector TEXT")
-        print("  [MIGRATE] Added column 'golden_references.embedding_vector'")
+    for db_path in db_paths:
+        if not os.path.exists(db_path):
+            continue
 
-    for col_name, col_type in migrations:
-        if col_name not in existing_cols:
-            cursor.execute(f"ALTER TABLE inspections ADD COLUMN {col_name} {col_type}")
-            print(f"  [MIGRATE] Added column 'inspections.{col_name}'")
-        else:
-            print(f"  [SKIP]    Column 'inspections.{col_name}' already exists")
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
 
-    conn.commit()
-    conn.close()
+        # Check existing columns in inspections table
+        cursor.execute("PRAGMA table_info(inspections)")
+        existing_cols = {row[1] for row in cursor.fetchall()}
+
+        migrations = [
+            ("vendor", "TEXT"),
+            ("component_name", "TEXT"),
+            ("date", "TEXT"),
+        ]
+
+        # Check existing columns in golden_references table
+        cursor.execute("PRAGMA table_info(golden_references)")
+        gld_cols = {row[1] for row in cursor.fetchall()}
+        if "embedding_vector" not in gld_cols:
+            cursor.execute("ALTER TABLE golden_references ADD COLUMN embedding_vector TEXT")
+            print(f"  [MIGRATE] Added column 'golden_references.embedding_vector' to {os.path.basename(db_path)}")
+
+        for col_name, col_type in migrations:
+            if col_name not in existing_cols:
+                cursor.execute(f"ALTER TABLE inspections ADD COLUMN {col_name} {col_type}")
+                print(f"  [MIGRATE] Added column 'inspections.{col_name}' to {os.path.basename(db_path)}")
+            else:
+                print(f"  [SKIP]    Column 'inspections.{col_name}' already exists in {os.path.basename(db_path)}")
+
+        conn.commit()
+        conn.close()
 
 
 def seed():
@@ -104,119 +111,71 @@ def seed():
 
         db.commit()
 
-        # 2. Seed Golden Catalog Reference Library
-        catalog_products = [
-            {
-                "part_number": "GOLD-RAM-DELL",
-                "name": "Dell DDR5 RAM",
-                "commodity": "ram",
-                "filename": "golden Dell ddr5 ram.png",
-                "expected_serial": "DELL-RAM-DDR5-001"
-            },
-            {
-                "part_number": "GOLD-BATTERY-DELL",
-                "name": "Dell Standard Battery",
-                "commodity": "battery",
-                "filename": "golden dell battery.png",
-                "expected_serial": "DELL-BATT-8822"
-            },
-            {
-                "part_number": "GOLD-MB-DELL",
-                "name": "Dell OEM Motherboard",
-                "commodity": "motherboard",
-                "filename": "golden dell motherboard.jpg",
-                "expected_serial": "DELL-MB-A01"
-            },
-            {
-                "part_number": "GOLD-HDD-SEAGATE",
-                "name": "Seagate 1TB HDD",
-                "commodity": "storage",
-                "filename": "golden hdd.jpeg",
-                "expected_serial": "SG-HDD-1000"
-            },
-            {
-                "part_number": "GOLD-MICROCHIP-A",
-                "name": "Microchip Controller A",
-                "commodity": "microchip",
-                "filename": "golden microchip .jpeg",
-                "expected_serial": "IC-MCP-9922"
-            },
-            {
-                "part_number": "GOLD-MB-STANDARD",
-                "name": "Standard Motherboard",
-                "commodity": "motherboard",
-                "filename": "golden motherboard.jpeg",
-                "expected_serial": "MB-STD-V2"
-            },
-            {
-                "part_number": "GOLD-RAM-GENERIC",
-                "name": "Generic RAM Module",
-                "commodity": "ram",
-                "filename": "golden ram.jpeg",
-                "expected_serial": "RAM-GEN-16G"
-            },
-            {
-                "part_number": "GOLD-ROM-BIOS",
-                "name": "BIOS ROM Standard",
-                "commodity": "storage",
-                "filename": "golden rom.jpeg",
-                "expected_serial": "ROM-BIOS-V8"
-            },
-            {
-                "part_number": "GOLD-SSD-M2-SAMSUNG-980",
-                "name": "Samsung 980 Pro SSD M.2",
-                "commodity": "storage",
-                "filename": "golden samsung m2-ssd 2.png",
-                "expected_serial": "MZ-V8P1T0"
-            },
-            {
-                "part_number": "GOLD-SSD-M2-SAMSUNG-970",
-                "name": "Samsung 970 Evo SSD M.2",
-                "commodity": "storage",
-                "filename": "golden samsung m2-ssd.png",
-                "expected_serial": "MZ-V7E500"
-            },
-            {
-                "part_number": "GOLD-SSD-SATA",
-                "name": "SATA SSD Standard",
-                "commodity": "storage",
-                "filename": "golden ssd.jpeg",
-                "expected_serial": "SSD-SATA-512"
-            },
-            {
-                "part_number": "GOLD-MICROCHIP-AI",
-                "name": "AI Processing Microchip",
-                "commodity": "microchip",
-                "filename": "golden_microchip.png",
-                "expected_serial": "AI-MCP-2026"
-            },
-            {
-                "part_number": "GOLD-MB-ROG",
-                "name": "Asus Rog Motherboard",
-                "commodity": "motherboard",
-                "filename": "golden_motherboard.png",
-                "expected_serial": "ASUS-ROG-Z790"
-            },
-            {
-                "part_number": "GOLD-LABEL-WARRANTY",
-                "name": "OEM Warranty Seal Label",
-                "commodity": "label",
-                "filename": "golden_warranty_label.png",
-                "expected_serial": "QC-PASS-VOID-0"
-            },
-            {
-                "part_number": "GOLD-GPU-AUDIO",
-                "name": "GPU Audio Processor Card",
-                "commodity": "gpu",
-                "filename": "gpu sound.jpeg",
-                "expected_serial": "GPU-AUD-X1"
-            }
-        ]
-
-        # Root folder path containing source images
+        # 2. Dynamically Seed Golden Catalog Reference Library from Golden_Images Directory
         project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         source_folder = os.path.join(project_root, "Golden_Images")
         os.makedirs(settings.GOLDEN_DIR, exist_ok=True)
+
+        valid_extensions = {".png", ".jpg", ".jpeg", ".webp"}
+        image_files = sorted([
+            f for f in os.listdir(source_folder)
+            if os.path.isfile(os.path.join(source_folder, f)) and os.path.splitext(f)[1].lower() in valid_extensions
+        ])
+
+        def get_commodity_from_filename(fname: str) -> str:
+            lower = fname.lower()
+            if "ram" in lower: return "ram"
+            if "battery" in lower or "batt" in lower: return "battery"
+            if "motherboard" in lower or "mb" in lower: return "motherboard"
+            if "microchip" in lower or "chip" in lower: return "microchip"
+            if "rom" in lower or "bios" in lower: return "storage"
+            if "ssd" in lower or "hdd" in lower or "drive" in lower: return "storage"
+            if "label" in lower or "warranty" in lower or "seal" in lower: return "label"
+            if "gpu" in lower or "sound" in lower or "card" in lower: return "gpu"
+            return "motherboard"
+
+        def get_part_number_from_filename(fname: str) -> str:
+            name_no_ext = os.path.splitext(fname)[0].strip()
+            clean_name = re.sub(r'[^a-zA-Z0-9_-]', '_', name_no_ext).upper()
+            clean_name = re.sub(r'_+', '_', clean_name).strip('_')
+            if not clean_name.startswith("GOLD"):
+                clean_name = f"GOLD_{clean_name}"
+            return clean_name.replace("_", "-")
+
+        def get_title_from_filename(fname: str) -> str:
+            name_no_ext = os.path.splitext(fname)[0].strip()
+            words = [w.capitalize() for w in name_no_ext.replace("_", " ").replace("-", " ").split()]
+            return " ".join(words)
+
+        catalog_products = []
+        seen_part_numbers = set()
+        for idx, fname in enumerate(image_files, 1):
+            part_num = get_part_number_from_filename(fname)
+            if part_num in seen_part_numbers:
+                part_num = f"{part_num}-{idx}"
+            seen_part_numbers.add(part_num)
+            title = get_title_from_filename(fname)
+            commodity = get_commodity_from_filename(fname)
+            catalog_products.append({
+                "part_number": part_num,
+                "name": title,
+                "commodity": commodity,
+                "filename": fname,
+                "expected_serial": part_num
+            })
+
+        # Purge all old catalog products and references for a 100% clean sync with Golden_Images folder
+        old_products = db.query(models.Product).all()
+        for old_prod in old_products:
+            print(f"  [SYNC PURGE] Removing old catalog entry '{old_prod.part_number}'")
+            insps = db.query(models.Inspection).filter(models.Inspection.product_id == old_prod.id).all()
+            for insp in insps:
+                db.query(models.InspectionResult).filter(models.InspectionResult.inspection_id == insp.id).delete()
+                db.query(models.AuditLog).filter(models.AuditLog.inspection_id == insp.id).delete()
+                db.delete(insp)
+            db.query(models.GoldenReference).filter(models.GoldenReference.product_id == old_prod.id).delete()
+            db.delete(old_prod)
+        db.commit()
 
         created_prod = 0
         for prod in catalog_products:
@@ -262,8 +221,8 @@ def seed():
             db.refresh(new_prod)
 
             # Calculate 512-dim visual vector embedding
-            from app.services.embedding_service import extract_image_embedding
-            emb_vec = extract_image_embedding(dst_file_path)
+            from app.services.embedding_service import _extract_opencv_fallback
+            emb_vec = _extract_opencv_fallback(dst_file_path)
 
             new_golden = models.GoldenReference(
                 product_id=new_prod.id,
