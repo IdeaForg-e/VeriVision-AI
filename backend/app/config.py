@@ -16,14 +16,14 @@ class Settings:
     OPENROUTER_API_KEY: Optional[str] = os.getenv("OPENROUTER_API_KEY", None)
     OPENROUTER_MODEL: str = os.getenv("OPENROUTER_MODEL", "nvidia/nemotron-3-ultra-550b-a55b:free")
 
-    # Database
-    DATABASE_URL: str = os.getenv("DATABASE_URL", "sqlite:///./verivision.db")
-
     # Directory Paths
     BASE_DIR: str = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     UPLOAD_DIR: str = os.path.join(BASE_DIR, "data", "cases")
     GOLDEN_DIR: str = os.path.join(BASE_DIR, "data", "golden")
     REPORTS_DIR: str = os.path.join(BASE_DIR, "data", "reports")
+
+    # Database
+    DATABASE_URL: str = os.getenv("DATABASE_URL", f"sqlite:///{os.path.join(BASE_DIR, 'verivision.db')}")
 
     # Vision Thresholds
     SSIM_THRESHOLD: float = 0.80
