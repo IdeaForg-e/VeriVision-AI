@@ -33,6 +33,7 @@ dist-ssr
 frontend/.vite/
 
 # IDEs & System
+.agents/
 .vscode/
 .idea/
 .DS_Store
