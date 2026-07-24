@@ -84,7 +84,8 @@ export function CaseStatusTracker({ status }) {
 export function EvidencePanel({ caseData, region, onRegionChange, onRegionCommit, learningStatus }) {
   if (!caseData) return null;
 
-  const currentRegion = region || { x: 20, y: 30, w: 60, h: 40 };
+  const isFull = (r) => !r || (r.w >= 90 && r.h >= 90) || (r.x <= 2 && r.y <= 2 && r.w >= 95);
+  const currentRegion = isFull(region) ? { x: 20, y: 30, w: 60, h: 40 } : region;
 
   return (
     <div className="lab-card p-4 space-y-4">

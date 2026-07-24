@@ -29,7 +29,9 @@ export function useReview(caseId) {
       .then(([reviewData, detail]) => {
         if (reviewData) {
           setCaseData(reviewData);
-          if (reviewData.aiRegion) setRegion(reviewData.aiRegion);
+          const r = reviewData.aiRegion;
+          const isFull = !r || (r.w >= 90 && r.h >= 90) || (r.x <= 2 && r.y <= 2 && r.w >= 95);
+          setRegion(isFull ? { x: 20, y: 30, w: 60, h: 40 } : r);
         }
         if (detail) {
           setDetailData(detail);
