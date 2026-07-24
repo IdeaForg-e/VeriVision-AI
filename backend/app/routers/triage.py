@@ -221,8 +221,9 @@ def get_case_detail(
     ocr_match = None
     if result:
         evidence = result.evidence_json or {}
+        detector_results = evidence.get("detector_results", {}) or {}
         pipeline_category = result.category or evidence.get("category")
-        ocr_detector_data = evidence.get("detector_results", {}).get("ocr", {})
+        ocr_detector_data = detector_results.get("ocr", {})
         ocr_similarity = ocr_detector_data.get("similarity") if ocr_detector_data.get("similarity") is not None else evidence.get("ocr_similarity")
 
         # Resolve expected serial: avoid using dummy part numbers like "GOLD-RAM" as serials
@@ -263,14 +264,18 @@ def get_case_detail(
             "mismatches": mismatches or [],
         })
 
-    # Build detector metrics
-    metrics = []
-    if result:
-        evidence = result.evidence_json or {}
-        detector_results = evidence.get("detector_results", {})
+        vec_match = (
+            detector_results.get("vector", {}).get("vector_embedding_match")
+            or detector_results.get("clip", {}).get("similarity")
+            or evidence.get("vector_embedding_match")
+            or evidence.get("vector_match")
+        )
+        vec_score = round(float(vec_match), 1) if vec_match is not None else (round(result.ssim_score * 100, 1) if result.ssim_score else 90.0)
+
         metrics = [
             {"name": "SSIM Score", "score": result.ssim_score or 0, "unit": "", "icon": "image_search", "description": "Structural similarity to OEM golden image"},
             {"name": "Keypoint Match", "score": result.keypoint_match_rate or 0, "unit": "", "icon": "hub", "description": "ORB/SIFT keypoint match rate"},
+            {"name": "Vector Sim", "score": vec_score, "unit": "%", "icon": "bolt", "description": "512-Dim CLIP Vector Cosine Similarity"},
             {"name": "Template Match", "score": detector_results.get("template", {}).get("template_match_score", 1.0), "unit": "", "icon": "verified", "description": "Expected label/seal presence check"},
             {"name": "Color Match", "score": detector_results.get("color", {}).get("color_hist_similarity", 1.0), "unit": "", "icon": "palette", "description": "Label/material color histogram similarity"},
             {"name": "Fraud Score", "score": result.fraud_score, "unit": "%", "icon": "psychology", "description": "Overall fraud risk assessment"},

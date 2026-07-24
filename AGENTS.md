@@ -330,11 +330,14 @@ Cross-angle evidence agreement boosts combined decision confidence by **+5% per 
 ### Agent 5 — Audit Explainer & Report Engine (`agent_5_explainer.py`)
 
 #### Primary Responsibility
-Translates complex mathematical metrics into audit-ready, fluent natural language narratives.
+Translates complex mathematical metrics into audit-ready, fluent natural language narratives for executive compliance reports.
 
-#### Implementation Architecture
-- **Primary LLM Generation:** Sends metrics to OpenRouter LLM with strict grounding instructions: *"Write an official audit narrative. Do not contradict Agent 4's verdict or introduce unlisted numbers."*
-- **Deterministic Local Template Fallback:** If offline or API fails, uses a multi-paragraph template generator that dynamically constructs explanation sections for SSIM, OCR, template presence, color correlation, and verdict rationale.
+#### Technical Highlights & Natural Language Formatting
+- **Primary LLM Generation:** Sends metrics to OpenRouter LLM (`openrouter_model`) with strict executive grounding instructions:
+  - *Natural Language Rules:* ABSOLUTELY NO raw pixel math, coordinate tuples like `(x=137, y=109)`, or raw code variables in customer-facing audit reports.
+  - *Human-Centric Wording:* Converts pixel locations into plain English (e.g., *"center label zone"*, *"upper PCB component area"*).
+  - *Strict Grounding:* Ensures the narrative matches Agent 4's verdict without introducing hallucinated numbers or contradictions.
+- **Deterministic Local Template Fallback:** If offline or API fails, uses a multi-paragraph template generator that dynamically constructs bullet summaries and structured explanation sections for SSIM, OCR character diffs, template presence, color correlation, and verdict rationale.
 
 ---
 

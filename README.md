@@ -245,9 +245,9 @@ Also generates:
 - **Multimodal Fusion**: Vision LLM findings boost or confirm the mathematical verdict
 - **Multi-Angle Fusion Engine** (Bonus): Noisy-OR probabilistic fusion across 2–3 camera angles
 
-#### Agent 5 — LLM Explainer (`agent_5_explainer.py`)
-- **Primary**: OpenRouter LLM generates fluent, audit-ready explanations grounded in Agent 4's reasoning
-- **Fallback**: Rich rule-based template generator produces structured paragraphs covering SSIM, OCR, template, color, and verdict
+#### Agent 5 — Executive Explainer & Report Engine (`agent_5_explainer.py`)
+- **Primary**: OpenRouter LLM generates fluent, executive-level audit explanations with strict natural language rules (no raw pixel math coordinates, no code variables).
+- **Fallback**: Rich local template generator produces structured bullet summaries and detailed audit paragraphs covering SSIM, OCR character diffs, template presence, color correlation, and verdict rationale.
 - **Grounding Constraint**: The explainer cannot contradict the decision agent — it only narrates the pre-determined verdict
 
 ---

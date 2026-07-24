@@ -46,8 +46,12 @@ def _build_prompt(ssim, verdict, fraud_score, detected_text, expected_text,
         f"and whether character mismatches were found.\n"
         f"3. If relevant, mention template/logo presence and color/material correlation findings.\n"
         f"4. Conclude with the verdict, fraud risk score, and recommended action.\n\n"
-        f"Make it sound like a senior quality auditor writing an official inspection report. "
-        f"Do not speculate beyond the metrics provided."
+        f"Make it sound like a senior quality auditor writing an official inspection report.\n\n"
+        f"CRITICAL NATURAL LANGUAGE RULES:\n"
+        f"- Write in smooth, natural, executive English.\n"
+        f"- ABSOLUTELY NO raw pixel math, coordinate tuples like '(x=137, y=109)', or code variables.\n"
+        f"- Describe locations in plain words (e.g., 'center sticker area', 'upper PCB chips').\n"
+        f"- Do not speculate beyond the metrics provided."
     )
 
 
@@ -67,7 +71,6 @@ def generate_explanation(metrics: dict) -> str:
     decision_reasoning = metrics.get("reasoning", "")
     multimodal_report = metrics.get("multimodal_report", "")
     anomaly_regions = metrics.get("anomaly_regions", []) or []
-    keypoint_ratio = metrics.get("keypoint_ratio")
     temp_score = metrics.get("template_match_score", 1.0)
     temp_found = metrics.get("template_match_found", True)
     color_sim = metrics.get("color_hist_similarity", 1.0)
@@ -77,8 +80,6 @@ def generate_explanation(metrics: dict) -> str:
     openrouter_key = settings.OPENROUTER_API_KEY
     openrouter_model = settings.OPENROUTER_MODEL
 
-    # Default to enabled when an API key is present — the env var exists only
-    # as an escape hatch to force the template fallback (e.g. for offline demos).
     use_llm_explainer = os.getenv("ENABLE_LLM_EXPLAINER", "true").lower() == "true"
     if openrouter_key and use_llm_explainer:
         prompt = _build_prompt(
@@ -101,126 +102,83 @@ def generate_explanation(metrics: dict) -> str:
         for attempt in range(1, MAX_LLM_ATTEMPTS + 1):
             logger.info(f"Querying OpenRouter Explainer model (attempt {attempt}/{MAX_LLM_ATTEMPTS}): {openrouter_model}")
             try:
-                response = requests.post(url, json=payload, headers=headers, timeout=30)
-                if response.status_code != 200:
-                    logger.warning(f"Explainer model endpoint returned status {response.status_code}. Details: {response.text}")
-                    continue
-
-                res_data = response.json()
-                explanation = res_data["choices"][0]["message"]["content"].strip()
-                if not explanation:
-                    raise ValueError("Explainer model returned an empty response")
-
-                logger.info("Explainer model returned response successfully.")
-                return explanation
-
+                response = requests.post(url, json=payload, headers=headers, timeout=10)
+                if response.status_code == 200:
+                    res_data = response.json()
+                    explanation = res_data["choices"][0]["message"]["content"].strip()
+                    if explanation:
+                        logger.info("Explainer model returned response successfully.")
+                        return explanation
+                else:
+                    logger.warning(f"Explainer model endpoint returned status {response.status_code}.")
             except Exception as e:
                 logger.error(f"Explainer LLM Agent attempt {attempt}/{MAX_LLM_ATTEMPTS} failed: {e}.")
 
         logger.warning("All Explainer LLM attempts exhausted. Falling back to template explainer...")
 
-    # ── Rule-Based Fallback — Rich Paragraph ──────────────────────────────
+    # ── Rule-Based Fallback — Rich Bullet & Paragraph Template ──────────────
     logger.info("Assembling rule-based local explanation template...")
 
     ssim_pct = ssim * 100
-    color_pct = color_sim * 100
     if anomaly_regions:
         region_text = "; ".join(
             f"the {r.get('location', 'unknown')} area of the component"
             for r in anomaly_regions[:3]
         )
     else:
-        region_text = "no localized defect regions above the detection threshold"
+        region_text = "localized defect regions"
 
     # --- 1. SSIM / Heatmap paragraph ---
     if ssim >= 0.85:
         heatmap_part = (
             f"SSIM heatmap analysis registered a structural similarity index of {ssim:.2f} ({ssim_pct:.0f}%), "
-            f"indicating the component surface matches the golden reference within acceptable tolerances. "
-            f"Pixel-level comparison produced {region_text}."
+            f"indicating the component surface matches the golden reference within acceptable tolerances."
         )
-    elif verdict == "missing":
-        parts.append(
-            "The inspection found that a critical element is missing from this part. "
-            "A label, sticker, or serial tag that should be present on the golden reference "
-            "could not be found on the submitted scan. This is a strong indicator of tampering or part substitution."
-        )
-    elif verdict == "mismatched":
-        parts.append(
-            "The inspection found that the label or serial number on this part does not match the golden reference. "
-            "The printed text appears to have been altered, which raises concerns about the authenticity "
-            "and traceability of this component."
-        )
-    elif verdict == "reused":
-        parts.append(
-            "The inspection suggests this part may have been previously used and returned as new. "
-            "While the overall layout matches the golden reference, there are visible signs of wear, "
-            "residue, or surface damage that are inconsistent with a brand-new OEM component."
+    elif ssim >= 0.65:
+        heatmap_part = (
+            f"SSIM heatmap analysis recorded a structural similarity score of {ssim:.2f} ({ssim_pct:.0f}%), "
+            f"which falls moderately below the ideal threshold. The heatmap overlay highlights {region_text}, "
+            f"suggesting surface-level wear or localized component alterations."
         )
     else:
-        parts.append(
-            "The inspection is complete. The system has analyzed the submitted scan and produced a verdict "
-            f"of {verdict.upper()} with a fraud risk score of {fraud_score} out of 100."
+        heatmap_part = (
+            f"SSIM heatmap analysis returned a low structural similarity index of {ssim:.2f} ({ssim_pct:.0f}%), "
+            f"well below the acceptable threshold. Significant structural deviation was detected in {region_text}."
         )
 
-    # --- OCR / Label details ---
-    if verdict in ("mismatched", "missing", "tampered") and expected_text and detected_text:
-        if expected_text != detected_text and ocr_mismatches:
-            mismatch_count = len(ocr_mismatches)
-            parts.append(
-                f"The label text on the part reads '{detected_text}', but the golden reference expects '{expected_text}'. "
-                f"There are {mismatch_count} character-level differences between the two. "
-                f"This kind of text alteration is a common sign of counterfeit or tampered parts."
-            )
-        elif not detected_text.strip() and expected_text:
-            parts.append(
-                f"The system expected to find the label text '{expected_text}' on the part, "
-                f"but no readable text could be extracted from the label area. "
-                f"This could mean the label is missing, illegible, or has been removed."
-            )
-        elif detected_text and expected_text and detected_text == expected_text:
-            parts.append(
-                f"The label text '{detected_text}' was read successfully and matches the golden reference exactly. "
-                f"The label appears authentic."
-            )
+    # --- 2. OCR / Label details ---
+    if not expected_text:
+        ocr_part = "Label text verification was not configured for this component model."
+    elif expected_text and detected_text and expected_text == detected_text:
+        ocr_part = f"Label OCR check confirmed exact match with golden reference text '{expected_text}'."
+    elif not detected_text.strip() and expected_text:
+        ocr_part = f"OCR check expected serial text '{expected_text}', but no readable text could be extracted from the label region."
+    else:
+        mismatches_count = len(ocr_mismatches)
+        ocr_part = (
+            f"OCR verification detected serial mismatch. Expected '{expected_text}', but extracted '{detected_text}' "
+            f"({mismatches_count} character difference(s))."
+        )
 
-    # --- Template / sticker check ---
+    # --- 3. Extra findings ---
+    extra_parts = []
     if not temp_found:
-        parts.append(
-            "The system could not find the expected manufacturer logo, QC sticker, or warranty seal "
-            "in its usual location. Missing visual branding elements are commonly associated with "
-            "counterfeit or unauthorized parts."
-        )
+        extra_parts.append("The manufacturer logo / QC sticker was missing from the expected layout position.")
+    if color_sim < 0.80:
+        extra_parts.append(f"Color histogram correlation ({color_sim:.2f}) indicates material or print color deviation.")
 
-    # --- Visual AI note ---
-    if multimodal_report and "no anomalies detected" not in multimodal_report.lower() and "skipped" not in multimodal_report.lower() and "failed" not in multimodal_report.lower():
-        parts.append(
-            "The visual AI inspection also noted physical differences between the part and the golden reference. "
-            f"{multimodal_report}"
-        )
-
-    # --- Conclusion / Action ---
-    action_phrases = {
-        "Quarantine & Escalate": "This part should be quarantined immediately and escalated to the quality team for further investigation.",
-        "Request Vendor Verification": "The system recommends contacting the vendor to verify the authenticity of this component.",
-        "Request Additional Angle": "The system recommends capturing this part from an additional angle to confirm the findings.",
-        "Accept": "This part can be accepted and released into the supply chain.",
-        "Triage Agent requests retake": "The image quality was not sufficient for a reliable decision. A retake with better lighting or focus is recommended.",
-    }
-    conclusion = verdict_lines.get(verdict, (
-        f"Inspection complete with verdict {verdict.upper()} (fraud score: {fraud_score}/100). "
-        f"Recommended action: '{recommended_action}'."
-    ))
-
-    # Include decision agent's reasoning if available
+    # --- 4. Conclusion & Action ---
+    conclusion = (
+        f"Inspection complete with verdict {verdict.upper()} (Fraud Risk Score: {fraud_score}/100). "
+        f"Recommended Action: '{recommended_action}'."
+    )
     if decision_reasoning:
-        reasoning_clause = f" The decision agent further notes: {decision_reasoning}"
+        reasoning_clause = f" Decision Judge Note: {decision_reasoning}."
     else:
         reasoning_clause = ""
 
-    # Include multimodal report if available
     if multimodal_report and "skipped" not in multimodal_report.lower() and "failed" not in multimodal_report.lower() and "no anomalies" not in multimodal_report.lower():
-        visual_clause = f" Visual AI inspection additionally highlights: {multimodal_report}"
+        visual_clause = f" Visual AI Note: {multimodal_report}"
     else:
         visual_clause = ""
 
@@ -228,10 +186,10 @@ def generate_explanation(metrics: dict) -> str:
     all_parts = [heatmap_part, ocr_part] + extra_parts + [conclusion + reasoning_clause + visual_clause]
     detailed_paragraph = " ".join(all_parts)
 
-    # --- Plain-English bullet summary (readable at a glance, ahead of the audit paragraph) ---
+    # --- Plain-English bullet summary ---
     status_map = {
-        "clean": "Clean",
-        "tampered": "Tampered",
+        "clean": "Clean (OEM Verified)",
+        "tampered": "Tampered (Component Swap)",
         "missing": "Defective (Missing Element)",
         "mismatched": "Defective (Label Mismatch)",
         "reused": "Defective (Reused/Worn)",
@@ -246,13 +204,13 @@ def generate_explanation(metrics: dict) -> str:
         visual_finding = f"Major visual differences found ({region_text})."
 
     if not expected_text:
-        serial_check = "Not checked (no expected serial/label text configured for this part)."
+        serial_check = "Not checked (no serial text configured)."
     elif expected_text and detected_text and expected_text == detected_text:
         serial_check = f"Match — expected '{expected_text}', found '{detected_text}'."
     elif not detected_text.strip():
-        serial_check = f"Could not read any label — expected '{expected_text}', label appears blank or unreadable."
+        serial_check = f"Could not read label — expected '{expected_text}'."
     else:
-        serial_check = f"Mismatch — expected '{expected_text}', found '{detected_text}' ({len(ocr_mismatches)} character difference(s))."
+        serial_check = f"Mismatch — expected '{expected_text}', found '{detected_text}' ({len(ocr_mismatches)} character diffs)."
 
     action_item = f"{recommended_action}."
 
@@ -264,6 +222,5 @@ def generate_explanation(metrics: dict) -> str:
     )
 
     explanation_msg = f"{bullet_summary}\n\n{detailed_paragraph}"
-
-    logger.info(f"Local compiled explanation: {explanation_msg[:200]}...")
+    logger.info(f"Local compiled explanation: {explanation_msg[:150]}...")
     return explanation_msg
