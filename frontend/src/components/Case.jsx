@@ -247,7 +247,12 @@ export function ImageComparison({ goldenUrl, uploadedUrl, imageHash }) {
         </div>
 
         <div className="space-y-1">
-          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Unit Under Test</span>
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Unit Under Test</span>
+            <span className="text-[9px] font-bold font-mono px-1.5 py-0.5 rounded bg-rose-500/10 text-rose-500 border border-rose-500/20 uppercase tracking-wider">
+              Defects Marked
+            </span>
+          </div>
           <div
             onClick={() => setZoom("uploaded")}
             className="relative aspect-square rounded-lg bg-slate-950 border border-slate-800 p-2 cursor-pointer group"

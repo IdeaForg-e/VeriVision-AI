@@ -260,6 +260,22 @@ def get_case_detail(
         base_name = os.path.basename(inspection.captured_image_path)
         name_no_ext, ext = os.path.splitext(base_name)
         annotated_path = os.path.join(settings.UPLOAD_DIR, f"{inspection.case_id}_annotated{ext}")
+
+        # Dynamic generation for legacy/existing cases missing the annotated file
+        if not os.path.exists(annotated_path) and os.path.exists(inspection.captured_image_path):
+            try:
+                src_img = cv2.imread(inspection.captured_image_path)
+                ref_path = (product.golden_references[0].image_path if (product and product.golden_references) else None)
+                if src_img is not None and ref_path and os.path.exists(ref_path):
+                    ref_img = cv2.imread(ref_path)
+                    if ref_img is not None:
+                        from app.services.agent_3_detector import compute_ssim_diff
+                        _, _, annotated_target = compute_ssim_diff(src_img, ref_img)
+                        cv2.imwrite(annotated_path, annotated_target)
+                        logger.info(f"Dynamically generated annotated defect scan for case {case_id}")
+            except Exception as e:
+                logger.error(f"Failed to dynamically generate annotated image for case {case_id}: {e}")
+
         if os.path.exists(annotated_path):
             annotated_image_url = f"/data/cases/{inspection.case_id}_annotated{ext}"
             uploaded_image_url = annotated_image_url
