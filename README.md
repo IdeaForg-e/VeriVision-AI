@@ -181,24 +181,25 @@ flowchart TB
 
 | Layer / Category | Technology | Version / Spec | Purpose & Role |
 |:---|:---|:---|:---|
-| **Frontend Framework** | React 18 | `18.3.1` | Modern component-based Single Page Application (SPA) |
-| **Frontend Build Tool** | Vite | `5.2.0` | Lightning-fast development server with Hot Module Replacement (HMR) |
-| **Styling & Theme** | Tailwind CSS | `3.4.3` | Utility-first styling with custom dark/light mode theme tokens |
-| **UI Components & Icons** | Lucide React | `0.344.0` | Industrial QA icon set for audit status & navigation |
-| **Data Visualization** | Recharts | `3.9.2` | Interactive charts for vendor risk, site breakdown, and monthly fraud trends |
-| **Routing & Protection** | React Router | `6.22.3` | Declarative client-side routing with role-based `ProtectedRoute` guards |
-| **Backend API Gateway** | FastAPI | `0.100.0+` | High-performance asynchronous REST API framework |
-| **Server ASGI** | Uvicorn | `0.22.0+` | ASGI web server running the backend API endpoints |
-| **Agentic Workflow** | LangGraph | `0.0.1+` | Directed acyclic graph orchestrating the 5 autonomous AI agents |
-| **Deep Learning & Neural Vector** | PyTorch & Open_CLIP | `torch 2.0+`, `ViT-B/32` | Extracts 512-dimensional visual embeddings for sub-10ms similarity matching |
-| **Computer Vision Engine** | OpenCV | `4.7.0+` | Homography image registration, Laplacian blur check, and heatmap overlays |
-| **Structural Metrics** | scikit-image | `0.20.0+` | Structural Similarity Index (SSIM) pixel delta matrix calculation |
-| **Text Extraction (OCR)** | EasyOCR | `1.7.0+` | Optical Character Recognition for serial numbers & character diffs |
-| **Multimodal Vision & LLM** | OpenRouter API | REST Endpoint | Multimodal visual comparison & audit-ready natural language explanations |
-| **PDF Report Generator** | ReportLab | `4.0.0+` | Generates laboratory compliance PDF certificates with embedded heatmaps |
-| **Database Engine** | SQLite | SQLite 3 | Embedded relational database storing cases, products, and audit trails |
-| **Database ORM** | SQLAlchemy | `2.0.0+` | Python ORM with 7 relational tables and session management |
-| **Security & Auth** | Passlib & PyJWT | `python-jose 3.3+` | JWT token authentication with bcrypt password encryption |
+| **Frontend Framework** | ![React](https://img.shields.io/badge/-React_18-61DAFB?style=flat-square&logo=react&logoColor=black) | `18.3.1` | Modern component-based Single Page Application (SPA) |
+| **Frontend Build Tool** | ![Vite](https://img.shields.io/badge/-Vite_5-646CFF?style=flat-square&logo=vite&logoColor=white) | `5.2.0` | Lightning-fast development server with Hot Module Replacement (HMR) |
+| **Styling & Theme** | ![Tailwind CSS](https://img.shields.io/badge/-Tailwind_CSS_v3-06B6D4?style=flat-square&logo=tailwindcss&logoColor=white) | `3.4.3` | Utility-first styling with custom dark/light mode theme tokens |
+| **UI Components & Icons** | ![Lucide](https://img.shields.io/badge/-Lucide_Icons-F56565?style=flat-square&logo=lucide&logoColor=white) | `0.344.0` | Industrial QA icon set for audit status & navigation |
+| **Data Visualization** | ![Recharts](https://img.shields.io/badge/-Recharts_v3-22B5BF?style=flat-square&logo=chartdotjs&logoColor=white) | `3.9.2` | Interactive charts for vendor risk, site breakdown, and monthly fraud trends |
+| **Routing & Protection** | ![React Router](https://img.shields.io/badge/-React_Router_v6-CA4245?style=flat-square&logo=reactrouter&logoColor=white) | `6.22.3` | Declarative client-side routing with role-based `ProtectedRoute` guards |
+| **Backend API Gateway** | ![FastAPI](https://img.shields.io/badge/-FastAPI-009688?style=flat-square&logo=fastapi&logoColor=white) | `0.100.0+` | High-performance asynchronous REST API framework |
+| **Server ASGI** | ![Uvicorn](https://img.shields.io/badge/-Uvicorn-499848?style=flat-square&logo=python&logoColor=white) | `0.22.0+` | ASGI web server running the backend API endpoints |
+| **Agentic Workflow** | ![LangGraph](https://img.shields.io/badge/-LangGraph_StateGraph-FF4081?style=flat-square&logo=diagramsdotnet&logoColor=white) | `0.0.1+` | Directed acyclic graph orchestrating the 5 autonomous AI agents |
+| **Deep Learning Engine** | ![PyTorch](https://img.shields.io/badge/-PyTorch_v2-EE4C2C?style=flat-square&logo=pytorch&logoColor=white) | `torch 2.0+` | Deep learning execution framework for neural visual embeddings |
+| **Neural Vector Search** | ![CLIP](https://img.shields.io/badge/-Open__CLIP_ViT--B/32-FF6F00?style=flat-square&logo=openai&logoColor=white) | `ViT-B/32` | Extracts 512-dimensional visual embeddings for sub-10ms similarity matching |
+| **Computer Vision Engine** | ![OpenCV](https://img.shields.io/badge/-OpenCV_4-5C3EE8?style=flat-square&logo=opencv&logoColor=white) | `4.7.0+` | Homography image registration, Laplacian blur check, and heatmap overlays |
+| **Structural Metrics** | ![scikit-image](https://img.shields.io/badge/-scikit--image-3776AB?style=flat-square&logo=scikitlearn&logoColor=white) | `0.20.0+` | Structural Similarity Index (SSIM) pixel delta matrix calculation |
+| **Text Extraction (OCR)** | ![EasyOCR](https://img.shields.io/badge/-EasyOCR-00C853?style=flat-square&logo=googlecloud&logoColor=white) | `1.7.0+` | Optical Character Recognition for serial numbers & character diffs |
+| **Multimodal Vision & LLM** | ![OpenRouter](https://img.shields.io/badge/-OpenRouter_Vision_LLM-7C3AED?style=flat-square&logo=openai&logoColor=white) | REST Endpoint | Multimodal visual comparison & audit-ready natural language explanations |
+| **PDF Report Generator** | ![ReportLab](https://img.shields.io/badge/-ReportLab_PDF-E11D48?style=flat-square&logo=adobeacrobatreader&logoColor=white) | `4.0.0+` | Generates laboratory compliance PDF certificates with embedded heatmaps |
+| **Database Engine** | ![SQLite](https://img.shields.io/badge/-SQLite_3-003B57?style=flat-square&logo=sqlite&logoColor=white) | SQLite 3 | Embedded relational database storing cases, products, and audit trails |
+| **Database ORM** | ![SQLAlchemy](https://img.shields.io/badge/-SQLAlchemy_2-D71F00?style=flat-square&logo=sqlalchemy&logoColor=white) | `2.0.0+` | Python ORM with 7 relational tables and session management |
+| **Security & Auth** | ![JWT Auth](https://img.shields.io/badge/-JWT_&_Bcrypt-000000?style=flat-square&logo=jsonwebtokens&logoColor=white) | `python-jose 3.3+` | JWT token authentication with bcrypt password encryption |
 
 ---
 
