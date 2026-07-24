@@ -173,17 +173,21 @@ def seed():
                 "expected_serial": part_num
             })
 
-        # Purge all old catalog products and references for a 100% clean sync with Golden_Images folder
+        # Only purge products that NO LONGER exist in the Golden_Images folder
+        # (to handle case where someone removed a reference image file)
+        # This preserves existing products AND their associated inspections!
+        existing_part_numbers = {p["part_number"] for p in catalog_products}
         old_products = db.query(models.Product).all()
         for old_prod in old_products:
-            print(f"  [SYNC PURGE] Removing old catalog entry '{old_prod.part_number}'")
-            insps = db.query(models.Inspection).filter(models.Inspection.product_id == old_prod.id).all()
-            for insp in insps:
-                db.query(models.InspectionResult).filter(models.InspectionResult.inspection_id == insp.id).delete()
-                db.query(models.AuditLog).filter(models.AuditLog.inspection_id == insp.id).delete()
-                db.delete(insp)
-            db.query(models.GoldenReference).filter(models.GoldenReference.product_id == old_prod.id).delete()
-            db.delete(old_prod)
+            if old_prod.part_number not in existing_part_numbers:
+                print(f"  [SYNC PURGE] Removing stale catalog entry '{old_prod.part_number}' (no longer in Golden_Images)")
+                insps = db.query(models.Inspection).filter(models.Inspection.product_id == old_prod.id).all()
+                for insp in insps:
+                    db.query(models.InspectionResult).filter(models.InspectionResult.inspection_id == insp.id).delete()
+                    db.query(models.AuditLog).filter(models.AuditLog.inspection_id == insp.id).delete()
+                    db.delete(insp)
+                db.query(models.GoldenReference).filter(models.GoldenReference.product_id == old_prod.id).delete()
+                db.delete(old_prod)
         db.commit()
 
         created_prod = 0

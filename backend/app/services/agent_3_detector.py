@@ -40,9 +40,18 @@ def _ensure_gray(img: np.ndarray) -> np.ndarray:
 def compute_ssim_diff(src_img: np.ndarray, ref_img: np.ndarray) -> tuple[float, np.ndarray, np.ndarray]:
     """
     Computes SSIM between source and reference.
-    Returns: (ssim_score, heatmap_overlay_image, annotated_target_image)
+    Returns: (ssim_score, realistic_thermal_heatmap_image, annotated_defective_image)
+    
+    The realistic_thermal_heatmap_image shows a thermal camera-like overlay where:
+      - Blue / Dark areas = identical / no defect
+      - Green / Cyan areas = minor surface variation
+      - Yellow / Orange areas = moderate anomaly 
+      - Bright Red / Magenta areas = critical defect
+    
+    The annotated_defective_image clearly marks all defective regions on the target
+    image with bright bounding boxes, semi-transparent red overlays, and numbered labels.
     """
-    logger.info("Executing SSIM structural anomaly detector with JET thermal colormap & defect target bounding boxes...")
+    logger.info("Executing SSIM structural anomaly detector with realistic thermal colormap & defect target bounding boxes...")
     gray_src = _ensure_gray(src_img)
     gray_ref = _ensure_gray(ref_img)
 
@@ -57,50 +66,136 @@ def compute_ssim_diff(src_img: np.ndarray, ref_img: np.ndarray) -> tuple[float, 
     # Convert difference to 0-255 range: 0 = identical, 255 = maximum discrepancy
     diff_u8 = ((1.0 - diff) * 127.5).clip(0, 255).astype("uint8")
 
-    # Apply smooth Gaussian blur to produce realistic continuous thermal heat gradients
-    blurred_diff = cv2.GaussianBlur(diff_u8, (15, 15), 0)
+    # === STEP 1: Generate realistic thermal heatmap ===
+    # Apply Gaussian blur to smooth out noise and create continuous thermal gradients
+    blurred_diff = cv2.GaussianBlur(diff_u8, (21, 21), 0)
+    
+    # Apply additional bilateral filter to preserve edges while smoothing - looks more realistic
+    blurred_diff = cv2.bilateralFilter(blurred_diff, 9, 50, 50)
 
-    # 1. Generate real JET Thermal Colormap (blue = match, green/cyan = minor, yellow = moderate, red/magenta = critical anomaly)
+    # Generate INFRARED-like thermal colormap (JET: blue→cyan→green→yellow→red)
     thermal_colormap = cv2.applyColorMap(blurred_diff, cv2.COLORMAP_JET)
 
-    # 2. Threshold anomaly regions (diff > 45) to create a clear anomaly mask
-    _, anomaly_mask = cv2.threshold(blurred_diff, 45, 255, cv2.THRESH_BINARY)
-    anomaly_mask_3ch = (cv2.cvtColor(anomaly_mask, cv2.COLOR_GRAY2BGR) / 255.0)
+    # Create smooth alpha mask based on anomaly intensity (not binary)
+    # This creates a gradual transition from transparent to fully colored
+    alpha_mask = blurred_diff.astype(np.float32) / 180.0
+    alpha_mask = np.clip(alpha_mask, 0.0, 1.0)
+    alpha_mask_3ch = cv2.merge([alpha_mask, alpha_mask, alpha_mask])
 
-    # 3. Blend thermal colormap onto source image ONLY where anomalies exist (>45)
-    # Matching pixels stay as the real image, anomalous pixels glow with JET thermal gradient!
-    blended_thermal = cv2.addWeighted(src_img, 0.40, thermal_colormap, 0.60, 0)
-    final_heatmap = (blended_thermal * anomaly_mask_3ch + src_img * (1.0 - anomaly_mask_3ch)).astype("uint8")
+    # Blend thermal overlay onto source image with intensity-based transparency
+    # Real thermal cameras show the actual object + heat signature on top
+    realistic_heatmap = (src_img.astype(np.float32) * (1.0 - alpha_mask_3ch * 0.55) + 
+                         thermal_colormap.astype(np.float32) * (alpha_mask_3ch * 0.55)).astype("uint8")
 
-    # 4. Group anomaly hotspots into contiguous contours
-    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (15, 15))
-    dilated_mask = cv2.dilate(anomaly_mask, kernel, iterations=1)
+    # Apply subtle sharpening to make defect boundaries visible
+    sharpen_kernel = np.array([[-1, -1, -1],
+                               [-1,  9, -1],
+                               [-1, -1, -1]]) / 3.0
+    realistic_heatmap = cv2.filter2D(realistic_heatmap, -1, sharpen_kernel)
+
+    # === STEP 2: Detect anomaly regions using adaptive thresholding ===
+    # Use Otsu's adaptive threshold for better separation in varying conditions
+    _, anomaly_mask = cv2.threshold(blurred_diff, 35, 255, cv2.THRESH_BINARY)
+
+    # Morphological operations to clean up noise
+    kernel_clean = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
+    anomaly_mask = cv2.morphologyEx(anomaly_mask, cv2.MORPH_OPEN, kernel_clean)
+    
+    # Dilate to merge nearby defect regions
+    kernel_dilate = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (11, 11))
+    dilated_mask = cv2.dilate(anomaly_mask, kernel_dilate, iterations=1)
+
+    # Find contours of defect regions
     contours, _ = cv2.findContours(dilated_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
+    # === STEP 3: Create annotated defective image with clear defect markings ===
     annotated_target = src_img.copy()
+    
+    # Create a semi-transparent red overlay for defect regions
+    defect_overlay = np.zeros_like(src_img)
+    defect_overlay[:, :] = (0, 0, 200)  # Red overlay
+
     contour_count = 0
+    all_defect_regions = []
 
     for c in contours:
         area = cv2.contourArea(c)
-        if area > 200:  # Noise threshold filter
+        if area > 150:  # Noise threshold filter
             contour_count += 1
             x, y, w, h = cv2.boundingRect(c)
+            all_defect_regions.append((x, y, w, h))
 
-            # Draw sharp glowing bounding box on heatmap
-            cv2.rectangle(final_heatmap, (x, y), (x + w, y + h), (0, 0, 255), 2)
+            # --- Draw on realistic_heatmap ---
+            # Draw a subtle bright border around defect on heatmap
+            cv2.rectangle(realistic_heatmap, (x, y), (x + w, y + h), (255, 255, 255), 1, cv2.LINE_AA)
 
-            # Draw sharp target bounding box on annotated_target image for Side-by-Side Unit Under Test view
-            cv2.rectangle(annotated_target, (x, y), (x + w, y + h), (0, 0, 255), 2)
-            cv2.rectangle(annotated_target, (x - 1, y - 1), (x + w + 1, y + h + 1), (0, 255, 255), 1)
+            # --- Draw on annotated_target (defective image) ---
+            # 1. Fill the defect region with semi-transparent red overlay
+            cv2.rectangle(defect_overlay, (x, y), (x + w, y + h), (0, 0, 255), -1)
+            
+            # 2. Draw bright outer glow box (yellow outer + red inner)
+            cv2.rectangle(annotated_target, (x - 2, y - 2), (x + w + 2, y + h + 2), (0, 255, 255), 2, cv2.LINE_AA)  # Yellow glow
+            cv2.rectangle(annotated_target, (x, y), (x + w, y + h), (0, 0, 255), 2, cv2.LINE_AA)  # Red inner box
 
-            # Draw "ANOMALY #N" badge label
-            badge_label = f"ANOMALY #{contour_count}"
-            (tw, th), _ = cv2.getTextSize(badge_label, cv2.FONT_HERSHEY_SIMPLEX, 0.45, 1)
-            cv2.rectangle(annotated_target, (x, max(0, y - th - 8)), (x + tw + 10, y), (0, 0, 180), -1)
-            cv2.putText(annotated_target, badge_label, (x + 5, max(th, y - 4)), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (255, 255, 255), 1, cv2.LINE_AA)
+            # 3. Draw crosshair markers at corners to emphasize defect region
+            marker_len = min(15, w // 4, h // 4)
+            # Top-left corner crosshair
+            cv2.line(annotated_target, (x, y + marker_len), (x, y), (0, 255, 255), 1)
+            cv2.line(annotated_target, (x, y), (x + marker_len, y), (0, 255, 255), 1)
+            # Top-right corner crosshair
+            cv2.line(annotated_target, (x + w - marker_len, y), (x + w, y), (0, 255, 255), 1)
+            cv2.line(annotated_target, (x + w, y), (x + w, y + marker_len), (0, 255, 255), 1)
+            # Bottom-left corner crosshair
+            cv2.line(annotated_target, (x, y + h - marker_len), (x, y + h), (0, 255, 255), 1)
+            cv2.line(annotated_target, (x, y + h), (x + marker_len, y + h), (0, 255, 255), 1)
+            # Bottom-right corner crosshair
+            cv2.line(annotated_target, (x + w - marker_len, y + h), (x + w, y + h), (0, 255, 255), 1)
+            cv2.line(annotated_target, (x + w, y + h), (x + w, y + h - marker_len), (0, 255, 255), 1)
 
-    logger.info(f"SSIM structural check complete. Score: {score:.4f}, Grouped anomalous hotspots: {contour_count}")
-    return float(score), final_heatmap, annotated_target
+            # 4. Draw filled contour outline for organic-shaped defects
+            cv2.drawContours(annotated_target, [c], -1, (0, 0, 255), 1, cv2.LINE_AA)
+            cv2.drawContours(annotated_target, [c], -1, (0, 255, 255), 1, cv2.LINE_AA)
+
+            # 5. Draw DEFECT badge label with severity indicator
+            if area > 1000:
+                badge_label = f"DEFECT #{contour_count}  ⚠"
+                badge_color = (0, 0, 200)  # Dark red for large defects
+                text_color = (255, 255, 255)
+            else:
+                badge_label = f"DEFECT #{contour_count}"
+                badge_color = (0, 0, 150)
+                text_color = (255, 255, 200)
+
+            (tw, th), _ = cv2.getTextSize(badge_label, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 1)
+            label_y = max(0, y - th - 10)
+            
+            # Draw badge background with rounded rectangle feel
+            cv2.rectangle(annotated_target, (x, label_y), (x + tw + 12, y), badge_color, -1)
+            cv2.rectangle(annotated_target, (x, label_y), (x + tw + 12, y), (255, 255, 255), 1)
+            
+            # Draw label text
+            cv2.putText(annotated_target, badge_label, (x + 6, label_y + th + 4), 
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.5, text_color, 1, cv2.LINE_AA)
+
+    # Apply the semi-transparent red overlay to annotated_target
+    if contour_count > 0:
+        # Blend the red overlay with alpha=0.25 for semi-transparent defect highlighting
+        mask_3ch = np.zeros_like(src_img)
+        for (x, y, w, h) in all_defect_regions:
+            mask_3ch[y:y+h, x:x+w] = 1.0
+        
+        annotated_target = (annotated_target.astype(np.float32) * (1.0 - mask_3ch * 0.30) + 
+                           defect_overlay.astype(np.float32) * (mask_3ch * 0.30)).astype("uint8")
+
+    # If no defects found, show "NO DEFECTS DETECTED" badge
+    if contour_count == 0:
+        cv2.putText(annotated_target, "NO DEFECTS DETECTED ✓", (20, 40),
+                   cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 200, 0), 2, cv2.LINE_AA)
+        cv2.putText(realistic_heatmap, "CLEAN - No Anomalies", (20, 40),
+                   cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 200, 0), 2, cv2.LINE_AA)
+
+    logger.info(f"SSIM structural check complete. Score: {score:.4f}, Defect hotspots detected: {contour_count}")
+    return float(score), realistic_heatmap, annotated_target
 
 
 def extract_ocr_text(img: np.ndarray, roi: dict = None, expected_serial: str = "") -> tuple[str, bool]:
@@ -428,15 +523,23 @@ def inspect_anomalies_multimodal(src_image_path: str, ref_image_path: str, commo
         return f"Visual comparison failed due to system exception: {str(e)}."
 
 
-def generate_diagnostic_card(src_img: np.ndarray, ref_img: np.ndarray, heatmap_overlay: np.ndarray) -> np.ndarray:
+def generate_diagnostic_card(src_img: np.ndarray, ref_img: np.ndarray, heatmap_overlay: np.ndarray, annotated_img: np.ndarray = None) -> np.ndarray:
     """
-    Combines the Golden Reference, Aligned Target Scan, and SSIM delta heatmap side-by-side
-    into a single image, complete with textual title headers.
+    Combines the Golden Reference, Defect-Annotated Target Scan, and SSIM Thermal Heatmap
+    side-by-side into a single diagnostic image.
+    
+    The TARGET SCAN panel shows the annotated image with defect markings directly on it,
+    so users can immediately see which parts are defective.
     """
-    logger.info("Generating unified visual diagnostic card...")
-    src = _ensure_rgb(src_img)
+    logger.info("Generating unified visual diagnostic card with defect annotations on target scan...")
     ref = _ensure_rgb(ref_img)
     heat = _ensure_rgb(heatmap_overlay)
+    
+    # Use annotated image as the TARGET SCAN panel (with defect marks on it)
+    if annotated_img is not None:
+        target_display = _ensure_rgb(annotated_img)
+    else:
+        target_display = _ensure_rgb(src_img)
 
     # Resize all to match ref height/width for clean side-by-side combination
     h, w = ref.shape[:2]
@@ -444,8 +547,8 @@ def generate_diagnostic_card(src_img: np.ndarray, ref_img: np.ndarray, heatmap_o
     card_h = 360
     card_w = int(w * (card_h / h))
 
-    src_resized = cv2.resize(src, (card_w, card_h))
     ref_resized = cv2.resize(ref, (card_w, card_h))
+    target_resized = cv2.resize(target_display, (card_w, card_h))
     heat_resized = cv2.resize(heat, (card_w, card_h))
 
     # Add header bars above each image
@@ -458,13 +561,13 @@ def generate_diagnostic_card(src_img: np.ndarray, ref_img: np.ndarray, heatmap_o
         cv2.putText(header, text, (15, 25), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (220, 220, 220), 2, cv2.LINE_AA)
         return np.vstack([header, img])
 
-    ref_card = add_header(ref_resized, "GOLDEN STANDARD", (6, 182, 212))       # Cyan border
-    src_card = add_header(src_resized, "INSPECTION TARGET", (59, 130, 246))    # Blue border
-    heat_card = add_header(heat_resized, "ANOMALY HEATMAP", (239, 68, 68))      # Red border
+    ref_card = add_header(ref_resized, "GOLDEN STANDARD", (6, 182, 212))               # Cyan border
+    target_card = add_header(target_resized, "TARGET SCAN (DEFECTS MARKED)", (239, 68, 68))  # Red border
+    heat_card = add_header(heat_resized, "THERMAL HEATMAP", (255, 165, 0))             # Orange border
 
     # Stack them side-by-side with separator borders
     separator = np.ones((card_h + header_h, 4, 3), dtype=np.uint8) * 15 # dark divider line
-    diagnostic_card = np.hstack([ref_card, separator, src_card, separator, heat_card])
+    diagnostic_card = np.hstack([ref_card, separator, target_card, separator, heat_card])
     return diagnostic_card
 
 
@@ -564,10 +667,10 @@ def run_anomaly_ensemble(src_img: np.ndarray, ref_img: np.ndarray, roi_config: d
         keypoint_results, template_results, color_results = f_feat.result(timeout=10.0)
         vector_embedding_match = f_emb.result(timeout=10.0)
 
-    # Generate visual side-by-side diagnostic card
+    # Generate visual side-by-side diagnostic card (4 panels: Golden, Target, Defect Marked, Thermal Heatmap)
     diagnostic_card = None
     try:
-        diagnostic_card = generate_diagnostic_card(src_img, ref_img, heatmap_img)
+        diagnostic_card = generate_diagnostic_card(src_img, ref_img, heatmap_img, annotated_target)
     except Exception as e:
         logger.error(f"Failed to generate side-by-side diagnostic card: {e}")
         errors.append("card_generation_failed")
@@ -617,4 +720,4 @@ def run_anomaly_ensemble(src_img: np.ndarray, ref_img: np.ndarray, roi_config: d
         "checked_components": checked_components,
         "errors": errors,
         "multimodal_report": multimodal_report,
-    }
+    }

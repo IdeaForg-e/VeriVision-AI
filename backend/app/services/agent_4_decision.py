@@ -9,19 +9,16 @@ VALID_ACTIONS = {
     "Request Vendor Verification",
     "Request Additional Angle",
 }
+
 def make_decision(ensemble_results: dict) -> dict:
     """
+    Agent 4: Decision & Fusion Judge.
     Evaluates evidence from Vision Layer and computes the final verdict,
     fraud score (0-100), confidence level, and recommended action.
 
-    Uses deterministic, evidence-based rules.  A language model must not
-    assign a risk score: its output can vary for identical detector evidence
-    and cannot be allowed to override measured image comparisons.
-
-    Output keys are unchanged from the original contract (fraud_score, verdict,
-    confidence, recommended_action) plus one new, additive key: "reasoning" —
-    a short, grounded justification string that Agent 5 (Explainer) consumes so
-    both agents stay consistent with each other.
+    Uses deterministic rule-based scoring. Each detection result is evaluated
+    in priority order: Missing label > Tampered (swap) > Mismatched (OCR) >
+    Non-OEM label > Reused board > Clean.
     """
     try:
         from app.routers.triage import _PIPELINE_CONFIG
@@ -30,7 +27,6 @@ def make_decision(ensemble_results: dict) -> dict:
         thresholds = {}
 
     ssim_target = thresholds.get("ssim", 0.85)
-    keypoint_delta = thresholds.get("keypointDeltaPct", 15)
     ocr_fuzzy = thresholds.get("ocrFuzzyPct", 100)
 
     ssim = ensemble_results.get("ssim_score", 1.0)
@@ -47,137 +43,181 @@ def make_decision(ensemble_results: dict) -> dict:
     source_reference_identical = bool(ensemble_results.get("source_reference_identical", False))
 
     logger.info(
-        f"Make Decision called with metrics: SSIM={ssim:.3f}, OCR Sim={ocr_sim:.2f}, "
-        f"Mismatches={len(ocr_mismatches)}, Keypoints Rate={kp_ratio:.3f}, "
-        f"Template Found={temp_found} ({temp_score:.2f}), Color Hist={color_sim:.3f}, Vector Embedding Match={vec_match:.1f}%"
-    )
-    logger.info(
-        f"Tuning Panel Calibration Target Values: SSIM={ssim_target:.2f}, "
-        f"Keypoint Delta={keypoint_delta}%, OCR Fuzzy Strictness={ocr_fuzzy}%"
+        f"[Agent 4] Decision inputs: SSIM={ssim:.3f}, OCR Sim={ocr_sim:.2f}, "
+        f"Mismatches={len(ocr_mismatches)}, Keypoints={kp_ratio:.3f}, "
+        f"Template Found={temp_found} ({temp_score:.2f}), Color={color_sim:.3f}, Vector Match={vec_match:.1f}%"
     )
 
-    # This is an invariant, not a heuristic: the same decoded image as the
-    # approved reference has no visual fraud evidence.  It also prevents a
-    # bad catalog serial or an OCR read error from falsely rejecting it.
+    # Invariant: pixel-identical upload = no fraud
     if source_reference_identical:
-        logger.info("Decision invariant: upload pixels exactly match the golden reference; assigning zero risk.")
+        logger.info("[Agent 4] Pixel-identical to golden reference. Verdict: CLEAN.")
         return {
             "fraud_score": 0,
             "verdict": "clean",
+            "category": "Clean (OEM Verified)",
             "confidence": 1.0,
             "recommended_action": "Accept",
-            "reasoning": "The uploaded image is pixel-identical to the approved golden reference.",
+            "reasoning": "The uploaded image is pixel-identical to the approved golden reference. No fraud indicators detected.",
         }
 
-    # Deterministic rule-based scoring matrix.
-    logger.info("Executing local mathematical fallback scoring matrix...")
+    # --- COMPUTE LOSSES ---
     ssim_loss = max(0.0, 1.0 - ssim)
     ocr_loss = max(0.0, 1.0 - ocr_sim)
     kp_loss = abs(1.0 - kp_ratio)
     color_loss = max(0.0, 1.0 - color_sim)
     vec_loss = max(0.0, (100.0 - vec_match) / 100.0)
     template_loss = 0.0 if temp_found else 1.0
+    # OCR mismatch severity: count how many characters are different
+    ocr_mismatch_count = len(ocr_mismatches)
+    has_ocr_mismatch = ocr_mismatch_count > 0 and (ocr_sim * 100) < ocr_fuzzy
 
-    # Weights: SSIM = 35%, OCR = 20%, Vector Embedding = 15%, Keypoints = 15%, Template/Logo = 10%, Color = 5%
-    weighted_score = (ssim_loss * 35) + (ocr_loss * 20) + (vec_loss * 15) + (min(kp_loss, 1.0) * 15) + (template_loss * 10) + (color_loss * 5)
-    fraud_score = int(min(max(weighted_score * 1.5, 0.0), 100.0))
-    logger.info(
-        f"Local calculated losses - SSIM: {ssim_loss:.3f}, OCR: {ocr_loss:.3f}, Vector: {vec_loss:.3f}, Keypoints: {kp_loss:.3f}, "
-        f"Template: {template_loss:.1f}, Color: {color_loss:.3f}. Weighted Score: {weighted_score:.2f} -> Fraud Score: {fraud_score}"
-    )
+    # --- DETERMINE VERDICT (Priority order: Most Severe → Least Severe) ---
 
     category = "Clean (OEM Verified)"
     verdict = "clean"
     recommended_action = "Accept"
     confidence = 0.90
+    fraud_score = 0
     reason_note = "All measured optical and character features fall within OEM tolerance."
 
-    # 1. Missing QC label: Golden shows sticker at known location; defective image has blank region there
+    # 1. MISSING QC LABEL → Template match failed
     if not temp_found:
         category = "Missing QC label"
         verdict = "missing"
         recommended_action = "Quarantine & Escalate"
         confidence = 0.98
-        reason_note = "Missing QC label: Golden reference shows sticker at known location, but defective image has blank region."
-        logger.info(f"Local Decision: Missing QC label. Verdict forced to {verdict.upper()}.")
+        fraud_score = 70
+        reason_note = (
+            f"MISSING QC LABEL: Golden reference shows {temp_score:.0%} template match in expected location, "
+            f"but defective image has blank region. Template score: {temp_score:.2f}. "
+            f"QC/security sticker appears to be removed or missing."
+        )
+        logger.info(f"[Agent 4] Decision: MISSING QC LABEL → Quarantine. Fraud Score: {fraud_score}")
 
-    # 2. Swap detection: Keypoint mismatch suggests a different component installed
-    elif kp_loss > 0.25:
+    # 2. TAMPERED / SWAP DETECTION → Keypoints don't match (different component)
+    elif kp_loss > 0.30:
         category = "Swap detection"
         verdict = "tampered"
         recommended_action = "Quarantine & Escalate"
         confidence = 0.95
-        reason_note = f"Swap detection: Keypoint mismatch (rate={kp_ratio:.2f}) suggests a different component is installed."
-        logger.info(f"Local Decision: Swap detection triggered. Verdict set to {verdict.upper()}.")
+        fraud_score = 75
+        reason_note = (
+            f"SWAP DETECTION: Keypoint mismatch (match rate={kp_ratio:.2f}) suggests a DIFFERENT COMPONENT is installed. "
+            f"Only {kp_ratio:.1%} of visual features match the golden reference. "
+            f"This indicates the part has been swapped with a non-OEM component."
+        )
+        logger.info(f"[Agent 4] Decision: SWAP DETECTION → Quarantine. Fraud Score: {fraud_score}")
 
-    # 3. Altered serial number: OCR diff on warranty or rev field — e.g., '0' changed to 'O'
-    elif len(ocr_mismatches) > 0 and (ocr_sim * 100) < ocr_fuzzy:
+    # 3. ALTERED SERIAL NUMBER → OCR mismatch detected
+    elif has_ocr_mismatch:
         category = "Altered serial number"
         verdict = "mismatched"
         recommended_action = "Escalate with evidence"
         confidence = 0.95
-        reason_note = f"Altered serial number: OCR diff on warranty/rev field — e.g. detected '{detected_text}' vs expected '{expected_text}'."
-        logger.info("Local Decision: Altered serial number detected. Action set to Escalate with evidence.")
+        fraud_score = 50
+        # Build character-level diff description
+        mismatch_details = "; ".join(
+            [f"pos {m['position']}: expected '{m['expected']}' got '{m['detected']}'" for m in ocr_mismatches[:5]]
+        )
+        reason_note = (
+            f"ALTERED SERIAL NUMBER: OCR text mismatch detected ({ocr_mismatch_count} character differences). "
+            f"Expected: '{expected_text}', Detected: '{detected_text}'. "
+            f"Character-level diffs: [{mismatch_details}]. "
+            f"Likely tampered with alphanumeric alterations (e.g., '0'→'O', '1'→'I')."
+        )
+        logger.info(f"[Agent 4] Decision: ALTERED SERIAL NUMBER → Escalate. Fraud Score: {fraud_score}")
 
-    # 4. Non-OEM label: Label hue/font differs from golden despite correct serial text
+    # 4. NON-OEM LABEL → Color histogram mismatch despite correct text
     elif color_loss > 0.35:
         category = "Non-OEM label"
         verdict = "mismatched"
         recommended_action = "Escalate to vendor"
         confidence = 0.85
-        reason_note = f"Non-OEM label: Label hue/font color spectrum ({color_sim:.2f}) differs from golden reference."
-        logger.info(f"Local Decision: Non-OEM label detected. Action set to Escalate to vendor.")
+        fraud_score = 40
+        reason_note = (
+            f"NON-OEM LABEL: Color histogram similarity ({color_sim:.2f}) indicates "
+            f"label hue/font/material differs from golden reference. "
+            f"Despite correct serial number format, the label stock or printing process is non-original."
+        )
+        logger.info(f"[Agent 4] Decision: NON-OEM LABEL → Escalate to vendor. Fraud Score: {fraud_score}")
 
-    # 5. Reused board: Layout matches golden but tamper tape is broken and residue is visible
-    elif ssim_loss > (1.0 - ssim_target):
+    # 5. REUSED BOARD → SSIM structural diff with good keypoints (layout matches but wear visible)
+    elif ssim_loss > 0.15:  # SSIM < 0.85
         category = "Reused board"
         verdict = "reused"
         recommended_action = "Request additional angle"
-        confidence = 0.85
-        reason_note = f"Reused board: Layout matches golden but tamper tape/wear residue is visible (SSIM={ssim:.2f})."
-        logger.info(f"Local Decision: Reused board detected. Action set to Request additional angle.")
+        confidence = 0.80
+        fraud_score = 35
+        reason_note = (
+            f"REUSED BOARD: Layout structure matches golden (keypoints={kp_ratio:.2f}) but "
+            f"SSIM score ({ssim:.2f}) detects surface wear, residue, or minor physical differences. "
+            f"This suggests the component was previously used and returned as new."
+        )
+        logger.info(f"[Agent 4] Decision: REUSED BOARD → Request additional angle. Fraud Score: {fraud_score}")
 
-    # 6. False alarm (lighting): SSIM hotspots caused by exposure differences, not actual tampering
+    # 6. FALSE ALARM / LIGHTING ISSUE → SSIM below target but no other indicators
     elif ssim < ssim_target:
         category = "False alarm (lighting)"
         verdict = "clean"
         recommended_action = "Triage Agent requests retake"
         confidence = 0.60
-        reason_note = f"False alarm (lighting): SSIM hotspots ({ssim:.2f}) caused by exposure differences, not actual tampering."
-        logger.info(f"Local Decision: False alarm (lighting). Triage Agent requests retake.")
+        fraud_score = 15
+        reason_note = (
+            f"FALSE ALARM (LIGHTING): SSIM score ({ssim:.2f}) is below threshold ({ssim_target:.2f}) "
+            f"but no other fraud indicators detected (OCR={ocr_sim:.2f}, keypoints={kp_ratio:.2f}). "
+            f"Anomaly hotspots likely caused by lighting/exposure differences, not actual tampering. "
+            f"Recommending retake with improved lighting for confirmation."
+        )
+        logger.info(f"[Agent 4] Decision: FALSE ALARM (lighting) → Retake requested. Fraud Score: {fraud_score}")
 
-    # Multimodal vision report integration
+    # --- MULTIMODAL VISION INTEGRATION ---
     multimodal_report = ensemble_results.get("multimodal_report", "")
     if multimodal_report and "visual comparison failed" not in multimodal_report.lower() and "visual comparison skipped" not in multimodal_report.lower():
         if "no anomalies detected" in multimodal_report.lower():
-            logger.info("Multimodal Vision check confirmed: No anomalies detected.")
+            logger.info("[Agent 4] Multimodal Vision confirmed: No anomalies.")
             if verdict == "clean":
-                confidence = min(1.0, confidence + 0.05)
+                confidence = min(1.0, confidence + 0.08)
+                fraud_score = max(0, fraud_score - 5)
         else:
-            logger.info(f"Multimodal Vision check flagged defects: {multimodal_report}")
+            logger.info(f"[Agent 4] Multimodal Vision flagged: {multimodal_report[:100]}...")
+            # Escalate verdict if multimodal found something
             if verdict == "clean":
-                category = "Reused board"
+                category = "AI-flagged defect"
                 verdict = "reused"
                 recommended_action = "Request additional angle"
                 confidence = 0.50
                 fraud_score = max(fraud_score, 45)
-                reason_note = f"Mathematical checks passed, but Visual AI flagged discrepancies: {multimodal_report}"
+                reason_note = f"Mathematical checks passed, but Visual AI flagged discrepancies: {multimodal_report[:300]}"
             else:
-                reason_note += f" Visual AI confirmation: {multimodal_report}"
+                # Boost confidence and score for detected issues
                 fraud_score = min(100, fraud_score + 10)
+                reason_note += f" Visual AI confirmation: {multimodal_report[:200]}"
 
-    # Force minimal fraud score floors depending on the verdict to align with test metrics
-    if verdict == "mismatched":
-        fraud_score = max(fraud_score, 35)
-    elif verdict == "missing":
-        fraud_score = max(fraud_score, 50)
-    elif verdict == "tampered":
+    # --- COMPUTE WEIGHTED FRAUD SCORE (if not already set by specific verdict) ---
+    if verdict in ("clean", "reused") and not source_reference_identical:
+        weighted_score = (ssim_loss * 35) + (ocr_loss * 20) + (vec_loss * 15) + (min(kp_loss, 1.0) * 15) + (template_loss * 10) + (color_loss * 5)
+        calc_fraud = int(min(max(weighted_score * 1.5, 0.0), 100.0))
+        # Use the higher of calculated score vs verdict-based score
+        if verdict == "reused":
+            fraud_score = max(fraud_score, calc_fraud)
+        elif verdict == "clean" and calc_fraud > 10:
+            fraud_score = calc_fraud
+            if fraud_score > 30:
+                # Even clean needs some attention if fraud score creeps up
+                reason_note += f" (calculated risk score: {fraud_score})"
+    elif verdict in ("tampered", "missing"):
+        # For severe verdicts, floor the score
         fraud_score = max(fraud_score, 60)
 
+    # Ensure fraud score is within bounds
+    fraud_score = int(min(max(fraud_score, 0), 100))
+
+    # Borderline confidence triggers human review
     if 40 <= fraud_score <= 70:
-        confidence = 0.45
-        reason_note += " Fraud score falls in the borderline 40-70 range, forcing human-in-the-loop review."
-        logger.info("Local Decision: Borderline fraud score (40-70). Confidence forced to 0.45 to trigger human-in-the-loop review.")
+        confidence = min(confidence, 0.45)
+        reason_note += " [BORDERLINE: Fraud score 40-70 range → Human review recommended.]"
+
+    logger.info(f"[Agent 4] FINAL DECISION: Verdict={verdict.upper()}, Score={fraud_score}/100, Confidence={confidence:.2f}, Action={recommended_action}")
 
     return {
         "fraud_score": fraud_score,
@@ -216,7 +256,7 @@ def fuse_multi_angle_decisions(angle_results: list[dict]) -> dict:
             "angles_analyzed": [single.get("angle", "top")]
         }
 
-    logger.info(f"Running Multi-Angle Fusion on {len(angle_results)} inspection angles...")
+    logger.info(f"[Agent 4] Running Multi-Angle Fusion on {len(angle_results)} inspection angles...")
     
     angles_analyzed = [item.get("angle", f"angle_{idx+1}") for idx, item in enumerate(angle_results)]
     scores = [float(item.get("fraud_score", 0)) for item in angle_results]
@@ -224,8 +264,7 @@ def fuse_multi_angle_decisions(angle_results: list[dict]) -> dict:
     verdicts = [item.get("verdict", "clean").lower() for item in angle_results]
     actions = [item.get("recommended_action", "Accept") for item in angle_results]
 
-    # 1. Probabilistic Noisy-OR Fusion for Fraud Score:
-    # 1 - prod(1 - s_i / 100) ensures multiple angle indicators compound joint probability
+    # 1. Probabilistic Noisy-OR Fusion for Fraud Score
     prod_clean = 1.0
     for s in scores:
         prod_clean *= (1.0 - (min(max(s, 0.0), 100.0) / 100.0))
@@ -233,7 +272,7 @@ def fuse_multi_angle_decisions(angle_results: list[dict]) -> dict:
     fused_score = int(round((1.0 - prod_clean) * 100.0))
     fused_score = min(max(fused_score, int(max(scores))), 100)
 
-    # 2. Priority Hierarchy for Fused Verdict: tampered > missing > mismatched > reused > clean
+    # 2. Priority Hierarchy for Fused Verdict
     verdict_priority = {"tampered": 5, "missing": 4, "mismatched": 3, "reused": 2, "clean": 1}
     sorted_by_severity = sorted(angle_results, key=lambda x: verdict_priority.get(x.get("verdict", "clean").lower(), 1), reverse=True)
     fused_verdict = sorted_by_severity[0].get("verdict", "clean")
@@ -243,14 +282,13 @@ def fuse_multi_angle_decisions(angle_results: list[dict]) -> dict:
     sorted_by_action = sorted(angle_results, key=lambda x: action_priority.get(x.get("recommended_action", "Accept"), 1), reverse=True)
     fused_action = sorted_by_action[0].get("recommended_action", "Accept")
 
-    # 4. Agreement Multiplier for Fused Confidence:
-    # Multi-angle agreement boosts statistical confidence by +5% per agreeing angle (max 1.0)
+    # 4. Agreement Multiplier for Fused Confidence
     matching_verdicts_count = sum(1 for v in verdicts if v == fused_verdict)
     base_confidence = max(confidences)
     confidence_boost = (matching_verdicts_count - 1) * 0.05
     fused_confidence = round(min(1.0, base_confidence + confidence_boost), 2)
 
-    # 5. Build Fusion Summary Narrative
+    # 5. Build Fusion Summary
     angle_details_str = ", ".join([f"{a.get('angle', 'unknown')}: score {a.get('fraud_score')}/100 ({a.get('verdict')})" for a in angle_results])
     fusion_summary = (
         f"Multi-Angle Fusion completed across {len(angle_results)} views ({', '.join(angles_analyzed)}). "
@@ -258,7 +296,7 @@ def fuse_multi_angle_decisions(angle_results: list[dict]) -> dict:
         f"Cross-angle evidence agreement elevates combined fraud confidence to {fused_confidence * 100:.0f}% with a fused risk score of {fused_score}/100."
     )
 
-    logger.info(f"Multi-Angle Fusion Result: Fused Score={fused_score}, Fused Verdict={fused_verdict.upper()}, Fused Confidence={fused_confidence}")
+    logger.info(f"[Agent 4] Multi-Angle Fusion Result: Fused Score={fused_score}, Verdict={fused_verdict.upper()}, Confidence={fused_confidence}")
 
     return {
         "fused_fraud_score": fused_score,
@@ -268,4 +306,3 @@ def fuse_multi_angle_decisions(angle_results: list[dict]) -> dict:
         "fusion_summary": fusion_summary,
         "angles_analyzed": angles_analyzed
     }
-
