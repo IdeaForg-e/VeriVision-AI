@@ -407,72 +407,88 @@ export function RegisterProductCard({ onProductAdded }) {
         <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="space-y-3">
             <div>
-              <label className="text-[10px] font-bold text-slate-500 uppercase mb-1 block">Part Code Suffix</label>
+              <label className="text-[10px] font-bold text-slate-500 uppercase mb-1 flex items-center justify-between">
+                <span>Part Code Suffix <span className="text-rose-500 font-bold">*</span></span>
+                <span className="text-[9px] text-slate-400 font-mono">GOLD-XXXX</span>
+              </label>
               <div className="relative flex items-center">
-                <span className="absolute left-3 text-xs font-mono font-bold text-slate-400">GOLD-</span>
+                <span className="absolute left-3 text-xs font-mono font-bold text-sky-500">GOLD-</span>
                 <input
                   type="text"
                   value={partSuffix}
                   onChange={(e) => setPartSuffix(e.target.value.replace(/[^a-zA-Z0-9_-]/g, "").toUpperCase())}
                   placeholder="RAM-DELL-8G"
-                  className="w-full h-8 pl-14 pr-3 text-xs lab-input font-mono font-bold"
+                  className="w-full h-9 pl-16 pr-3 text-xs lab-input font-mono font-bold"
                   disabled={registering}
+                  required
                 />
               </div>
             </div>
             <div>
-              <label className="text-[10px] font-bold text-slate-500 uppercase mb-1 block">Part Title / Name</label>
+              <label className="text-[10px] font-bold text-slate-500 uppercase mb-1 block">
+                Part Title / Name <span className="text-rose-500 font-bold">*</span>
+              </label>
               <input
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="e.g. Dell DDR4 8GB RAM Module"
-                className="w-full h-8 px-3 text-xs lab-input"
+                className="w-full h-9 px-3 text-xs lab-input"
                 disabled={registering}
+                required
               />
             </div>
           </div>
 
           <div className="space-y-3">
             <div>
-              <label className="text-[10px] font-bold text-slate-500 uppercase mb-1 block">Commodity Category</label>
+              <label className="text-[10px] font-bold text-slate-500 uppercase mb-1 flex items-center justify-between">
+                <span>Commodity Category</span>
+                <span className="text-[9px] text-slate-400 dark:text-slate-500 font-normal lowercase">(optional)</span>
+              </label>
               <input
                 type="text"
                 value={commodity}
                 onChange={(e) => setCommodity(e.target.value.toLowerCase())}
                 placeholder="e.g. ram, motherboard, chip"
-                className="w-full h-8 px-3 text-xs lab-input"
+                className="w-full h-9 px-3 text-xs lab-input"
                 disabled={registering}
               />
             </div>
             <div>
-              <label className="text-[10px] font-bold text-slate-500 uppercase mb-1 block">Expected Serial ID</label>
+              <label className="text-[10px] font-bold text-slate-500 uppercase mb-1 flex items-center justify-between">
+                <span>Expected Serial ID</span>
+                <span className="text-[9px] text-slate-400 dark:text-slate-500 font-normal lowercase">(optional — auto-reads image)</span>
+              </label>
               <input
                 type="text"
                 value={expectedSerial}
                 onChange={(e) => setExpectedSerial(e.target.value)}
                 placeholder="e.g. DELL-RAM-DDR4-001"
-                className="w-full h-8 px-3 text-xs lab-input font-mono"
+                className="w-full h-9 px-3 text-xs lab-input font-mono"
                 disabled={registering}
               />
             </div>
           </div>
 
-          <div className="flex flex-col justify-between">
+          <div className="flex flex-col justify-between space-y-3 md:space-y-0">
             <div>
-              <label className="text-[10px] font-bold text-slate-500 uppercase mb-1 block">Golden Reference Image</label>
+              <label className="text-[10px] font-bold text-slate-500 uppercase mb-1 block">
+                Golden Reference Image <span className="text-rose-500 font-bold">*</span>
+              </label>
               {preview ? (
-                <div className="flex items-center justify-between p-2 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-900">
-                  <img src={preview} className="h-12 w-12 object-contain rounded" alt="Preview" />
+                <div className="flex items-center justify-between p-2 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-900 h-9">
+                  <img src={preview} className="h-6 w-6 object-contain rounded border border-slate-700" alt="Preview" />
+                  <span className="text-[11px] text-slate-300 font-mono truncate px-2">{file?.name}</span>
                   <button type="button" onClick={() => { setFile(null); setPreview(null); }} className="text-slate-400 hover:text-rose-400">
-                    <X size={16} />
+                    <X size={14} />
                   </button>
                 </div>
               ) : (
-                <label className="flex flex-col items-center justify-center p-3 rounded-lg border-2 border-dashed border-slate-300 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 transition">
+                <label className="flex items-center justify-center h-9 px-3 rounded-lg border border-dashed border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 transition">
                   <input type="file" accept="image/*" onChange={handleFileChange} className="hidden" />
-                  <UploadCloud size={18} className="text-slate-400" />
-                  <span className="text-[10px] font-bold text-slate-600 dark:text-slate-400">Select Image File</span>
+                  <UploadCloud size={15} className="text-sky-500 mr-2" />
+                  <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">Select Image File</span>
                 </label>
               )}
             </div>
@@ -484,7 +500,7 @@ export function RegisterProductCard({ onProductAdded }) {
               loading={registering}
               disabled={registering || !partSuffix || !name || !file}
               icon={<Plus size={14} />}
-              className="mt-2 w-full justify-center"
+              className="h-9 w-full justify-center text-xs font-bold"
             >
               Register Golden Standard
             </Button>
