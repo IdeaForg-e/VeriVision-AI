@@ -156,43 +156,54 @@ export default function InspectionDetailPage() {
 
   const merged = useMemo(() => ({ ...caseData, ...reviewData }), [caseData, reviewData]);
 
-  const ssim = merged.metrics?.find((m) => m.name.includes("SSIM"))?.score ?? 0;
-  const keypoint = merged.metrics?.find((m) => m.name.includes("Keypoint"))?.score ?? 0;
+  // pipelineComplete is true only when the backend returned real result data
+  const pipelineComplete = merged.pipelineComplete === true;
+
+  const ssim = merged.metrics?.find((m) => m.name.includes("SSIM"))?.score ?? null;
+  const keypoint = merged.metrics?.find((m) => m.name.includes("Keypoint"))?.score ?? null;
+  // Vector similarity is returned as a separate metric named "Vector Sim" — no fallback to 85.0
   const vectorMatchRaw = merged.metrics?.find((m) => m.name?.includes("Vector"))?.score;
-  const vectorMatchScore = vectorMatchRaw ? parseFloat(vectorMatchRaw) : 85.0;
+  const vectorMatchScore = vectorMatchRaw != null ? parseFloat(vectorMatchRaw) : null;
   const ocrResults = merged.ocrResults || [];
-  const ocrMatch = ocrResults[0]?.match ?? false;
-  const ocrText = ocrResults[0]?.extracted || "No text detected";
-  const ocrExpected = ocrResults[0]?.expected || "N/A";
+  const ocrMatch = ocrResults[0]?.match ?? null;
+  const ocrText = ocrResults[0]?.extracted || "";
+  const ocrExpected = ocrResults[0]?.expected || "";
   const recommendation = merged.recommendation || {};
-  const recDecision =
-    recommendation.decision === "Accept"
+
+  // Only map to a verdict when the pipeline actually ran
+  const recDecision = !pipelineComplete
+    ? null
+    : recommendation.decision === "Accept"
       ? REVIEW_DECISION.APPROVED
       : recommendation.decision === "Quarantine & Escalate"
       ? REVIEW_DECISION.REJECTED
       : REVIEW_DECISION.NEEDS_MORE_EVIDENCE;
-  const heatmapUrl = merged.heatmapUrl || null;
-  const fraudScore = merged.fraudScore ?? 0;
-  const aiConfidence = recommendation.confidence ?? merged.confidencePct ?? 0;
 
-  const aiClassification = merged.status || "UNKNOWN";
-  const aiCategory = recommendation.decision || "UNKNOWN";
+  const heatmapUrl = merged.heatmapUrl || null;
+  // null means pipeline didn't run — never fall back to 0
+  const fraudScore = merged.fraudScore ?? null;
+  const aiConfidence = recommendation.confidence ?? merged.confidencePct ?? null;
+
+  const aiClassification = pipelineComplete ? (merged.status || "UNKNOWN") : merged.status || "pending";
 
   const rawCategory = merged.result?.category || merged.category;
-  const currentVerdict = (merged.result?.verdict || merged.verdict || merged.status || "").toLowerCase();
+  const currentVerdict = (merged.result?.verdict || merged.verdict || "").toLowerCase();
   const currentAction = (merged.result?.recommended_action || recommendation.decision || "").toLowerCase();
 
-  const anomalyCategory = rawCategory || (
-    currentVerdict === "tampered" || currentAction.includes("quarantine")
-      ? "Swap detection"
-      : currentVerdict === "missing"
-      ? "Missing QC label"
-      : currentVerdict === "mismatched"
-      ? "Altered serial number"
-      : currentVerdict === "reused"
-      ? "Reused board"
-      : "Clean (OEM Verified)"
-  );
+  // Only compute anomaly category when pipeline finished
+  const anomalyCategory = !pipelineComplete
+    ? null
+    : rawCategory || (
+      currentVerdict === "tampered" || currentAction.includes("quarantine")
+        ? "Swap detection"
+        : currentVerdict === "missing"
+        ? "Missing QC label"
+        : currentVerdict === "mismatched"
+        ? "Altered serial number"
+        : currentVerdict === "reused"
+        ? "Reused board"
+        : "Clean (OEM Verified)"
+    );
 
   const ocrFieldsTotal = Math.max(ocrResults.length, 1);
   const ocrFieldsMatched = ocrResults.filter((r) => r.match === true).length;
@@ -538,53 +549,68 @@ export default function InspectionDetailPage() {
         <StatCard
           icon={Gauge}
           label="Fraud Score"
-          value={`${fraudScore}/100`}
-          sublabel={fraudScore >= 70 ? "Critical Risk" : fraudScore >= 40 ? "Warning" : "Passed"}
-          color={fraudScore >= 70 ? "rose" : fraudScore >= 40 ? "amber" : "emerald"}
+          value={fraudScore != null ? `${fraudScore}/100` : "N/A"}
+          sublabel={fraudScore == null ? "Pipeline incomplete" : fraudScore >= 70 ? "Critical Risk" : fraudScore >= 40 ? "Warning" : "Passed"}
+          color={fraudScore == null ? "sky" : fraudScore >= 70 ? "rose" : fraudScore >= 40 ? "amber" : "emerald"}
         />
         <StatCard
           icon={BarChart3}
           label="SSIM Score"
-          value={`${(ssim * 100).toFixed(1)}%`}
-          sublabel={ssim >= 0.8 ? "Match" : "Structural Diff"}
-          color={ssim >= 0.8 ? "emerald" : "amber"}
+          value={ssim != null ? `${(ssim * 100).toFixed(1)}%` : "N/A"}
+          sublabel={ssim == null ? "No result" : ssim >= 0.8 ? "Match" : "Structural Diff"}
+          color={ssim == null ? "sky" : ssim >= 0.8 ? "emerald" : "amber"}
         />
         <StatCard
           icon={Zap}
           label="Vector Sim"
-          value={`${vectorMatchScore.toFixed(1)}%`}
+          value={vectorMatchScore != null ? `${vectorMatchScore.toFixed(1)}%` : "N/A"}
           sublabel="512-Dim Cosine"
           color="sky"
         />
         <StatCard
           icon={ScanLine}
           label="Keypoint Match"
-          value={`${(keypoint * 100).toFixed(1)}%`}
+          value={keypoint != null ? `${(keypoint * 100).toFixed(1)}%` : "N/A"}
           sublabel="ORB Descriptors"
           color="sky"
         />
         <StatCard
           icon={CheckCircle2}
           label="OCR Label"
-          value={ocrMatch ? "PASS" : "FAIL"}
-          sublabel={ocrMatch ? "Serial Verified" : "Mismatch Detected"}
-          color={ocrMatch ? "emerald" : "rose"}
+          value={ocrMatch == null ? "N/A" : ocrMatch ? "PASS" : "FAIL"}
+          sublabel={ocrMatch == null ? "No result" : ocrMatch ? "Serial Verified" : "Mismatch Detected"}
+          color={ocrMatch == null ? "sky" : ocrMatch ? "emerald" : "rose"}
         />
       </div>
 
       {/* Decision Judge Banner */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 mb-4">
         <div className="lg:col-span-8">
-          <RecommendationCard
-            recommendation={recDecision}
-            confidence={aiConfidence}
-            reasoning={recommendation.reasoning || "AI confidence score requires operator verification."}
-            flags={recommendation.flags || []}
-          />
+          {pipelineComplete ? (
+            <RecommendationCard
+              recommendation={recDecision}
+              confidence={aiConfidence}
+              reasoning={recommendation.reasoning || "AI confidence score requires operator verification."}
+              flags={recommendation.flags || []}
+            />
+          ) : (
+            <div className="lab-card p-4 flex flex-col justify-center gap-2">
+              <p className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
+                <AlertCircle size={14} className="text-amber-500" /> Pipeline Incomplete
+              </p>
+              <p className="text-xs text-slate-500">
+                The AI pipeline did not complete for this inspection. No verdict has been issued.
+                Submit a new scan or check the backend pipeline logs.
+              </p>
+            </div>
+          )}
         </div>
         <div className="lg:col-span-4 lab-card p-4 flex flex-col items-center justify-center">
           <p className="text-[10px] font-bold font-mono text-slate-500 uppercase mb-2">Overall Risk Gauge</p>
-          <FraudScore score={fraudScore} size="md" showLabel={false} />
+          <FraudScore score={fraudScore ?? 0} size="md" showLabel={false} />
+          {!pipelineComplete && (
+            <p className="text-[10px] text-slate-500 mt-1 font-mono">No result data</p>
+          )}
         </div>
       </div>
 
@@ -630,18 +656,21 @@ export default function InspectionDetailPage() {
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 font-mono text-xs">
             <div className="p-2.5 rounded bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
               <span className="text-[9px] font-bold text-slate-500 uppercase block">Anomaly Category</span>
-              <span className="font-bold text-sky-600 dark:text-sky-400 font-sans text-[11px] block truncate mt-0.5" title={anomalyCategory}>
-                {anomalyCategory}
+              <span className="font-bold text-sky-600 dark:text-sky-400 font-sans text-[11px] block truncate mt-0.5" title={anomalyCategory || "—"}>
+                {anomalyCategory || "—"}
               </span>
             </div>
             <div className="p-2.5 rounded bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
               <span className="text-[9px] font-bold text-slate-500 uppercase block">Verdict</span>
-              <span className="font-bold text-emerald-600 dark:text-emerald-400 uppercase text-[11px] block mt-0.5">{aiClassification}</span>
+              <span className={`font-bold uppercase text-[11px] block mt-0.5 ${
+                pipelineComplete ? "text-emerald-600 dark:text-emerald-400" : "text-slate-400"
+              }`}>{aiClassification}</span>
             </div>
             <div className="p-2.5 rounded bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
               <span className="text-[9px] font-bold text-slate-500 uppercase block">Action</span>
-              <span className="font-bold text-amber-600 dark:text-amber-400 font-sans text-[11px] block truncate mt-0.5" title={merged.result?.recommended_action || recommendation.decision || "Accept"}>
-                {merged.result?.recommended_action || recommendation.decision || "Accept"}
+              <span className="font-bold text-amber-600 dark:text-amber-400 font-sans text-[11px] block truncate mt-0.5"
+                title={recommendation.decision || "—"}>
+                {recommendation.decision || "—"}
               </span>
             </div>
           </div>
@@ -665,12 +694,23 @@ export default function InspectionDetailPage() {
         </div>
         <div className="bg-slate-950 text-slate-300 p-3 rounded text-[11px] space-y-1 overflow-x-auto">
           <p className="text-slate-500">&gt; Session: {merged.updatedAt || "Active"}</p>
-          <p className="text-sky-400">&gt; Agent-1: Ingest &amp; aspect ratio check OK</p>
-          <p className="text-emerald-400">&gt; Agent-2: Keypoints Match: {(keypoint * 100).toFixed(1)}%</p>
-          <p className="text-sky-400">&gt; Agent-3: SSIM Coefficient: {ssim.toFixed(2)}</p>
-          <p className="text-rose-400">&gt; Agent-3: OCR: Expected "{ocrExpected}" vs Got "{ocrText}"</p>
-          <p className="text-amber-400">&gt; Agent-4: Risk Score: {fraudScore}% | Confidence: {aiConfidence}%</p>
-          <p className="text-emerald-400">&gt; Agent-5: Rationale summary compiled.</p>
+          {/* Agent log lines are only shown when real pipeline data is present */}
+          {pipelineComplete ? (
+            <>
+              <p className="text-sky-400">&gt; Agent-1: Ingest &amp; aspect ratio check OK</p>
+              <p className="text-emerald-400">&gt; Agent-2: Keypoints Match: {keypoint != null ? (keypoint * 100).toFixed(1) : "N/A"}%</p>
+              <p className="text-sky-400">&gt; Agent-3: SSIM Coefficient: {ssim != null ? ssim.toFixed(2) : "N/A"}</p>
+              <p className="text-rose-400">&gt; Agent-3: OCR: Expected "{ocrExpected || "N/A"}" vs Got "{ocrText || "N/A"}"</p>
+              <p className="text-amber-400">&gt; Agent-4: Risk Score: {fraudScore ?? "N/A"}% | Confidence: {aiConfidence ?? "N/A"}%</p>
+              <p className="text-emerald-400">&gt; Agent-5: Rationale summary compiled.</p>
+            </>
+          ) : (
+            <>
+              <p className="text-amber-400">&gt; [WARN] Pipeline execution was halted or did not complete.</p>
+              <p className="text-rose-400">&gt; [ERROR] No InspectionResult record found for this case.</p>
+              <p className="text-slate-500">&gt; Agents 2–5 did not run. Submit a new scan to generate results.</p>
+            </>
+          )}
         </div>
       </div>
 

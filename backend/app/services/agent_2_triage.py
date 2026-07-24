@@ -78,8 +78,13 @@ def align_images(src_img: np.ndarray, ref_img: np.ndarray) -> tuple[np.ndarray, 
 
     logger.info(f"Geometric matching: Extracted {len(kp_src)} src keypoints, {len(kp_ref)} ref keypoints. Found {len(good_matches)} good matches (rate: {match_rate:.3f})")
 
-    if len(good_matches) < 4:
-        logger.warning(f"Not enough good keypoint matches ({len(good_matches)} < 4) to estimate homography transformation matrix.")
+    MIN_MATCHES_FOR_HOMOGRAPHY = 10
+    if len(good_matches) < MIN_MATCHES_FOR_HOMOGRAPHY:
+        logger.warning(
+            f"Not enough good keypoint matches ({len(good_matches)} < {MIN_MATCHES_FOR_HOMOGRAPHY}) to reliably "
+            f"estimate a homography transform. 4 points is the mathematical minimum but produces degenerate, "
+            f"overfit transforms with zero redundancy — RANSAC needs a comfortable surplus to reject outliers."
+        )
         return src_img, match_rate, False
 
     src_pts = np.array([kp_src[m.queryIdx].pt for m in good_matches], dtype=np.float32).reshape(-1, 1, 2)

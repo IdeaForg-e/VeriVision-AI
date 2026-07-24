@@ -56,9 +56,15 @@ def migrate_db():
         # Check existing columns in inspection_results table
         cursor.execute("PRAGMA table_info(inspection_results)")
         res_cols = {row[1] for row in cursor.fetchall()}
-        if "category" not in res_cols:
-            cursor.execute("ALTER TABLE inspection_results ADD COLUMN category TEXT")
-            print(f"  [MIGRATE] Added column 'inspection_results.category' to {os.path.basename(db_path)}")
+        res_migrations = [
+            ("category", "TEXT"),
+            ("diagnostic_path", "TEXT"),
+            ("evidence_json", "TEXT"),
+        ]
+        for col_name, col_type in res_migrations:
+            if col_name not in res_cols:
+                cursor.execute(f"ALTER TABLE inspection_results ADD COLUMN {col_name} {col_type}")
+                print(f"  [MIGRATE] Added column 'inspection_results.{col_name}' to {os.path.basename(db_path)}")
 
         for col_name, col_type in migrations:
             if col_name not in existing_cols:

@@ -317,14 +317,18 @@ def get_case_detail(
                         "heatmapUrl": sib_heatmap_url,
                     })
 
+    # pipeline_complete is True only when an InspectionResult record exists
+    pipeline_complete = result is not None
+
     return {
         "metadata": {
             "id": inspection.case_id,
             "partCode": product.part_number if product else "N/A",
             "commodity": product.commodity if product else "Unknown",
-            "status": result.verdict if result else inspection.status,
-            "confidencePct": int((result.confidence or 0.5) * 100) if result else 0,
-            "fraudScore": result.fraud_score if result else 0,
+            "status": result.verdict if pipeline_complete else inspection.status,
+            # Return None (not 0 or 50) when no pipeline result so the UI can show N/A
+            "confidencePct": int(result.confidence * 100) if (pipeline_complete and result.confidence is not None) else None,
+            "fraudScore": result.fraud_score if pipeline_complete else None,
             "imageHash": f"0x{abs(hash(inspection.case_id)):08X}",
             "neuralModel": "FraudSense v4.2",
             "updatedAt": inspection.created_at.isoformat() if inspection.created_at else "",
@@ -333,17 +337,19 @@ def get_case_detail(
             "uploadedImageUrl": uploaded_image_url,
             "captureAngle": inspection.capture_angle or "top",
             "multiAngleViews": multi_angle_views,
+            "pipelineComplete": pipeline_complete,
         },
         "ocrResults": ocr_results,
         "metrics": metrics,
         "timeline": timeline,
         "recommendation": {
-            "decision": result.recommended_action if result else "needs_more_evidence",
-            "confidence": int((result.confidence or 0.5) * 100) if result else 50,
-            "reasoning": result.explanation if result else "AI confidence is below the auto-decide threshold. Manual review required.",
-            "flags": (result.evidence_json or {}).get("evidence_summary", {}) if result else {},
+            # Return None for all fields when pipeline hasn't produced a result
+            "decision": result.recommended_action if pipeline_complete else None,
+            "confidence": int(result.confidence * 100) if (pipeline_complete and result.confidence is not None) else None,
+            "reasoning": result.explanation if pipeline_complete else None,
+            "flags": (result.evidence_json or {}).get("evidence_summary", {}) if pipeline_complete else {},
         },
-        "evidence": result.evidence_json if result else {},
+        "evidence": result.evidence_json if pipeline_complete else {},
     }
 
 

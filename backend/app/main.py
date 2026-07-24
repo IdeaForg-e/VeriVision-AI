@@ -77,6 +77,36 @@ if os.path.exists(dataset_dir):
     app.mount("/dataset", StaticFiles(directory=dataset_dir), name="dataset")
 
 @app.on_event("startup")
+def warmup_ml_models():
+    """
+    Pre-warm all PyTorch-backed ML models on the main thread at server startup.
+
+    EasyOCR and open_clip both import torchvision internally. Python's module
+    import system serializes imports via _ModuleLock. When these models are
+    lazy-initialized for the first time inside a ThreadPoolExecutor worker thread,
+    it races against other threads also trying to import the same module — resulting
+    in a deadlock on '_ModuleLock(torchvision.ops.misc)'.
+
+    Loading them here on the main thread guarantees all modules are fully initialized
+    before any background threads are spawned by the pipeline ensemble.
+    """
+    logger.info("[Startup] Pre-warming ML models on main thread to prevent thread deadlocks...")
+    try:
+        from app.services.agent_3_detector import get_ocr_reader
+        get_ocr_reader()
+        logger.info("[Startup] EasyOCR reader pre-warmed successfully.")
+    except Exception as e:
+        logger.warning(f"[Startup] EasyOCR pre-warm failed (OCR will degrade gracefully): {e}")
+
+    try:
+        from app.services.embedding_service import _load_clip
+        _load_clip()
+        logger.info("[Startup] CLIP embedding model pre-warmed successfully.")
+    except Exception as e:
+        logger.warning(f"[Startup] CLIP pre-warm failed (will use OpenCV fallback): {e}")
+
+
+@app.on_event("startup")
 def auto_sync_golden_catalog():
     try:
         import sys

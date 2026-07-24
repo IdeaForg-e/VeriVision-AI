@@ -132,9 +132,9 @@ def classify_part_commodity(image_path: str) -> str:
                 "HTTP-Referer": "https://github.com/IdeaForg-e/VeriVision-AI",
                 "X-Title": "VeriVision QC Platform",
             }
-            # Use openrouter/free to access vision models on the free tier
+            # Use Google Gemini Flash (free tier) vision model via OpenRouter
             payload = {
-                "model": "openrouter/free",
+                "model": "google/gemini-2.0-flash-exp:free",
                 "messages": [
                     {
                         "role": "user",
@@ -201,8 +201,12 @@ def classify_part_commodity(image_path: str) -> str:
     except Exception as e:
         logger.error(f"[Agent 1: Selector] Local fallback classifier failed: {e}")
 
-    logger.info("[Agent 1: Selector] Defaulting to commodity type: motherboard")
-    return "motherboard"
+    logger.warning(
+        "[Agent 1: Selector] Could not confidently classify commodity type "
+        "(AI classification and local OCR heuristics both failed/inconclusive). "
+        "Returning 'other' instead of guessing, so downstream agents/UI can flag this for human review."
+    )
+    return "other"
 
 
 def auto_select_golden_reference(uploaded_image_path: str, db) -> dict:
@@ -225,4 +229,3 @@ def auto_select_golden_reference(uploaded_image_path: str, db) -> dict:
         f"'{top_match['part_number']}' ({top_match['name']}) at {top_match['similarity_score']}% confidence."
     )
     return search_res
-

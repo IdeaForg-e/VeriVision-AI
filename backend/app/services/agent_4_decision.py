@@ -15,7 +15,7 @@ VALID_ACTIONS = {
     "Triage Agent requests retake",
 }
 
-def make_decision(ensemble_results: dict) -> dict:
+def make_decision(ensemble_results: dict, thresholds: dict | None = None) -> dict:
     """
     Agent 4: Decision & Fusion Judge.
     Evaluates evidence from Vision Layer and computes the final verdict,
@@ -24,12 +24,20 @@ def make_decision(ensemble_results: dict) -> dict:
     Uses deterministic rule-based scoring. Each detection result is evaluated
     in priority order: Missing label > Tampered (swap) > Mismatched (OCR) >
     Non-OEM label > Reused board > Clean.
+
+    `thresholds` (e.g. {"ssim": 0.85, "ocrFuzzyPct": 100}) is caller-supplied.
+    A service module should never reach into the router layer for config —
+    that inverts the dependency direction and breaks if triage.py's config
+    shape changes or its module isn't loaded yet. The router/caller is
+    responsible for resolving live thresholds and passing them in.
+
+    `ensemble_results["alignment_reliable"]` (bool) tells this agent whether
+    Agent 2's homography actually converged. If it didn't, the source and
+    reference images are NOT pixel-registered — SSIM and keypoint-ratio are
+    then measuring pose/perspective difference, not fraud, and must not be
+    trusted at full weight or used to justify an SSIM-driven verdict.
     """
-    try:
-        from app.routers.triage import _PIPELINE_CONFIG
-        thresholds = _PIPELINE_CONFIG.get("thresholds", {})
-    except Exception:
-        thresholds = {}
+    thresholds = thresholds or {}
 
     ssim_target = thresholds.get("ssim", 0.85)
     ocr_fuzzy = thresholds.get("ocrFuzzyPct", 100)
@@ -46,9 +54,16 @@ def make_decision(ensemble_results: dict) -> dict:
     temp_score = ensemble_results.get("template_match_score", 1.0)
     temp_found = ensemble_results.get("template_match_found", True)
     color_sim = ensemble_results.get("color_hist_similarity", 1.0)
-    vec_match = float(ensemble_results.get("vector_embedding_match", 85.0))
+    raw_vec_match = ensemble_results.get("vector_embedding_match")
+    vec_match_available = raw_vec_match is not None
+    # If the embedding comparison failed/was skipped, don't pretend it said 85% —
+    # fall back to neutral (no evidence either way) and skip it in the weighted score below.
+    vec_match = float(raw_vec_match) if vec_match_available else 50.0
     source_reference_identical = bool(ensemble_results.get("source_reference_identical", False))
     anomaly_regions = ensemble_results.get("anomaly_regions", [])
+    # Default True for backward compatibility with callers that don't pass it —
+    # but any caller running the real pipeline (workflow.py) always supplies it.
+    alignment_reliable = bool(ensemble_results.get("alignment_reliable", True))
 
     logger.info(
         f"[Agent 4] Decision inputs: SSIM={ssim:.3f}, OCR Sim={ocr_sim:.2f}, "
@@ -73,17 +88,21 @@ def make_decision(ensemble_results: dict) -> dict:
     ocr_loss = max(0.0, 1.0 - ocr_sim)
     kp_loss = abs(1.0 - kp_ratio)
     color_loss = max(0.0, 1.0 - color_sim)
-    vec_loss = max(0.0, (100.0 - vec_match) / 100.0)
+    vec_loss = max(0.0, (100.0 - vec_match) / 100.0) if vec_match_available else 0.0
     template_loss = 0.0 if temp_found else 1.0
     multimodal_report = ensemble_results.get("multimodal_report", "")
     multimodal_lower = multimodal_report.lower()
     mentions_missing_component = "missing component" in multimodal_lower or "absent" in multimodal_lower
     strong_identity_match = ssim >= 0.80 and vec_match >= 90.0
-    strong_swap_evidence = (
+    # SSIM and ORB keypoint ratio are only meaningful when the two images are
+    # pixel-registered. If Agent 2's homography didn't converge, both metrics
+    # mostly encode pose/perspective difference rather than fraud evidence —
+    # do not let them drive a swap/reused/false-alarm verdict in that case.
+    strong_swap_evidence = alignment_reliable and (
         kp_ratio < 0.35
         or (kp_ratio < 0.55 and (ssim < 0.65 or vec_match < 75.0))
     )
-    localized_structural_issue = ssim < max(ssim_target, 0.85) or bool(anomaly_regions)
+    localized_structural_issue = alignment_reliable and (ssim < max(ssim_target, 0.85) or bool(anomaly_regions))
     # OCR mismatch severity: count how many characters are different
     ocr_mismatch_count = len(ocr_mismatches)
     has_ocr_mismatch = (
@@ -116,7 +135,26 @@ def make_decision(ensemble_results: dict) -> dict:
         )
         logger.info(f"[Agent 4] Decision: MISSING QC LABEL → Quarantine. Fraud Score: {fraud_score}")
 
-    # 2. TAMPERED / SWAP DETECTION → Keypoints don't match (different component)
+    # 2. OCR UNREADABLE → label is physically present (template matched) and we
+    # expected serial text, but OCR could not read ANY text off it. This is
+    # different from a MISMATCH (wrong text) — it means the check is inconclusive,
+    # not confirmed clean, so it must not fall through to "clean" by default.
+    elif temp_found and expected_text and not detected_text.strip() and ensemble_results.get("ocr_engine_available", True):
+        category = "OCR unreadable (needs review)"
+        verdict = "missing"
+        recommended_action = "Request Additional Angle"
+        confidence = 0.35
+        fraud_score = 25
+        reason_note = (
+            f"OCR UNREADABLE: Label/template region was located (template score: {temp_score:.2f}), "
+            f"but zero text could be extracted during OCR, even after full-frame fallback. Expected serial: "
+            f"'{expected_text}'. This is INCONCLUSIVE, not confirmed clean — most likely caused by a "
+            f"mis-cropped label ROI, low resolution, or glare, rather than actual tampering. "
+            f"Recommending a re-capture / additional angle before this case can be marked clean."
+        )
+        logger.info(f"[Agent 4] Decision: OCR UNREADABLE → Request Additional Angle. Fraud Score: {fraud_score}")
+
+    # 3. TAMPERED / SWAP DETECTION → Keypoints don't match (different component)
     elif strong_swap_evidence and not strong_identity_match:
         category = "Swap detection"
         verdict = "tampered"
@@ -130,7 +168,7 @@ def make_decision(ensemble_results: dict) -> dict:
         )
         logger.info(f"[Agent 4] Decision: SWAP DETECTION → Quarantine. Fraud Score: {fraud_score}")
 
-    # 3. ALTERED SERIAL NUMBER → OCR mismatch detected
+    # 4. ALTERED SERIAL NUMBER → OCR mismatch detected
     elif mentions_missing_component and strong_identity_match and localized_structural_issue:
         category = "Localized missing component"
         verdict = "missing"
@@ -162,7 +200,7 @@ def make_decision(ensemble_results: dict) -> dict:
         )
         logger.info(f"[Agent 4] Decision: ALTERED SERIAL NUMBER → Escalate. Fraud Score: {fraud_score}")
 
-    # 4. NON-OEM LABEL → Color histogram mismatch despite correct text
+    # 5. NON-OEM LABEL → Color histogram mismatch despite correct text
     elif color_loss > 0.35:
         category = "Non-OEM label"
         verdict = "mismatched"
@@ -176,8 +214,9 @@ def make_decision(ensemble_results: dict) -> dict:
         )
         logger.info(f"[Agent 4] Decision: NON-OEM LABEL → Escalate to vendor. Fraud Score: {fraud_score}")
 
-    # 5. REUSED BOARD → SSIM structural diff with good keypoints (layout matches but wear visible)
-    elif ssim_loss > 0.15:  # SSIM < 0.85
+    # 6. REUSED BOARD → SSIM structural diff with good keypoints (layout matches but wear visible)
+    # Only trust this when images are actually pixel-registered — see alignment_reliable note above.
+    elif alignment_reliable and ssim_loss > 0.15:  # SSIM < 0.85
         category = "Reused board"
         verdict = "reused"
         recommended_action = "Request additional angle"
@@ -190,8 +229,28 @@ def make_decision(ensemble_results: dict) -> dict:
         )
         logger.info(f"[Agent 4] Decision: REUSED BOARD → Request additional angle. Fraud Score: {fraud_score}")
 
-    # 6. FALSE ALARM / LIGHTING ISSUE → SSIM below target but no other indicators
-    elif ssim < ssim_target:
+    # 7. ALIGNMENT UNRELIABLE → homography didn't converge; SSIM/keypoint evidence
+    # is not trustworthy here, and none of the ROI-based checks above (OCR,
+    # template, color) fired either. This is inconclusive, not clean — request
+    # a cleaner angle rather than silently accepting or guessing at pose noise.
+    elif not alignment_reliable:
+        category = "Alignment unreliable (needs retake)"
+        verdict = "reused"
+        recommended_action = "Request additional angle"
+        confidence = 0.30
+        fraud_score = 20
+        reason_note = (
+            f"ALIGNMENT UNRELIABLE: Geometric registration between the captured scan and golden reference "
+            f"did not converge, so SSIM ({ssim:.2f}) and keypoint ratio ({kp_ratio:.2f}) are not trustworthy "
+            f"fraud signals here — they mostly reflect pose/perspective difference. OCR, template, and color "
+            f"checks did not independently flag an issue. Recommending a straighter, closer-angle retake "
+            f"before a structural verdict can be trusted."
+        )
+        logger.info(f"[Agent 4] Decision: ALIGNMENT UNRELIABLE → Request additional angle. Fraud Score: {fraud_score}")
+
+    # 8. FALSE ALARM / LIGHTING ISSUE → SSIM below target but no other indicators
+    # (only meaningful on a reliable alignment; unreliable case is handled above)
+    elif alignment_reliable and ssim < ssim_target:
         category = "False alarm (lighting)"
         verdict = "clean"
         recommended_action = "Triage Agent requests retake"
@@ -223,7 +282,14 @@ def make_decision(ensemble_results: dict) -> dict:
 
     # --- COMPUTE WEIGHTED FRAUD SCORE (if not already set by specific verdict) ---
     if verdict in ("clean", "reused") and not source_reference_identical:
-        weighted_score = (ssim_loss * 35) + (ocr_loss * 20) + (vec_loss * 15) + (min(kp_loss, 1.0) * 15) + (template_loss * 10) + (color_loss * 5)
+        if alignment_reliable:
+            weighted_score = (ssim_loss * 35) + (ocr_loss * 20) + (vec_loss * 15) + (min(kp_loss, 1.0) * 15) + (template_loss * 10) + (color_loss * 5)
+        else:
+            # SSIM (35) and keypoint (15) weight is untrustworthy on an unaligned
+            # pair — redistribute it to the ROI-based signals (OCR, template,
+            # color) that don't depend on global geometric registration, rather
+            # than silently dropping 50% of the weighting.
+            weighted_score = (ocr_loss * 40) + (vec_loss * 25) + (template_loss * 25) + (color_loss * 10)
         calc_fraud = int(min(max(weighted_score * 1.5, 0.0), 100.0))
         # Use the higher of calculated score vs verdict-based score
         if verdict == "reused":
@@ -233,8 +299,11 @@ def make_decision(ensemble_results: dict) -> dict:
             if fraud_score > 30:
                 # Even clean needs some attention if fraud score creeps up
                 reason_note += f" (calculated risk score: {fraud_score})"
-    elif verdict in ("tampered", "missing"):
-        # For severe verdicts, floor the score
+    elif verdict in ("tampered", "missing") and category != "OCR unreadable (needs review)":
+        # For severe, confirmed verdicts, floor the score. Explicitly excluded:
+        # "OCR unreadable" is inconclusive-not-confirmed by design (see its
+        # branch above) — flooring it to 60 would silently override its own
+        # deliberately low score/confidence and contradict the reasoning text.
         fraud_score = max(fraud_score, 60)
 
     # Ensure fraud score is within bounds

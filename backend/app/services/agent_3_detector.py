@@ -28,12 +28,20 @@ def get_ocr_reader():
 def _ensure_rgb(img: np.ndarray) -> np.ndarray:
     if img is None:
         raise ValueError("Image input cannot be None")
-    if len(img.shape) == 2:
+    if img.ndim == 2:
         return cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
-    return img
+    if img.ndim == 3 and img.shape[2] == 4:
+        return cv2.cvtColor(img, cv2.COLOR_BGRA2BGR)
+    if img.ndim == 3 and img.shape[2] == 3:
+        return img
+    raise ValueError(f"Unsupported image shape for RGB conversion: {img.shape}")
 
 
 def _ensure_gray(img: np.ndarray) -> np.ndarray:
+    if img is None:
+        raise ValueError("Image input cannot be None")
+    if img.ndim == 2:
+        return img
     return cv2.cvtColor(_ensure_rgb(img), cv2.COLOR_BGR2GRAY)
 
 
@@ -260,6 +268,15 @@ def extract_ocr_text(img: np.ndarray, roi: dict = None, expected_serial: str = "
         if y + h <= img.shape[0] and x + w <= img.shape[1] and w > 0 and h > 0:
             crop = img[y:y + h, x:x + w]
             cropped_used = True
+            # EasyOCR frequently returns nothing on small/tight crops (common when a
+            # label_roi is configured too small). Upscale small crops before reading
+            # so we get a real "no text present" result instead of a false empty read.
+            crop_h, crop_w = crop.shape[:2]
+            min_dim = 300
+            if 0 < crop_h < min_dim or 0 < crop_w < min_dim:
+                scale = min_dim / max(crop_h, crop_w, 1)
+                crop = cv2.resize(crop, (int(crop_w * scale), int(crop_h * scale)), interpolation=cv2.INTER_CUBIC)
+                logger.info(f"Upscaled small OCR crop ({crop_w}x{crop_h}) by {scale:.2f}x for more reliable text detection.")
         else:
             logger.warning("Configured text label ROI exceeds image boundary dimensions or is empty. Defaulting to full image.")
 
@@ -545,7 +562,7 @@ def inspect_anomalies_multimodal(src_image_path: str, ref_image_path: str, commo
         )
 
         payload = {
-            "model": "openrouter/free",
+            "model": "google/gemini-2.0-flash-exp:free",
             "messages": [
                 {
                     "role": "user",
@@ -647,6 +664,22 @@ def run_anomaly_ensemble(src_img: np.ndarray, ref_img: np.ndarray, roi_config: d
     errors = []
     roi_config = _normalize_roi_config(roi_config)
 
+    # ── Pre-warm PyTorch-backed models on the MAIN THREAD ─────────────────────
+    # EasyOCR and open_clip both import torchvision internally. Python's module
+    # import system uses _ModuleLock, which causes a deadlock when these models
+    # are lazy-initialized for the first time inside a ThreadPoolExecutor worker.
+    # Calling get_ocr_reader() here ensures all torch/torchvision modules are
+    # fully loaded before any background threads start.
+    get_ocr_reader()
+
+    # Also pre-warm CLIP embedding model on the main thread for the same reason.
+    try:
+        from app.services.embedding_service import _load_clip
+        _load_clip()
+    except Exception as _clip_prewarm_err:
+        logger.warning(f"[Agent 3: Detector] CLIP pre-warm failed (will use OpenCV fallback): {_clip_prewarm_err}")
+    # ──────────────────────────────────────────────────────────────────────────
+
     label_roi = None
     expected_serial = ""
     if roi_config:
@@ -710,8 +743,9 @@ def run_anomaly_ensemble(src_img: np.ndarray, ref_img: np.ndarray, roi_config: d
                 return round(sim * 100.0, 2)
             except Exception as e:
                 logger.error(f"Vector embedding comparison failed: {e}")
-                return 85.0
-        return 85.0
+                return None
+        logger.warning("Vector embedding comparison skipped: source/reference image path missing on disk.")
+        return None
 
     # Dispatch tasks to ThreadPoolExecutor for concurrent parallel processing
     with ThreadPoolExecutor(max_workers=5) as executor:
@@ -721,15 +755,41 @@ def run_anomaly_ensemble(src_img: np.ndarray, ref_img: np.ndarray, roi_config: d
         f_feat = executor.submit(task_features)
         f_emb = executor.submit(task_embedding)
 
-        ssim_val, heatmap_img, annotated_target, anomaly_regions = f_ssim.result(timeout=10.0)
+        try:
+            ssim_val, heatmap_img, annotated_target, anomaly_regions = f_ssim.result(timeout=10.0)
+        except Exception as e:
+            logger.error(f"[Agent 3: Detector] SSIM task timed out or failed: {e}")
+            errors.append("ssim_timeout_or_failed")
+            ssim_val, heatmap_img, annotated_target, anomaly_regions = 0.0, src_img.copy(), src_img.copy(), []
+
         try:
             multimodal_report = f_multi.result(timeout=10.0)
         except Exception as e:
             logger.warning(f"[Agent 3: Detector] Multimodal vision task timed out or failed: {e}")
             multimodal_report = "Visual comparison skipped: Multimodal response timeout."
-        detected_text, golden_text, ocr_engine_available = f_ocr.result(timeout=15.0)
-        keypoint_results, template_results, color_results = f_feat.result(timeout=10.0)
-        vector_embedding_match = f_emb.result(timeout=10.0)
+
+        try:
+            detected_text, golden_text, ocr_engine_available = f_ocr.result(timeout=15.0)
+        except Exception as e:
+            logger.error(f"[Agent 3: Detector] OCR task timed out or failed: {e}")
+            errors.append("ocr_timeout_or_failed")
+            detected_text, golden_text, ocr_engine_available = "", "", False
+
+        try:
+            keypoint_results, template_results, color_results = f_feat.result(timeout=10.0)
+        except Exception as e:
+            logger.error(f"[Agent 3: Detector] Feature/template/color task timed out or failed: {e}")
+            errors.append("features_timeout_or_failed")
+            keypoint_results = {"keypoint_match_score": 0.0, "good_matches": 0, "total_matches": 0}
+            template_results = {"template_match_score": 0.0, "template_match_found": False, "template_match_checked": True}
+            color_results = {"color_hist_similarity": 0.0, "color_hist_checked": True}
+
+        try:
+            vector_embedding_match = f_emb.result(timeout=10.0)
+        except Exception as e:
+            logger.error(f"[Agent 3: Detector] Embedding task timed out or failed: {e}")
+            errors.append("embedding_timeout_or_failed")
+            vector_embedding_match = None
 
     # Generate visual side-by-side diagnostic card (4 panels: Golden, Target, Defect Marked, Thermal Heatmap)
     diagnostic_card = None

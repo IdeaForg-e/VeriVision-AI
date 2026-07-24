@@ -262,9 +262,22 @@ def decision_node(state: InspectionState) -> Dict[str, Any]:
         "thresholds_used": state.get("thresholds_used", {}),
         "source_reference_identical": state.get("source_reference_identical", False),
         "multimodal_report": state.get("multimodal_report", ""),
+        # alignment_status is set by triage_node to "aligned" only when Agent 2's
+        # homography actually converged (see agent_2_triage.align_images). Any
+        # other value ("semantic_fallback", "not_run", etc.) means SSIM/keypoint
+        # evidence is on an unregistered image pair — Agent 4 needs this to
+        # avoid treating pose difference as fraud evidence.
+        "alignment_reliable": state.get("alignment_status") == "aligned",
     }
     
-    decision = services.make_decision(ensemble_results)
+    try:
+        from app.routers.triage import _PIPELINE_CONFIG
+        thresholds = _PIPELINE_CONFIG.get("thresholds", {})
+    except Exception as e:
+        logger.warning(f"[Node: Decision Judge] Could not load live threshold config, using defaults: {e}")
+        thresholds = {}
+
+    decision = services.make_decision(ensemble_results, thresholds=thresholds)
     logger.info(f"⚖️ [Node: Decision Judge] Verdict: {decision['verdict'].upper()}, Score: {decision['fraud_score']}/100, Action: {decision['recommended_action']}")
     logger.info("\n" + "="*80 + f"\n✅ [FINISHED] NODE: decision (SUCCESS) - Case {case_id}\n" + "="*80)
     
