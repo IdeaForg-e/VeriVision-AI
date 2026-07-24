@@ -18,7 +18,6 @@ copy .env.example .env
 Open the newly created `.env` file and configure the settings:
 - **`OPENROUTER_API_KEY`**: Your OpenRouter API key for LLM Judge (Agent 4) & LLM Explainer (Agent 5). If left blank, the pipeline will fallback to local mathematical rules.
 - **`SECRET_KEY`**: Secret key for signing JWT tokens. Change this to a secure random string in production.
-- **`GOOGLE_CLIENT_ID`**: Required for verifying Google OAuth IDs on the frontend integration.
 
 ---
 
