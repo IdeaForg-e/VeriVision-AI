@@ -138,7 +138,9 @@ def seed():
             name_no_ext = os.path.splitext(fname)[0].strip()
             clean_name = re.sub(r'[^a-zA-Z0-9_-]', '_', name_no_ext).upper()
             clean_name = re.sub(r'_+', '_', clean_name).strip('_')
-            if not clean_name.startswith("GOLD"):
+            if clean_name.startswith("GOLDEN_"):
+                clean_name = f"GOLD_{clean_name[7:]}"
+            elif not clean_name.startswith("GOLD_") and not clean_name.startswith("GOLD-"):
                 clean_name = f"GOLD_{clean_name}"
             return clean_name.replace("_", "-")
 

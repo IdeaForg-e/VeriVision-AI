@@ -23,10 +23,10 @@ def get_catalog_products(
     current_user: models.User = Depends(utils.get_current_user)
 ):
     """
-    Returns all pre-registered Golden Catalog reference standards (those starting with GOLD-).
+    Returns all pre-registered Golden Catalog reference standards.
     """
     logger.info(f"User {current_user.email} fetching Golden Catalog references list.")
-    products = db.query(models.Product).filter(models.Product.part_number.like("GOLD-%")).all()
+    products = db.query(models.Product).all()
     return products
 
 @router.post("", response_model=schemas.InspectionResponse, status_code=status.HTTP_201_CREATED)
