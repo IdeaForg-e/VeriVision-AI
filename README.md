@@ -495,13 +495,22 @@ npm run dev
 #### 3. Environment Variables (Optional)
 Copy `backend/.env.example` to `backend/.env` and configure:
 ```env
-SECRET_KEY=your_jwt_secret_key
-OPENROUTER_API_KEY=your_openrouter_api_key    # Enables multimodal vision + LLM explanations
+# 🔌 OpenRouter API Integration (Bypasses Google regional/rate limits)
+OPENROUTER_API_KEY=your_openrouter_api_key_here
 OPENROUTER_MODEL=nvidia/nemotron-3-ultra-550b-a55b:free
+
+# 🛡️ Security & Authentication (Change in production)
+SECRET_KEY=verivision_super_secret_key_change_me_in_production
+ALGORITHM=HS256
+ACCESS_TOKEN_EXPIRE_MINUTES=1440
+GOOGLE_CLIENT_ID=your_google_client_id_here
+
+# 🗄️ Database Connection
 DATABASE_URL=sqlite:///./verivision.db
 ```
 
-> **Note**: VeriVision works fully without an OpenRouter API key. The multimodal vision comparisons and LLM explanations gracefully fall back to local rule-based alternatives.
+> [!NOTE]
+> **Graceful Fallback**: VeriVision AI works fully out-of-the-box without an OpenRouter API key. Multimodal vision comparisons and LLM audit explanations gracefully fall back to local rule-based deterministic alternatives.
 
 ---
 
