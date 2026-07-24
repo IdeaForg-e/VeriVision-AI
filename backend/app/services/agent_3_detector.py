@@ -164,12 +164,23 @@ def extract_ocr_text(img: np.ndarray, roi: dict = None, expected_serial: str = "
 
 def calculate_string_diff(str1: str, str2: str) -> dict:
     """
-    Calculates character-level differences and character similarity.
+    Calculates character-level differences and character similarity with OCR confusion pair tolerance.
     Returns: {"similarity": float, "mismatches": list}
     """
     logger.info(f"Comparing OCR detected string '{str1}' against master catalog reference '{str2}'")
     s1 = str1.upper().replace(" ", "")
     s2 = str2.upper().replace(" ", "")
+
+    # Common OCR visual confusion pairs (e.g. 'G' vs '6', '0' vs 'O', 'I' vs '1', 'S' vs '5', 'B' vs '8')
+    confusion_pairs = {
+        ('O', '0'), ('0', 'O'),
+        ('I', '1'), ('1', 'I'), ('|', 'I'), ('I', '|'), ('|', '1'), ('1', '|'),
+        ('S', '5'), ('5', 'S'),
+        ('G', '6'), ('6', 'G'),
+        ('B', '8'), ('8', 'B'),
+        ('Z', '2'), ('2', 'Z'),
+        ('T', '7'), ('7', 'T'),
+    }
 
     mismatches = []
     max_len = max(len(s1), len(s2))
@@ -180,7 +191,7 @@ def calculate_string_diff(str1: str, str2: str) -> dict:
     for idx in range(max_len):
         char1 = s1_padded[idx]
         char2 = s2_padded[idx]
-        if char1 == char2:
+        if char1 == char2 or (char1, char2) in confusion_pairs:
             matches += 1
         else:
             mismatches.append({
