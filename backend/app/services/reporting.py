@@ -85,9 +85,24 @@ def generate_pdf_report(inspection_id: int, db: Session) -> str:
         elif res.verdict in ['missing', 'mismatched']:
             verdict_color = '#f59e0b'  # Orange
 
+        cat_val = getattr(res, 'category', None)
+        if not cat_val:
+            v_lower = (res.verdict or "").lower()
+            act_lower = (res.recommended_action or "").lower()
+            if v_lower == "tampered" or "quarantine" in act_lower:
+                cat_val = "Swap detection"
+            elif v_lower == "missing":
+                cat_val = "Missing QC label"
+            elif v_lower == "mismatched":
+                cat_val = "Altered serial number"
+            elif v_lower == "reused":
+                cat_val = "Reused board"
+            else:
+                cat_val = "Clean (OEM Verified)"
+
         verdict_data = [
             [Paragraph("<font size=16 color='white'><b>VERDICT & COMPLIANCE SUMMARY</b></font>", body_style), ""],
-            [Paragraph("<b>Anomaly Category:</b>", body_style), Paragraph(f"<b><font color='#1e3a8a'>{getattr(res, 'category', None) or 'Unclassified'}</font></b>", body_style)],
+            [Paragraph("<b>Anomaly Category:</b>", body_style), Paragraph(f"<b><font color='#1e3a8a'>{cat_val}</font></b>", body_style)],
             [Paragraph("<b>Final Verdict:</b>", body_style), Paragraph(f"<font color='{verdict_color}'><b>{res.verdict.upper()}</b></font>", body_style)],
             [Paragraph("<b>Fraud Score:</b>", body_style), Paragraph(f"<b>{res.fraud_score} / 100</b>", body_style)],
             [Paragraph("<b>Confidence Level:</b>", body_style), Paragraph(f"{res.confidence * 100:.1f}%", body_style)],

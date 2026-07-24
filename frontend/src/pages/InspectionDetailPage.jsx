@@ -178,6 +178,22 @@ export default function InspectionDetailPage() {
   const aiClassification = merged.status || "UNKNOWN";
   const aiCategory = recommendation.decision || "UNKNOWN";
 
+  const rawCategory = merged.result?.category || merged.category;
+  const currentVerdict = (merged.result?.verdict || merged.verdict || merged.status || "").toLowerCase();
+  const currentAction = (merged.result?.recommended_action || recommendation.decision || "").toLowerCase();
+
+  const anomalyCategory = rawCategory || (
+    currentVerdict === "tampered" || currentAction.includes("quarantine")
+      ? "Swap detection"
+      : currentVerdict === "missing"
+      ? "Missing QC label"
+      : currentVerdict === "mismatched"
+      ? "Altered serial number"
+      : currentVerdict === "reused"
+      ? "Reused board"
+      : "Clean (OEM Verified)"
+  );
+
   const ocrFieldsTotal = Math.max(ocrResults.length, 1);
   const ocrFieldsMatched = ocrResults.filter((r) => r.match === true).length;
   const ocrFieldsFilled = ocrResults.filter(
@@ -614,8 +630,8 @@ export default function InspectionDetailPage() {
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 font-mono text-xs">
             <div className="p-2.5 rounded bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
               <span className="text-[9px] font-bold text-slate-500 uppercase block">Anomaly Category</span>
-              <span className="font-bold text-sky-600 dark:text-sky-400 font-sans text-[11px] block truncate mt-0.5" title={merged.result?.category || merged.category || "Clean (OEM Verified)"}>
-                {merged.result?.category || merged.category || "Clean (OEM Verified)"}
+              <span className="font-bold text-sky-600 dark:text-sky-400 font-sans text-[11px] block truncate mt-0.5" title={anomalyCategory}>
+                {anomalyCategory}
               </span>
             </div>
             <div className="p-2.5 rounded bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
