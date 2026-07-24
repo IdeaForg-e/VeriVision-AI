@@ -84,7 +84,7 @@ export function CaseStatusTracker({ status }) {
 export function EvidencePanel({ caseData, region, onRegionChange, onRegionCommit, learningStatus }) {
   if (!caseData) return null;
 
-  const currentRegion = region || { x: 30, y: 25, w: 40, h: 45 };
+  const currentRegion = region || { x: 20, y: 30, w: 60, h: 40 };
 
   return (
     <div className="lab-card p-4 space-y-4">
@@ -105,22 +105,20 @@ export function EvidencePanel({ caseData, region, onRegionChange, onRegionCommit
             [ Drag &amp; Resize Box to Calibrate AI Training Memory ]
           </span>
         </div>
-        <div className="relative w-full min-h-[380px] max-h-[520px] bg-slate-950 rounded-xl overflow-hidden border border-slate-800 flex items-center justify-center p-3">
-          <div className="relative inline-block max-w-full max-h-full">
-            <img
-              className="max-w-full max-h-[480px] object-contain rounded pointer-events-none select-none"
-              alt="Uploaded target scan"
-              src={caseData.uploadedImageUrl}
+        <div className="relative w-full h-[420px] bg-slate-950 rounded-xl overflow-hidden border border-slate-800 flex items-center justify-center p-2">
+          <img
+            className="w-full h-full object-contain rounded pointer-events-none select-none"
+            alt="Uploaded target scan"
+            src={caseData.uploadedImageUrl}
+          />
+          <div className="absolute inset-0 p-2 pointer-events-auto">
+            <ROIEditor
+              region={currentRegion}
+              onChange={onRegionChange}
+              onCommit={onRegionCommit}
+              learningStatus={learningStatus}
+              label="HUMAN_VERIFIED_ANOMALY_ROI"
             />
-            <div className="absolute inset-0">
-              <ROIEditor
-                region={currentRegion}
-                onChange={onRegionChange}
-                onCommit={onRegionCommit}
-                learningStatus={learningStatus}
-                label="HUMAN_VERIFIED_ANOMALY_ROI"
-              />
-            </div>
           </div>
         </div>
       </div>
