@@ -247,11 +247,9 @@ export function ImageComparison({ goldenUrl, uploadedUrl, imageHash }) {
         </div>
 
         <div className="space-y-1">
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Unit Under Test</span>
-            <span className="text-[9px] font-bold font-mono px-1.5 py-0.5 rounded bg-rose-500/10 text-rose-500 border border-rose-500/20 uppercase tracking-wider">
-              Defects Marked
-            </span>
+          <div className="flex items-center justify-between text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+            <span>Unit Under Test</span>
+            <span className="text-[9px] text-rose-500 dark:text-rose-400 bg-rose-500/10 px-1.5 py-0.5 rounded font-mono">ANOMALY MARKED</span>
           </div>
           <div
             onClick={() => setZoom("uploaded")}

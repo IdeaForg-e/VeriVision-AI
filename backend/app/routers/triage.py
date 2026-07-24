@@ -5,13 +5,14 @@ Provides all endpoints that the frontend needs to replace mock data.
 import os
 import json
 import logging
+import cv2
 from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from app.database import get_db
 from app.config import settings
-from app import models, schemas, utils
+from app import models, schemas, utils, services
 
 logger = logging.getLogger(__name__)
 
@@ -256,28 +257,32 @@ def get_case_detail(
 
     uploaded_image_url = None
     annotated_image_url = None
-    if inspection.captured_image_path:
+    if inspection.captured_image_path and os.path.exists(inspection.captured_image_path):
         base_name = os.path.basename(inspection.captured_image_path)
-        name_no_ext, ext = os.path.splitext(base_name)
-        annotated_path = os.path.join(settings.UPLOAD_DIR, f"{inspection.case_id}_annotated{ext}")
+        
+        # Check for any existing annotated file on disk
+        for test_ext in [".png", ".jpeg", ".jpg", ".webp"]:
+            cand = os.path.join(settings.UPLOAD_DIR, f"{inspection.case_id}_annotated{test_ext}")
+            if os.path.exists(cand):
+                annotated_image_url = f"/data/cases/{os.path.basename(cand)}"
+                break
+        
+        # On-the-fly annotated target generation fallback for existing cases
+        if not annotated_image_url and product and product.golden_references:
+            golden_ref = product.golden_references[0]
+            if golden_ref.image_path and os.path.exists(golden_ref.image_path):
+                try:
+                    src_img = cv2.imread(inspection.captured_image_path)
+                    ref_img = cv2.imread(golden_ref.image_path)
+                    if src_img is not None and ref_img is not None:
+                        _, _, annotated_target = services.compute_ssim_diff(src_img, ref_img)
+                        gen_path = os.path.join(settings.UPLOAD_DIR, f"{inspection.case_id}_annotated.png")
+                        cv2.imwrite(gen_path, annotated_target)
+                        annotated_image_url = f"/data/cases/{inspection.case_id}_annotated.png"
+                except Exception as e:
+                    logger.error(f"Failed on-the-fly annotated target generation: {e}")
 
-        # Dynamic generation for legacy/existing cases missing the annotated file
-        if not os.path.exists(annotated_path) and os.path.exists(inspection.captured_image_path):
-            try:
-                src_img = cv2.imread(inspection.captured_image_path)
-                ref_path = (product.golden_references[0].image_path if (product and product.golden_references) else None)
-                if src_img is not None and ref_path and os.path.exists(ref_path):
-                    ref_img = cv2.imread(ref_path)
-                    if ref_img is not None:
-                        from app.services.agent_3_detector import compute_ssim_diff
-                        _, _, annotated_target = compute_ssim_diff(src_img, ref_img)
-                        cv2.imwrite(annotated_path, annotated_target)
-                        logger.info(f"Dynamically generated annotated defect scan for case {case_id}")
-            except Exception as e:
-                logger.error(f"Failed to dynamically generate annotated image for case {case_id}: {e}")
-
-        if os.path.exists(annotated_path):
-            annotated_image_url = f"/data/cases/{inspection.case_id}_annotated{ext}"
+        if annotated_image_url:
             uploaded_image_url = annotated_image_url
         else:
             uploaded_image_url = f"/data/cases/{base_name}"
