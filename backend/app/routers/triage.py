@@ -255,8 +255,16 @@ def get_case_detail(
         heatmap_url = f"/data/cases/{os.path.basename(result.heatmap_path)}"
 
     uploaded_image_url = None
+    annotated_image_url = None
     if inspection.captured_image_path:
-        uploaded_image_url = f"/data/cases/{os.path.basename(inspection.captured_image_path)}"
+        base_name = os.path.basename(inspection.captured_image_path)
+        name_no_ext, ext = os.path.splitext(base_name)
+        annotated_path = os.path.join(settings.UPLOAD_DIR, f"{inspection.case_id}_annotated{ext}")
+        if os.path.exists(annotated_path):
+            annotated_image_url = f"/data/cases/{inspection.case_id}_annotated{ext}"
+            uploaded_image_url = annotated_image_url
+        else:
+            uploaded_image_url = f"/data/cases/{base_name}"
 
     # Multi-Angle Views lookup for same product/user
     multi_angle_views = []

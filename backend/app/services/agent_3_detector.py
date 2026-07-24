@@ -37,12 +37,12 @@ def _ensure_gray(img: np.ndarray) -> np.ndarray:
     return cv2.cvtColor(_ensure_rgb(img), cv2.COLOR_BGR2GRAY)
 
 
-def compute_ssim_diff(src_img: np.ndarray, ref_img: np.ndarray) -> tuple[float, np.ndarray]:
+def compute_ssim_diff(src_img: np.ndarray, ref_img: np.ndarray) -> tuple[float, np.ndarray, np.ndarray]:
     """
     Computes SSIM between source and reference.
-    Returns: (ssim_score, heatmap_overlay_image)
+    Returns: (ssim_score, heatmap_overlay_image, annotated_target_image)
     """
-    logger.info("Executing SSIM structural anomaly detector with premium JET highlighting...")
+    logger.info("Executing SSIM structural anomaly detector with JET thermal colormap & defect target bounding boxes...")
     gray_src = _ensure_gray(src_img)
     gray_ref = _ensure_gray(ref_img)
 
@@ -51,48 +51,56 @@ def compute_ssim_diff(src_img: np.ndarray, ref_img: np.ndarray) -> tuple[float, 
         gray_src = cv2.resize(gray_src, (gray_ref.shape[1], gray_ref.shape[0]))
         src_img = cv2.resize(src_img, (ref_img.shape[1], ref_img.shape[0]))
 
-    # Compute SSIM
+    # Compute SSIM structural difference map
     score, diff = ssim(gray_ref, gray_src, full=True)
 
-    # Normalize difference image: 255 is identical, 0 is completely different
-    diff_u8 = ((diff + 1) * 127.5).astype("uint8")
+    # Convert difference to 0-255 range: 0 = identical, 255 = maximum discrepancy
+    diff_u8 = ((1.0 - diff) * 127.5).clip(0, 255).astype("uint8")
 
-    # Invert diff so that larger differences are brighter (closer to 255)
-    inv_diff = 255 - diff_u8
+    # Apply smooth Gaussian blur to produce realistic continuous thermal heat gradients
+    blurred_diff = cv2.GaussianBlur(diff_u8, (15, 15), 0)
 
-    # Threshold diff: values below 100 in diff_u8 (meaning high difference) become 255 in thresh
-    _, thresh = cv2.threshold(diff_u8, 100, 255, cv2.THRESH_BINARY_INV)
+    # 1. Generate real JET Thermal Colormap (blue = match, green/cyan = minor, yellow = moderate, red/magenta = critical anomaly)
+    thermal_colormap = cv2.applyColorMap(blurred_diff, cv2.COLORMAP_JET)
 
-    # 1. Use the original real image scan directly as the base (without thermal colormap filter)
-    glowing_base = src_img.copy()
+    # 2. Threshold anomaly regions (diff > 45) to create a clear anomaly mask
+    _, anomaly_mask = cv2.threshold(blurred_diff, 45, 255, cv2.THRESH_BINARY)
+    anomaly_mask_3ch = (cv2.cvtColor(anomaly_mask, cv2.COLOR_GRAY2BGR) / 255.0)
 
-    # 2. Group nearby small points (like pin connections) into unified contiguous regions
-    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (25, 25))
-    dilated_mask = cv2.dilate(thresh, kernel, iterations=1)
+    # 3. Blend thermal colormap onto source image ONLY where anomalies exist (>45)
+    # Matching pixels stay as the real image, anomalous pixels glow with JET thermal gradient!
+    blended_thermal = cv2.addWeighted(src_img, 0.40, thermal_colormap, 0.60, 0)
+    final_heatmap = (blended_thermal * anomaly_mask_3ch + src_img * (1.0 - anomaly_mask_3ch)).astype("uint8")
 
+    # 4. Group anomaly hotspots into contiguous contours
+    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (15, 15))
+    dilated_mask = cv2.dilate(anomaly_mask, kernel, iterations=1)
     contours, _ = cv2.findContours(dilated_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
-    # 3. Compile premium shaded bounding overlays
-    overlay = glowing_base.copy()
+    annotated_target = src_img.copy()
     contour_count = 0
+
     for c in contours:
         area = cv2.contourArea(c)
-        if area > 150:  # Noise threshold filter
+        if area > 200:  # Noise threshold filter
             contour_count += 1
             x, y, w, h = cv2.boundingRect(c)
-            # Draw a filled red transparent box in the overlay mask
-            cv2.rectangle(overlay, (x, y), (x + w, y + h), (0, 0, 230), -1)
-            # Draw a thick neon-red border on the base
-            cv2.rectangle(glowing_base, (x, y), (x + w, y + h), (0, 0, 255), 2)
-            # Draw an outer dark border for maximum depth contrast
-            cv2.rectangle(glowing_base, (x - 1, y - 1), (x + w + 1, y + h + 1), (0, 0, 50), 1)
 
-    # Blend the filled transparent boxes overlay with the bordered glowing base
-    # (75% bordered base, 25% transparent filled warning boxes)
-    final_heatmap = cv2.addWeighted(overlay, 0.25, glowing_base, 0.75, 0)
+            # Draw sharp glowing bounding box on heatmap
+            cv2.rectangle(final_heatmap, (x, y), (x + w, y + h), (0, 0, 255), 2)
+
+            # Draw sharp target bounding box on annotated_target image for Side-by-Side Unit Under Test view
+            cv2.rectangle(annotated_target, (x, y), (x + w, y + h), (0, 0, 255), 2)
+            cv2.rectangle(annotated_target, (x - 1, y - 1), (x + w + 1, y + h + 1), (0, 255, 255), 1)
+
+            # Draw "ANOMALY #N" badge label
+            badge_label = f"ANOMALY #{contour_count}"
+            (tw, th), _ = cv2.getTextSize(badge_label, cv2.FONT_HERSHEY_SIMPLEX, 0.45, 1)
+            cv2.rectangle(annotated_target, (x, max(0, y - th - 8)), (x + tw + 10, y), (0, 0, 180), -1)
+            cv2.putText(annotated_target, badge_label, (x + 5, max(th, y - 4)), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (255, 255, 255), 1, cv2.LINE_AA)
 
     logger.info(f"SSIM structural check complete. Score: {score:.4f}, Grouped anomalous hotspots: {contour_count}")
-    return float(score), final_heatmap
+    return float(score), final_heatmap, annotated_target
 
 
 def extract_ocr_text(img: np.ndarray, roi: dict = None, expected_serial: str = "") -> tuple[str, bool]:
@@ -391,8 +399,8 @@ def inspect_anomalies_multimodal(src_image_path: str, ref_image_path: str, commo
             ]
         }
 
-        # Set 25s timeout for heavy vision model inference
-        response = requests.post(url, json=payload, headers=headers, timeout=25)
+        # Set 5s timeout for vision model inference to keep pipeline ultra-fast
+        response = requests.post(url, json=payload, headers=headers, timeout=5)
         if response.status_code == 200:
             res_data = response.json()
             description = res_data["choices"][0]["message"]["content"].strip()
@@ -401,6 +409,9 @@ def inspect_anomalies_multimodal(src_image_path: str, ref_image_path: str, commo
         else:
             logger.error(f"[Agent 3: Detector] OpenRouter API returned status {response.status_code}: {response.text}")
             return f"Visual comparison failed: API returned status {response.status_code}."
+    except requests.exceptions.Timeout:
+        logger.warning("[Agent 3: Detector] OpenRouter API request timed out (5s limit reached).")
+        return "Visual comparison skipped: OpenRouter API timeout."
     except Exception as e:
         logger.error(f"[Agent 3: Detector] Multimodal vision query failed: {e}")
         return f"Visual comparison failed due to system exception: {str(e)}."
@@ -470,7 +481,7 @@ def run_anomaly_ensemble(src_img: np.ndarray, ref_img: np.ndarray, roi_config: d
             return compute_ssim_diff(src_img, ref_img)
         except Exception as e:
             logger.error(f"SSIM computation failed: {e}")
-            return 0.0, src_img.copy()
+            return 0.0, src_img.copy(), src_img.copy()
 
     def task_multimodal():
         if src_image_path and ref_image_path:
@@ -532,11 +543,15 @@ def run_anomaly_ensemble(src_img: np.ndarray, ref_img: np.ndarray, roi_config: d
         f_feat = executor.submit(task_features)
         f_emb = executor.submit(task_embedding)
 
-        ssim_val, heatmap_img = f_ssim.result()
-        multimodal_report = f_multi.result()
-        detected_text, golden_text, ocr_engine_available = f_ocr.result()
-        keypoint_results, template_results, color_results = f_feat.result()
-        vector_embedding_match = f_emb.result()
+        ssim_val, heatmap_img, annotated_target = f_ssim.result(timeout=10.0)
+        try:
+            multimodal_report = f_multi.result(timeout=5.0)
+        except Exception as e:
+            logger.warning(f"[Agent 3: Detector] Multimodal vision task timed out or failed: {e}")
+            multimodal_report = "Visual comparison skipped: Multimodal response timeout."
+        detected_text, golden_text, ocr_engine_available = f_ocr.result(timeout=15.0)
+        keypoint_results, template_results, color_results = f_feat.result(timeout=10.0)
+        vector_embedding_match = f_emb.result(timeout=10.0)
 
     # Generate visual side-by-side diagnostic card
     diagnostic_card = None
@@ -586,6 +601,7 @@ def run_anomaly_ensemble(src_img: np.ndarray, ref_img: np.ndarray, roi_config: d
         "vector_embedding_match": vector_embedding_match,
         "matching_score": matching_score,
         "heatmap_img": heatmap_img,
+        "annotated_target": annotated_target,
         "diagnostic_card": diagnostic_card,
         "checked_components": checked_components,
         "errors": errors,

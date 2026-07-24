@@ -176,6 +176,16 @@ def detect_anomalies_node(state: InspectionState) -> Dict[str, Any]:
         logger.error(f"❌ [Node: Anomaly Ensemble] Failed to save heatmap image for Case {case_id}: {e}")
         heatmap_path = None
 
+    # Save the annotated target scan image (with defect bounding boxes & labels)
+    if ensemble_results.get("annotated_target") is not None:
+        annotated_name = f"{case_id}_annotated{file_ext}"
+        annotated_path = os.path.join(settings.UPLOAD_DIR, annotated_name)
+        logger.info(f"[Node: Anomaly Ensemble] Saving annotated target scan image to {annotated_path}")
+        try:
+            cv2.imwrite(annotated_path, ensemble_results["annotated_target"])
+        except Exception as e:
+            logger.error(f"❌ [Node: Anomaly Ensemble] Failed to save annotated target scan: {e}")
+
     # Also save the dynamic diagnostic card to a separate file (for audits/reports)
     if ensemble_results.get("diagnostic_card") is not None:
         diag_name = f"{case_id}_diagnostic{file_ext}"

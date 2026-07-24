@@ -6,7 +6,7 @@ from app.config import settings
 
 logger = logging.getLogger(__name__)
 
-MAX_LLM_ATTEMPTS = 2  # 1 initial attempt + 1 retry before falling back to the template
+MAX_LLM_ATTEMPTS = 1  # Single fast attempt before falling back to local template
 
 
 def _build_prompt(ssim, verdict, fraud_score, detected_text, expected_text,
@@ -103,7 +103,7 @@ def generate_explanation(metrics: dict) -> str:
         for attempt in range(1, MAX_LLM_ATTEMPTS + 1):
             logger.info(f"Querying OpenRouter Explainer model (attempt {attempt}/{MAX_LLM_ATTEMPTS}): {openrouter_model}")
             try:
-                response = requests.post(url, json=payload, headers=headers, timeout=8)
+                response = requests.post(url, json=payload, headers=headers, timeout=3)
                 if response.status_code != 200:
                     logger.warning(f"Explainer model endpoint returned status {response.status_code}. Details: {response.text}")
                     continue
