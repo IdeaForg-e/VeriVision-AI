@@ -483,10 +483,12 @@ def run_anomaly_ensemble(src_img: np.ndarray, ref_img: np.ndarray, roi_config: d
 
     def task_ocr():
         try:
-            return extract_ocr_text(src_img, label_roi, expected_serial)
+            target_text, available = extract_ocr_text(src_img, label_roi, expected_serial)
+            golden_text, _ = extract_ocr_text(ref_img, label_roi, expected_serial)
+            return target_text, golden_text, available
         except Exception as e:
             logger.error(f"OCR extraction failed: {e}")
-            return "", False
+            return "", "", False
 
     def task_features():
         try:
@@ -532,7 +534,7 @@ def run_anomaly_ensemble(src_img: np.ndarray, ref_img: np.ndarray, roi_config: d
 
         ssim_val, heatmap_img = f_ssim.result()
         multimodal_report = f_multi.result()
-        detected_text, ocr_engine_available = f_ocr.result()
+        detected_text, golden_text, ocr_engine_available = f_ocr.result()
         keypoint_results, template_results, color_results = f_feat.result()
         vector_embedding_match = f_emb.result()
 
@@ -544,10 +546,19 @@ def run_anomaly_ensemble(src_img: np.ndarray, ref_img: np.ndarray, roi_config: d
         logger.error(f"Failed to generate side-by-side diagnostic card: {e}")
         errors.append("card_generation_failed")
 
-    # OCR string diff calculation
+    # OCR string diff calculation (Dual check: expected serial DB & golden image OCR)
     ocr_diff = {"similarity": 1.0, "mismatches": []}
-    if expected_serial and ocr_engine_available:
-        ocr_diff = calculate_string_diff(detected_text, expected_serial)
+    if ocr_engine_available:
+        diff_expected = calculate_string_diff(detected_text, expected_serial) if expected_serial else {"similarity": 0.0, "mismatches": []}
+        diff_golden = calculate_string_diff(detected_text, golden_text) if golden_text else {"similarity": 0.0, "mismatches": []}
+
+        # Use the highest similarity match (e.g. when identical images are uploaded, diff_golden is 1.0)
+        if diff_golden["similarity"] >= diff_expected["similarity"]:
+            ocr_diff = diff_golden
+            if not expected_serial and golden_text:
+                expected_serial = golden_text
+        else:
+            ocr_diff = diff_expected
 
     score_components = [keypoint_results["keypoint_match_score"]]
     checked_components = ["keypoint"]
