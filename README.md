@@ -606,6 +606,42 @@ VeriVision AI is architected for Phase I delivery with explicit design hooks for
 }
 ```
 
+### 3. Mobile Capture API Input / Output Schema Mapping (Phase III)
+
+This mapping defines how a field engineer's mobile camera capture app connects directly to the 5-Agent pipeline:
+
+| Mobile Capture API Field | Agent Pipeline Mapping | Direction | Purpose & Behavior |
+|:---|:---|:---|:---|
+| `camera_frame_binary` | `Agent 2 (Triage)` & `Agent 1` | Input | High-res camera snapshot or frame buffer from mobile app |
+| `device_telemetry` | `Inspection.capture_site` / `angle` | Input | GPS coordinates, device ID, lens angle (0°, 45°, 90°) |
+| `triage_feedback` | `Agent 2 (Triage)` Output | Output | Immediate camera overlay feedback (`PASS` or `RETAKE_NEEDED`) |
+| `framing_guidance` | `Agent 2` Detail Message | Output | Real-time text overlay: *"Image blurry (45 < 100). Turn on flashlight & hold steady."* |
+| `fraud_verdict` | `Agent 4 (Decision)` Output | Output | Instant visual alert on phone screen: `CLEAN` (Green) or `QUARANTINE` (Red) |
+| `anomaly_roi_boxes` | `Agent 3 (Detector)` Overlay | Output | JSON bounding box coordinates rendered directly on the phone camera viewfinder |
+| `pdf_audit_url` | `Agent 5 (Explainer)` Output | Output | Download URL for field technician to view laboratory audit certificate |
+
+```json
+// Mobile API Response Payload Schema (`POST /api/mobile/v1/scan`)
+{
+  "case_id": "c9a4f210-5b8e-4a1d-9e32-123456789abc",
+  "triage": {
+    "status": "retake_needed",
+    "clarity_score": 45.2,
+    "framing_guidance": "⚠️ RETAKE NEEDED: Image is blurry. Please illuminate label area and hold camera steady."
+  },
+  "pipeline_result": {
+    "fraud_score": 85,
+    "verdict": "MISMATCHED",
+    "confidence_pct": 92.5,
+    "action_recommended": "Quarantine & Escalate",
+    "bounding_box_rois": [
+      { "field": "serial_number", "x": 120, "y": 85, "w": 200, "h": 60, "status": "OCR_MISMATCH" }
+    ],
+    "pdf_report_download": "http://api.verivision.com/api/reports/report_c9a4f210.pdf"
+  }
+}
+```
+
 ---
 
 ## ⚠️ Known Limitations & Edge Cases
