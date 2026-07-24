@@ -84,7 +84,9 @@ def generate_explanation(metrics: dict) -> str:
     openrouter_key = settings.OPENROUTER_API_KEY
     openrouter_model = settings.OPENROUTER_MODEL
 
-    use_llm_explainer = os.getenv("ENABLE_LLM_EXPLAINER", "false").lower() == "true"
+    # Default to enabled when an API key is present — the env var exists only
+    # as an escape hatch to force the template fallback (e.g. for offline demos).
+    use_llm_explainer = os.getenv("ENABLE_LLM_EXPLAINER", "true").lower() == "true"
     if openrouter_key and use_llm_explainer:
         prompt = _build_prompt(
             ssim, verdict, fraud_score, detected_text, expected_text,
@@ -106,7 +108,7 @@ def generate_explanation(metrics: dict) -> str:
         for attempt in range(1, MAX_LLM_ATTEMPTS + 1):
             logger.info(f"Querying OpenRouter Explainer model (attempt {attempt}/{MAX_LLM_ATTEMPTS}): {openrouter_model}")
             try:
-                response = requests.post(url, json=payload, headers=headers, timeout=10)
+                response = requests.post(url, json=payload, headers=headers, timeout=30)
                 if response.status_code != 200:
                     logger.warning(f"Explainer model endpoint returned status {response.status_code}. Details: {response.text}")
                     continue
@@ -131,11 +133,11 @@ def generate_explanation(metrics: dict) -> str:
     color_pct = color_sim * 100
     if anomaly_regions:
         region_text = "; ".join(
-            f"{r.get('location', 'unknown')} region at x={r.get('x')}, y={r.get('y')}, w={r.get('w')}, h={r.get('h')}"
+            f"the {r.get('location', 'unknown')} area of the component"
             for r in anomaly_regions[:3]
         )
     else:
-        region_text = "no localized anomaly boxes above the configured contour threshold"
+        region_text = "no localized defect regions above the detection threshold"
 
     # --- 1. SSIM / Heatmap paragraph ---
     if ssim >= 0.85:
@@ -258,9 +260,46 @@ def generate_explanation(metrics: dict) -> str:
     else:
         visual_clause = ""
 
-    # Assemble final paragraph
+    # Assemble detailed paragraph
     all_parts = [heatmap_part, ocr_part] + extra_parts + [conclusion + reasoning_clause + visual_clause]
-    explanation_msg = " ".join(all_parts)
+    detailed_paragraph = " ".join(all_parts)
+
+    # --- Plain-English bullet summary (readable at a glance, ahead of the audit paragraph) ---
+    status_map = {
+        "clean": "Clean",
+        "tampered": "Tampered",
+        "missing": "Defective (Missing Element)",
+        "mismatched": "Defective (Label Mismatch)",
+        "reused": "Defective (Reused/Worn)",
+    }
+    part_status = status_map.get(verdict, verdict.title())
+
+    if ssim >= 0.85:
+        visual_finding = "No meaningful visual differences found compared to the golden reference."
+    elif ssim >= 0.65:
+        visual_finding = f"Some visual differences found ({region_text})."
+    else:
+        visual_finding = f"Major visual differences found ({region_text})."
+
+    if not expected_text:
+        serial_check = "Not checked (no expected serial/label text configured for this part)."
+    elif expected_text and detected_text and expected_text == detected_text:
+        serial_check = f"Match — expected '{expected_text}', found '{detected_text}'."
+    elif not detected_text.strip():
+        serial_check = f"Could not read any label — expected '{expected_text}', label appears blank or unreadable."
+    else:
+        serial_check = f"Mismatch — expected '{expected_text}', found '{detected_text}' ({len(ocr_mismatches)} character difference(s))."
+
+    action_item = f"{recommended_action}."
+
+    bullet_summary = (
+        f"• Part Status: {part_status}\n"
+        f"• Visual Findings: {visual_finding}\n"
+        f"• Serial Check: {serial_check}\n"
+        f"• Inspector Action Item: {action_item}"
+    )
+
+    explanation_msg = f"{bullet_summary}\n\n{detailed_paragraph}"
 
     logger.info(f"Local compiled explanation: {explanation_msg[:200]}...")
     return explanation_msg

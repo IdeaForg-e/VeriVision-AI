@@ -8,12 +8,57 @@ VALID_ACTIONS = {
     "Quarantine & Escalate",
     "Request Vendor Verification",
     "Request Additional Angle",
-    "Request additional angle",
     "Retake",
     "Escalate with evidence",
     "Escalate to vendor",
     "Triage Agent requests retake",
 }
+
+# Keyword groups the Vision LLM's free-text report is scanned for, ordered
+# most-severe-first. First group that matches wins. Kept intentionally small
+# and literal (not fuzzy) — this is a tie-breaker for ambiguous cases, not
+# the primary detector, so false positives here should be rare by design.
+_MULTIMODAL_KEYWORD_RULES = [
+    (
+        {"counterfeit", "tamper", "tampered", "broken seal", "seal removed", "swapped", "different component"},
+        "Tampered (Visual AI flagged)", "tampered", "Quarantine & Escalate", 55, 0.55,
+    ),
+    (
+        {"missing capacitor", "missing component", "component missing", "absent", "not present", "no sticker", "sticker missing"},
+        "Missing component (Visual AI flagged)", "missing", "Quarantine & Escalate", 50, 0.55,
+    ),
+    (
+        {"serial mismatch", "label mismatch", "wrong serial", "altered text", "text does not match", "incorrect label"},
+        "Label mismatch (Visual AI flagged)", "mismatched", "Escalate with evidence", 45, 0.55,
+    ),
+    (
+        {"scratch", "scratches", "crack", "cracked", "dent", "physical damage", "discoloration"},
+        "Physical damage (Visual AI flagged)", "tampered", "Request Vendor Verification", 40, 0.50,
+    ),
+    (
+        {"residue", "wear pattern", "wear and tear", "previously used", "reused"},
+        "Reused board (Visual AI flagged)", "reused", "Request Additional Angle", 30, 0.50,
+    ),
+]
+
+
+def _classify_multimodal_keywords(multimodal_report: str) -> tuple[str | None, str | None, str | None, int, float]:
+    """
+    Scans the Vision LLM's natural-language report for concrete fraud
+    keywords and maps the first matching group onto (category, verdict,
+    action, fraud_score, confidence). Returns (None, None, None, 0, 0.0)
+    when nothing matches or the report is a "no anomalies" / failure note.
+    """
+    text = (multimodal_report or "").lower()
+    if not text or "no anomalies detected" in text or "skipped" in text or "failed" in text:
+        return None, None, None, 0, 0.0
+
+    for keywords, category, verdict, action, score, confidence in _MULTIMODAL_KEYWORD_RULES:
+        if any(kw in text for kw in keywords):
+            return category, verdict, action, score, confidence
+
+    return None, None, None, 0, 0.0
+
 
 def make_decision(ensemble_results: dict, thresholds: dict | None = None) -> dict:
     """
@@ -219,7 +264,7 @@ def make_decision(ensemble_results: dict, thresholds: dict | None = None) -> dic
     elif alignment_reliable and ssim_loss > 0.15:  # SSIM < 0.85
         category = "Reused board"
         verdict = "reused"
-        recommended_action = "Request additional angle"
+        recommended_action = "Request Additional Angle"
         confidence = 0.80
         fraud_score = 35
         reason_note = (
@@ -236,7 +281,7 @@ def make_decision(ensemble_results: dict, thresholds: dict | None = None) -> dic
     elif not alignment_reliable:
         category = "Alignment unreliable (needs retake)"
         verdict = "reused"
-        recommended_action = "Request additional angle"
+        recommended_action = "Request Additional Angle"
         confidence = 0.30
         fraud_score = 20
         reason_note = (
@@ -264,9 +309,36 @@ def make_decision(ensemble_results: dict, thresholds: dict | None = None) -> dic
         )
         logger.info(f"[Agent 4] Decision: FALSE ALARM (lighting) → Retake requested. Fraud Score: {fraud_score}")
 
+    # 9. AMBIGUOUS CASE → no deterministic detector fired strongly enough to
+    # pick a category (we're still sitting on the "clean" default), but the
+    # Vision LLM's free-text description mentions a concrete fraud finding.
+    # Use its wording to steer category selection instead of defaulting to
+    # clean just because the numeric thresholds were borderline/inconclusive.
+    # This never *overrides* a verdict a deterministic rule already reached
+    # above — it only fills in when nothing else claimed the case.
+    if verdict == "clean" and multimodal_report and not source_reference_identical:
+        mm_category, mm_verdict, mm_action, mm_score, mm_confidence = _classify_multimodal_keywords(multimodal_report)
+        if mm_verdict is not None:
+            category = mm_category
+            verdict = mm_verdict
+            recommended_action = mm_action
+            fraud_score = mm_score
+            confidence = mm_confidence
+            reason_note = (
+                f"AMBIGUOUS CASE RESOLVED BY VISUAL AI: Deterministic detectors (SSIM={ssim:.2f}, OCR sim={ocr_sim:.2f}, "
+                f"keypoints={kp_ratio:.2f}, template found={temp_found}, color sim={color_sim:.2f}) did not clearly "
+                f"trip any single rule. The Vision LLM's semantic description of the image was used to classify this "
+                f"as '{category}'. Vision AI note: \"{multimodal_report[:250]}\". Flagged for human confirmation "
+                f"given this verdict rests on semantic description rather than a deterministic metric."
+            )
+            logger.info(f"[Agent 4] Decision: AMBIGUOUS → resolved via multimodal keywords as {category}. Fraud Score: {fraud_score}")
+
     # --- MULTIMODAL VISION INTEGRATION ---
-    multimodal_report = ensemble_results.get("multimodal_report", "")
-    if multimodal_report and "visual comparison failed" not in multimodal_report.lower() and "visual comparison skipped" not in multimodal_report.lower():
+    # Note: multimodal_report was already read at the top of this function (for
+    # mentions_missing_component). We reuse that same variable here — no second
+    # .get() call, which previously overwrote the first read with the same value
+    # but created a confusing double-read code path.
+    if multimodal_report and "visual comparison failed" not in multimodal_lower and "visual comparison skipped" not in multimodal_lower:
         if "no anomalies detected" in multimodal_report.lower():
             logger.info("[Agent 4] Multimodal Vision confirmed: No anomalies.")
             if verdict == "clean":

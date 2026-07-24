@@ -216,12 +216,51 @@ def get_case_detail(
 
     # Build OCR results from the inspection result
     ocr_results = []
+    pipeline_category = None
+    ocr_similarity = None
+    ocr_match = None
     if result:
+        evidence = result.evidence_json or {}
+        pipeline_category = result.category or evidence.get("category")
+        ocr_detector_data = evidence.get("detector_results", {}).get("ocr", {})
+        ocr_similarity = ocr_detector_data.get("similarity") if ocr_detector_data.get("similarity") is not None else evidence.get("ocr_similarity")
+
+        # Resolve expected serial: avoid using dummy part numbers like "GOLD-RAM" as serials
+        expected_serial = result.ocr_expected_text or ocr_detector_data.get("expected_text")
+        if not expected_serial and product and product.golden_references:
+            ref_serial = product.golden_references[0].expected_serial
+            if ref_serial and not ref_serial.startswith("GOLD-") and not ref_serial.startswith("AUTO-") and ref_serial != product.part_number:
+                expected_serial = ref_serial
+
+        detected_text = result.ocr_detected_text or ocr_detector_data.get("detected_text") or "No text detected"
+        expected_text = expected_serial if expected_serial else "N/A font / board label"
+
+        def _normalize_text(value):
+            if not value:
+                return ""
+            return "".join(str(value).split()).lower()
+
+        mismatches = ocr_detector_data.get("mismatches") if ocr_detector_data.get("mismatches") is not None else evidence.get("ocr_mismatches", [])
+
+        if expected_serial and expected_serial != "N/A":
+            if isinstance(mismatches, list) and len(mismatches) > 0:
+                ocr_match = False
+            elif ocr_similarity is not None:
+                ocr_match = float(ocr_similarity) >= 0.9
+            elif detected_text and detected_text != "No text detected":
+                ocr_match = _normalize_text(detected_text) == _normalize_text(expected_serial)
+            else:
+                ocr_match = False
+        else:
+            ocr_match = None
+
         ocr_results.append({
             "field": "Barcode / Label Text Check",
-            "extracted": result.ocr_detected_text or "No text detected",
-            "expected": result.ocr_expected_text or "N/A",
-            "match": (result.ocr_detected_text == result.ocr_expected_text) if (result.ocr_detected_text and result.ocr_expected_text) else False,
+            "extracted": detected_text,
+            "expected": expected_text,
+            "match": ocr_match,
+            "similarity": ocr_similarity,
+            "mismatches": mismatches or [],
         })
 
     # Build detector metrics
@@ -329,6 +368,7 @@ def get_case_detail(
             # Return None (not 0 or 50) when no pipeline result so the UI can show N/A
             "confidencePct": int(result.confidence * 100) if (pipeline_complete and result.confidence is not None) else None,
             "fraudScore": result.fraud_score if pipeline_complete else None,
+            "category": pipeline_category if pipeline_complete else None,
             "imageHash": f"0x{abs(hash(inspection.case_id)):08X}",
             "neuralModel": "FraudSense v4.2",
             "updatedAt": inspection.created_at.isoformat() if inspection.created_at else "",
@@ -339,6 +379,9 @@ def get_case_detail(
             "multiAngleViews": multi_angle_views,
             "pipelineComplete": pipeline_complete,
         },
+        "pipelineVerdict": result.verdict if pipeline_complete else None,
+        "pipelineCategory": pipeline_category if pipeline_complete else None,
+        "pipelineAction": result.recommended_action if pipeline_complete else None,
         "ocrResults": ocr_results,
         "metrics": metrics,
         "timeline": timeline,

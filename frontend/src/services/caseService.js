@@ -21,6 +21,7 @@ export async function getCaseById(caseId) {
     commodity: data.metadata.commodity,
     confidencePct: data.metadata.confidencePct,
     fraudScore: data.metadata.fraudScore,
+    category: data.metadata.category,
     status: data.metadata.status,
     updatedAt: data.metadata.updatedAt,
     imageHash: data.metadata.imageHash,
@@ -30,11 +31,16 @@ export async function getCaseById(caseId) {
     uploadedImageUrl: data.metadata.uploadedImageUrl,
     captureAngle: data.metadata.captureAngle,
     multiAngleViews: data.metadata.multiAngleViews || [],
+    pipelineComplete: data.metadata.pipelineComplete,
     title: `Case detail for ${data.metadata.partCode}`,
+    pipelineVerdict: data.pipelineVerdict,
+    pipelineCategory: data.pipelineCategory,
+    pipelineAction: data.pipelineAction,
     ocrResults: data.ocrResults,
     metrics: data.metrics,
     timeline: data.timeline,
     recommendation: data.recommendation,
+    evidence: data.evidence,
   };
 }
 

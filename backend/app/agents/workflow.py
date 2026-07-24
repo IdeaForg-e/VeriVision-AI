@@ -56,6 +56,7 @@ class InspectionState(TypedDict):
     confidence: Optional[float]
     recommended_action: Optional[str]
     explanation: Optional[str]
+    decision_reasoning: Optional[str]  # Agent 4 reasoning; kept separate so triage_detail retains quality info
     
     # Final workflow state
     status: str                 # "completed", "retake_needed", "failed"
@@ -134,7 +135,14 @@ def detect_anomalies_node(state: InspectionState) -> Dict[str, Any]:
         logger.info("\n" + "="*80 + f"\n⏹️ [FINISHED] NODE: detect_anomalies (SKIPPED) - Case {case_id}\n" + "="*80)
         return {}
 
-    aligned_img = state["aligned_image"]
+    aligned_img = state.get("aligned_image")
+    if aligned_img is None:
+        logger.error(f"\u274c [Node: Anomaly Ensemble] aligned_image is None for Case {case_id} — cannot run detection ensemble.")
+        logger.info("\n" + "="*80 + f"\n\u23f9\ufe0f [FINISHED] NODE: detect_anomalies (FAILED — no aligned image) - Case {case_id}\n" + "="*80)
+        return {
+            "status": "failed",
+            "triage_detail": "Aligned image unavailable. The scan could not be registered against the golden reference. Please retake."
+        }
     ref_img = cv2.imread(state["golden_path"])
     
     if ref_img is None:
@@ -270,12 +278,23 @@ def decision_node(state: InspectionState) -> Dict[str, Any]:
         "alignment_reliable": state.get("alignment_status") == "aligned",
     }
     
+    # Read thresholds from settings as a baseline so they are always populated,
+    # then overlay any runtime-adjusted values from the admin triage config.
+    # NOTE: importing from a router module is a dependency-direction violation
+    # (services should not import from routers). The try/except ensures the
+    # pipeline still works in tests and CLI contexts where triage.py is not
+    # imported, and settings values are always used as the safe fallback.
+    thresholds = {
+        "ssim": float(getattr(settings, "SSIM_THRESHOLD", 0.85)),
+        "ocrFuzzyPct": 100,
+    }
     try:
         from app.routers.triage import _PIPELINE_CONFIG
-        thresholds = _PIPELINE_CONFIG.get("thresholds", {})
+        runtime_thresholds = _PIPELINE_CONFIG.get("thresholds", {})
+        if runtime_thresholds:
+            thresholds.update(runtime_thresholds)
     except Exception as e:
-        logger.warning(f"[Node: Decision Judge] Could not load live threshold config, using defaults: {e}")
-        thresholds = {}
+        logger.warning(f"[Node: Decision Judge] Could not load live threshold config, using settings defaults: {e}")
 
     decision = services.make_decision(ensemble_results, thresholds=thresholds)
     logger.info(f"⚖️ [Node: Decision Judge] Verdict: {decision['verdict'].upper()}, Score: {decision['fraud_score']}/100, Action: {decision['recommended_action']}")
@@ -287,7 +306,7 @@ def decision_node(state: InspectionState) -> Dict[str, Any]:
         "category": decision.get("category"),
         "confidence": decision["confidence"],
         "recommended_action": decision["recommended_action"],
-        "triage_detail": decision["reasoning"],
+        "decision_reasoning": decision["reasoning"],
     }
 
 # 5. Explainer Agent Node
@@ -320,7 +339,10 @@ def explainer_node(state: InspectionState) -> Dict[str, Any]:
         "evidence_summary": state.get("evidence_summary", {}),
         "thresholds_used": state.get("thresholds_used", {}),
         "alignment_status": state.get("alignment_status"),
-        "reasoning": state.get("triage_detail"),
+        # Use decision_reasoning (set by decision_node) as the grounding context
+        # for the LLM explainer. Fall back to triage_detail (image quality message)
+        # only if decision_reasoning is not available.
+        "reasoning": state.get("decision_reasoning") or state.get("triage_detail", ""),
         "multimodal_report": state.get("multimodal_report", "")
     }
     
@@ -347,10 +369,16 @@ def check_gatekeeper_condition(state: InspectionState) -> str:
 
 def check_triage_condition(state: InspectionState) -> str:
     """
-    Checks if triage has failed.
+    Checks if triage has failed or if the aligned image is unavailable.
     """
     if state.get("triage_status") == "fail" or state.get("status") == "retake_needed":
         logger.warning(f"[Routing: Triage Fail] Bypassing pipeline directly to End due to Ingestion Quality/Alignment rejection.")
+        return "fail"
+    # Guard: aligned_image must be populated. A triage can 'pass' quality checks
+    # but still fail to produce an aligned image (e.g. if cv2.imread returned None
+    # for the source file). Catch it here before the detection node crashes.
+    if state.get("aligned_image") is None:
+        logger.warning("[Routing: Triage Fail] aligned_image is None despite triage passing — routing to fail.")
         return "fail"
     logger.info(f"[Routing: Triage Pass] Routing flow to Anomaly Detector Ensemble.")
     return "continue"
@@ -443,6 +471,7 @@ def run_inspection_pipeline(initial_state: Dict[str, Any]) -> Dict[str, Any]:
         "confidence": None,
         "recommended_action": None,
         "explanation": None,
+        "decision_reasoning": None,
         "status": "pending"
     }
     

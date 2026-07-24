@@ -2,26 +2,55 @@ import cv2
 import numpy as np
 import os
 import logging
+import difflib
+from typing import Optional
 from skimage.metrics import structural_similarity as ssim
 from app.config import settings
 
 logger = logging.getLogger(__name__)
 
-# Lazy initialize EasyOCR reader to save startup memory/time
+# Lazy initialize EasyOCR reader to save startup memory/time.
+# _easyocr_reader states: None = not yet attempted, "FAILED" = init tried and
+# failed, Reader instance = ready. We never silently re-cache None on failure —
+# that made every request after the first failure look like a fresh retry log
+# line while actually permanently short-circuiting to the fallback path.
 _easyocr_reader = None
+_easyocr_init_error: Optional[str] = None
 
 
-def get_ocr_reader():
-    global _easyocr_reader
-    if _easyocr_reader is None:
+def get_ocr_reader(retry: bool = False):
+    """
+    Returns a ready EasyOCR reader, or raises RuntimeError with the original
+    cause if the engine cannot be initialized. Callers that can legitimately
+    run without OCR (e.g. run_anomaly_ensemble's ThreadPoolExecutor tasks)
+    must catch this explicitly and record it in `errors`, not swallow it
+    into a generic "" / False result.
+
+    `retry=True` forces a fresh init attempt even after a prior failure —
+    use this from an ops/healthcheck endpoint after fixing the environment,
+    instead of restarting the whole process.
+    """
+    global _easyocr_reader, _easyocr_init_error
+
+    if _easyocr_reader == "FAILED" and not retry:
+        raise RuntimeError(f"EasyOCR previously failed to initialize: {_easyocr_init_error}")
+
+    if _easyocr_reader is None or _easyocr_reader == "FAILED":
         logger.info("Initializing EasyOCR Engine on CPU mode...")
         try:
             import easyocr
             _easyocr_reader = easyocr.Reader(["en"], gpu=False)
+            _easyocr_init_error = None
             logger.info("EasyOCR Engine successfully initialized.")
         except Exception as e:
-            logger.error(f"Warning: EasyOCR failed to initialize. Details: {e}")
-            _easyocr_reader = None
+            _easyocr_reader = "FAILED"
+            _easyocr_init_error = str(e)
+            logger.critical(
+                f"EasyOCR failed to initialize — OCR detection is DOWN for this process. "
+                f"Check 'pip show easyocr torch' in this environment. Cause: {e}"
+            )
+            raise RuntimeError(f"EasyOCR initialization failed: {e}") from e
+
     return _easyocr_reader
 
 
@@ -250,6 +279,52 @@ def compute_ssim_diff(src_img: np.ndarray, ref_img: np.ndarray) -> tuple[float, 
     return float(score), realistic_heatmap, annotated_target, anomaly_regions[:12]
 
 
+def _preprocess_for_ocr(crop: np.ndarray) -> np.ndarray:
+    """
+    Cleans up a label crop before handing it to EasyOCR:
+      1. Upscale small crops (EasyOCR reads tiny/low-res text poorly).
+      2. Convert to grayscale.
+      3. Denoise while keeping edges sharp (bilateral filter).
+      4. Boost local contrast (CLAHE) so faint/worn print stands out.
+      5. Adaptive-threshold binarize (black text on white background),
+         then hand back a 3-channel image since EasyOCR expects BGR/RGB input.
+
+    Any failure here just returns the original crop untouched instead of
+    raising, so OCR quality is best-effort, never a hard failure point.
+    """
+    try:
+        crop_h, crop_w = crop.shape[:2]
+        min_dim = 300
+        if 0 < crop_h < min_dim or 0 < crop_w < min_dim:
+            scale = min_dim / max(crop_h, crop_w, 1)
+            crop = cv2.resize(crop, (int(crop_w * scale), int(crop_h * scale)), interpolation=cv2.INTER_CUBIC)
+
+        gray = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY) if crop.ndim == 3 else crop
+
+        # Denoise but keep character edges crisp
+        denoised = cv2.bilateralFilter(gray, 7, 50, 50)
+
+        # Local contrast boost — helps faded/worn labels
+        clahe = cv2.createCLAHE(clipLimit=2.5, tileGridSize=(8, 8))
+        contrast_boosted = clahe.apply(denoised)
+
+        # Adaptive threshold to get clean black-on-white text
+        binarized = cv2.adaptiveThreshold(
+            contrast_boosted, 255,
+            cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY,
+            blockSize=25, C=10
+        )
+
+        # Light morphological cleanup to remove speckle noise from thresholding
+        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2, 2))
+        cleaned = cv2.morphologyEx(binarized, cv2.MORPH_OPEN, kernel)
+
+        return cv2.cvtColor(cleaned, cv2.COLOR_GRAY2BGR)
+    except Exception as e:
+        logger.warning(f"OCR preprocessing/binarization failed, using raw crop instead: {e}")
+        return crop
+
+
 def extract_ocr_text(img: np.ndarray, roi: dict = None, expected_serial: str = "") -> tuple[str, bool]:
     """
     Crops ROI (if coordinates are provided) and reads text using EasyOCR.
@@ -280,17 +355,29 @@ def extract_ocr_text(img: np.ndarray, roi: dict = None, expected_serial: str = "
         else:
             logger.warning("Configured text label ROI exceeds image boundary dimensions or is empty. Defaulting to full image.")
 
-    reader = get_ocr_reader()
-    if reader is None:
-        logger.error(
-            "OCR Reader offline. Returning empty detected text and flagging engine as unavailable."
-        )
+    try:
+        reader = get_ocr_reader()
+    except RuntimeError as e:
+        logger.error(f"OCR Reader offline: {e}. Returning empty detected text and flagging engine as unavailable.")
         return "", False
 
     try:
-        results = reader.readtext(crop)
+        # Only binarize/clean when we actually cropped a small ROI — a full
+        # frame board image put through adaptive threshold + CLAHE tends to
+        # blow out non-label regions and doesn't help text detection there.
+        ocr_input = _preprocess_for_ocr(crop) if cropped_used else crop
+        results = reader.readtext(ocr_input)
         texts = [res[1] for res in results]
         detected = " ".join(texts).strip()
+
+        # Cleaned-up crop occasionally reads worse than the raw crop (e.g. if
+        # thresholding erased faint strokes) — try raw crop too and keep
+        # whichever produced more characters.
+        if cropped_used and not detected:
+            raw_results = reader.readtext(crop)
+            raw_detected = " ".join(res[1] for res in raw_results).strip()
+            if raw_detected:
+                detected = raw_detected
         
         # Check similarity with expected serial
         is_poor_match = False
@@ -318,51 +405,79 @@ def extract_ocr_text(img: np.ndarray, roi: dict = None, expected_serial: str = "
 
 
 
+import difflib
+
+# Common OCR visual confusion pairs (e.g. 'G' vs '6', '0' vs 'O', 'I' vs '1', 'S' vs '5', 'B' vs '8')
+_CONFUSION_PAIRS = {
+    ('O', '0'), ('0', 'O'),
+    ('I', '1'), ('1', 'I'), ('|', 'I'), ('I', '|'), ('|', '1'), ('1', '|'),
+    ('S', '5'), ('5', 'S'),
+    ('G', '6'), ('6', 'G'),
+    ('B', '8'), ('8', 'B'),
+    ('Z', '2'), ('2', 'Z'),
+    ('T', '7'), ('7', 'T'),
+}
+
+
 def calculate_string_diff(str1: str, str2: str) -> dict:
     """
-    Calculates character-level differences and character similarity with OCR confusion pair tolerance.
-    Returns: {"similarity": float, "mismatches": list}
+    same length and perfectly lined up. If OCR drops or inserts even a single
+    character (very common — e.g. missing a hyphen, or reading "AOO-001" as
+    "A0O01"), every character *after* that point shifts by one position and
+    gets flagged as a mismatch, even though the label is actually correct.
+    Sequence alignment finds the actual matching/inserted/deleted/replaced
+    spans, so a single dropped character produces exactly one mismatch entry,
+    not a cascade of false ones.
+
+    Returns: {"similarity": float, "mismatches": list, "suspicious_confusions": list}
     """
     logger.info(f"Comparing OCR detected string '{str1}' against master catalog reference '{str2}'")
-    s1 = str1.upper().replace(" ", "")
-    s2 = str2.upper().replace(" ", "")
+    s1 = str1.upper().replace(" ", "")  # detected
+    s2 = str2.upper().replace(" ", "")  # expected
 
-    # Common OCR visual confusion pairs (e.g. 'G' vs '6', '0' vs 'O', 'I' vs '1', 'S' vs '5', 'B' vs '8')
-    confusion_pairs = {
-        ('O', '0'), ('0', 'O'),
-        ('I', '1'), ('1', 'I'), ('|', 'I'), ('I', '|'), ('|', '1'), ('1', '|'),
-        ('S', '5'), ('5', 'S'),
-        ('G', '6'), ('6', 'G'),
-        ('B', '8'), ('8', 'B'),
-        ('Z', '2'), ('2', 'Z'),
-        ('T', '7'), ('7', 'T'),
-    }
+    matcher = difflib.SequenceMatcher(None, s1, s2, autojunk=False)
+    similarity = matcher.ratio()
 
     mismatches = []
     suspicious_confusions = []
-    max_len = max(len(s1), len(s2))
-    s1_padded = s1.ljust(max_len)
-    s2_padded = s2.ljust(max_len)
 
-    matches = 0
-    for idx in range(max_len):
-        char1 = s1_padded[idx]
-        char2 = s2_padded[idx]
-        if char1 == char2:
-            matches += 1
+    for tag, i1, i2, j1, j2 in matcher.get_opcodes():
+        if tag == "equal":
+            continue
+
+        detected_span = s1[i1:i2]
+        expected_span = s2[j1:j2]
+
+        # For 'replace' spans of equal length, report per-character mismatches
+        # (keeps parity with prior granular position-level reporting).
+        # For 'insert'/'delete'/uneven 'replace' spans, report the whole span
+        # as one mismatch instead of forcing a bogus 1:1 char alignment.
+        if tag == "replace" and len(detected_span) == len(expected_span):
+            for offset, (c1, c2) in enumerate(zip(detected_span, expected_span)):
+                mismatch = {
+                    "position": j1 + offset,
+                    "expected": c2,
+                    "detected": c1,
+                    "tag": "replace",
+                    "confusable": (c1, c2) in _CONFUSION_PAIRS,
+                }
+                mismatches.append(mismatch)
+                if mismatch["confusable"]:
+                    suspicious_confusions.append(mismatch)
         else:
             mismatch = {
-                "position": idx,
-                "expected": char2.strip(),
-                "detected": char1.strip(),
-                "confusable": (char1, char2) in confusion_pairs
+                "position": j1,
+                "expected": expected_span,
+                "detected": detected_span,
+                "tag": tag,  # 'insert' (extra chars detected) or 'delete' (missing chars) or uneven 'replace'
+                "confusable": False,
             }
             mismatches.append(mismatch)
-            if mismatch["confusable"]:
-                suspicious_confusions.append(mismatch)
 
-    similarity = matches / max(max_len, 1)
-    logger.info(f"Character validation complete. String similarity rate: {similarity:.2f}, mismatches count: {len(mismatches)}")
+    logger.info(
+        f"Fuzzy character validation complete. String similarity rate: {similarity:.2f}, "
+        f"mismatches count: {len(mismatches)}"
+    )
     return {
         "similarity": similarity,
         "mismatches": mismatches,
@@ -562,7 +677,7 @@ def inspect_anomalies_multimodal(src_image_path: str, ref_image_path: str, commo
         )
 
         payload = {
-            "model": "google/gemini-2.0-flash-exp:free",
+            "model": settings.OPENROUTER_MODEL,  # Use configured model, not hardcoded free model
             "messages": [
                 {
                     "role": "user",
@@ -585,8 +700,8 @@ def inspect_anomalies_multimodal(src_image_path: str, ref_image_path: str, commo
             ]
         }
 
-        # Set 10s timeout for vision model inference
-        response = requests.post(url, json=payload, headers=headers, timeout=10)
+        # 30s timeout — free-tier vision model inference takes 8–20s; 10s caused constant timeouts
+        response = requests.post(url, json=payload, headers=headers, timeout=30)
         if response.status_code == 200:
             res_data = response.json()
             description = res_data["choices"][0]["message"]["content"].strip()
@@ -596,7 +711,7 @@ def inspect_anomalies_multimodal(src_image_path: str, ref_image_path: str, commo
             logger.error(f"[Agent 3: Detector] OpenRouter API returned status {response.status_code}: {response.text}")
             return f"Visual comparison failed: API returned status {response.status_code}."
     except requests.exceptions.Timeout:
-        logger.warning("[Agent 3: Detector] OpenRouter API request timed out (10s limit reached).")
+        logger.warning("[Agent 3: Detector] OpenRouter API request timed out (30s limit reached).")
         return "Visual comparison skipped: OpenRouter API timeout."
     except Exception as e:
         logger.error(f"[Agent 3: Detector] Multimodal vision query failed: {e}")
@@ -670,7 +785,10 @@ def run_anomaly_ensemble(src_img: np.ndarray, ref_img: np.ndarray, roi_config: d
     # are lazy-initialized for the first time inside a ThreadPoolExecutor worker.
     # Calling get_ocr_reader() here ensures all torch/torchvision modules are
     # fully loaded before any background threads start.
-    get_ocr_reader()
+    try:
+        get_ocr_reader()
+    except RuntimeError as e:
+        logger.critical(f"[Agent 3: Detector] OCR unavailable for this entire case — all OCR results will be empty. {e}")
 
     # Also pre-warm CLIP embedding model on the main thread for the same reason.
     try:
@@ -763,7 +881,7 @@ def run_anomaly_ensemble(src_img: np.ndarray, ref_img: np.ndarray, roi_config: d
             ssim_val, heatmap_img, annotated_target, anomaly_regions = 0.0, src_img.copy(), src_img.copy(), []
 
         try:
-            multimodal_report = f_multi.result(timeout=10.0)
+            multimodal_report = f_multi.result(timeout=25.0)
         except Exception as e:
             logger.warning(f"[Agent 3: Detector] Multimodal vision task timed out or failed: {e}")
             multimodal_report = "Visual comparison skipped: Multimodal response timeout."
@@ -800,10 +918,11 @@ def run_anomaly_ensemble(src_img: np.ndarray, ref_img: np.ndarray, roi_config: d
         errors.append("card_generation_failed")
 
     # Dynamic Ground-Truth OCR Determination:
-    # Prefer explicit catalog serial text. Use golden OCR only when it is a
-    # short, plausible label; never turn full-frame board text into a serial.
+    # Prefer explicit catalog serial text. Use golden OCR ONLY when a focused label_roi
+    # is configured — full-frame golden OCR reads silkscreen markings (R102, C15, etc.)
+    # which are NOT serial numbers and cause false mismatches on every clean scan.
     explicit_expected = expected_serial if _is_plausible_expected_label(expected_serial) else ""
-    golden_expected = golden_text if _is_plausible_expected_label(golden_text) else ""
+    golden_expected = (golden_text if label_roi and _is_plausible_expected_label(golden_text) else "")
     master_expected_text = explicit_expected or golden_expected
 
     ocr_diff = {"similarity": 1.0, "mismatches": [], "suspicious_confusions": []}

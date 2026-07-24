@@ -327,21 +327,28 @@ export function OCRResults({ results = [] }) {
 
       <div className="divide-y divide-slate-200 dark:divide-slate-800/60 text-xs">
         {results.map((row, i) => (
-          <div key={i} className="py-2 flex items-center justify-between gap-2">
-            <div>
-              <p className="text-[10px] font-bold text-slate-500 uppercase">{row.field}</p>
-              <p className="font-mono font-bold text-slate-800 dark:text-slate-200">{row.extracted ?? "—"}</p>
+          <div key={i} className="py-2 space-y-1">
+            <div className="flex items-center justify-between gap-2">
+              <div>
+                <p className="text-[10px] font-bold text-slate-500 uppercase">{row.field}</p>
+                <p className="font-mono font-bold text-slate-800 dark:text-slate-200">{row.extracted ?? "—"}</p>
+              </div>
+              <div className="text-right">
+                <p className="text-[10px] font-bold text-slate-500 uppercase">Expected</p>
+                <p className="font-mono text-slate-500">{row.expected ?? "—"}</p>
+              </div>
+              {row.match === true ? (
+                <CheckCircle2 size={16} className="text-emerald-500 shrink-0" />
+              ) : row.match === false ? (
+                <XCircle size={16} className="text-rose-500 shrink-0" />
+              ) : (
+                <AlertTriangle size={16} className="text-amber-500 shrink-0" />
+              )}
             </div>
-            <div className="text-right">
-              <p className="text-[10px] font-bold text-slate-500 uppercase">Expected</p>
-              <p className="font-mono text-slate-500">{row.expected ?? "—"}</p>
-            </div>
-            {row.match === true ? (
-              <CheckCircle2 size={16} className="text-emerald-500 shrink-0" />
-            ) : row.match === false ? (
-              <XCircle size={16} className="text-rose-500 shrink-0" />
-            ) : (
-              <AlertTriangle size={16} className="text-amber-500 shrink-0" />
+            {row.mismatches && row.mismatches.length > 0 && (
+              <div className="text-[10px] font-mono text-rose-500 bg-rose-500/10 p-1.5 rounded border border-rose-500/20">
+                Mismatch: {row.mismatches.map((m) => `Pos ${m.position}: expected '${m.expected}' got '${m.detected}'`).join("; ")}
+              </div>
             )}
           </div>
         ))}

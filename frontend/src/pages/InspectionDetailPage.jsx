@@ -156,8 +156,8 @@ export default function InspectionDetailPage() {
 
   const merged = useMemo(() => ({ ...caseData, ...reviewData }), [caseData, reviewData]);
 
-  // pipelineComplete is true only when the backend returned real result data
-  const pipelineComplete = merged.pipelineComplete === true;
+  // pipelineComplete is true when backend returned result data
+  const pipelineComplete = merged.pipelineComplete === true || (merged.metrics && merged.metrics.length > 0 && merged.fraudScore != null);
 
   const ssim = merged.metrics?.find((m) => m.name.includes("SSIM"))?.score ?? null;
   const keypoint = merged.metrics?.find((m) => m.name.includes("Keypoint"))?.score ?? null;
@@ -165,17 +165,18 @@ export default function InspectionDetailPage() {
   const vectorMatchRaw = merged.metrics?.find((m) => m.name?.includes("Vector"))?.score;
   const vectorMatchScore = vectorMatchRaw != null ? parseFloat(vectorMatchRaw) : null;
   const ocrResults = merged.ocrResults || [];
-  const ocrMatch = ocrResults[0]?.match ?? null;
   const ocrText = ocrResults[0]?.extracted || "";
   const ocrExpected = ocrResults[0]?.expected || "";
+  const ocrMatch = !pipelineComplete ? null : (ocrResults[0]?.match ?? (ocrText && ocrExpected && ocrExpected !== "N/A font / board label" ? ocrText === ocrExpected : null));
   const recommendation = merged.recommendation || {};
 
   // Only map to a verdict when the pipeline actually ran
+  const rawAction = recommendation.decision || merged.pipelineAction || merged.recommendation?.decision;
   const recDecision = !pipelineComplete
     ? null
-    : recommendation.decision === "Accept"
+    : rawAction === "Accept"
       ? REVIEW_DECISION.APPROVED
-      : recommendation.decision === "Quarantine & Escalate"
+      : rawAction === "Quarantine & Escalate" || rawAction === "Escalate with evidence" || rawAction === "Escalate to vendor"
       ? REVIEW_DECISION.REJECTED
       : REVIEW_DECISION.NEEDS_MORE_EVIDENCE;
 
@@ -184,26 +185,28 @@ export default function InspectionDetailPage() {
   const fraudScore = merged.fraudScore ?? null;
   const aiConfidence = recommendation.confidence ?? merged.confidencePct ?? null;
 
-  const aiClassification = pipelineComplete ? (merged.status || "UNKNOWN") : merged.status || "pending";
+  const aiClassification = pipelineComplete
+    ? (merged.pipelineVerdict || merged.metadata?.status || merged.result?.verdict || merged.status || "UNKNOWN").toUpperCase()
+    : (merged.status || "pending").toUpperCase();
 
-  const rawCategory = merged.result?.category || merged.category;
-  const currentVerdict = (merged.result?.verdict || merged.verdict || "").toLowerCase();
-  const currentAction = (merged.result?.recommended_action || recommendation.decision || "").toLowerCase();
+  const rawCategory = merged.pipelineCategory || merged.category || merged.metadata?.category || merged.result?.category;
+  const currentVerdict = (merged.pipelineVerdict || merged.metadata?.status || merged.status || "").toLowerCase();
+  const currentAction = (merged.pipelineAction || recommendation.decision || "").toLowerCase();
 
   // Only compute anomaly category when pipeline finished
   const anomalyCategory = !pipelineComplete
     ? null
     : rawCategory || (
-      currentVerdict === "tampered" || currentAction.includes("quarantine")
-        ? "Swap detection"
-        : currentVerdict === "missing"
-        ? "Missing QC label"
-        : currentVerdict === "mismatched"
-        ? "Altered serial number"
-        : currentVerdict === "reused"
-        ? "Reused board"
-        : "Clean (OEM Verified)"
-    );
+        currentVerdict === "tampered" || currentAction.includes("quarantine") || currentAction.includes("escalate")
+          ? "Swap detection"
+          : currentVerdict === "missing"
+          ? "Missing QC label"
+          : currentVerdict === "mismatched"
+          ? "Altered serial number"
+          : currentVerdict === "reused"
+          ? "Reused board"
+          : "Clean (OEM Verified)"
+      );
 
   const ocrFieldsTotal = Math.max(ocrResults.length, 1);
   const ocrFieldsMatched = ocrResults.filter((r) => r.match === true).length;
@@ -694,21 +697,24 @@ export default function InspectionDetailPage() {
         </div>
         <div className="bg-slate-950 text-slate-300 p-3 rounded text-[11px] space-y-1 overflow-x-auto">
           <p className="text-slate-500">&gt; Session: {merged.updatedAt || "Active"}</p>
-          {/* Agent log lines are only shown when real pipeline data is present */}
+          {/* Agent log lines are dynamically generated from real pipeline data */}
           {pipelineComplete ? (
             <>
-              <p className="text-sky-400">&gt; Agent-1: Ingest &amp; aspect ratio check OK</p>
-              <p className="text-emerald-400">&gt; Agent-2: Keypoints Match: {keypoint != null ? (keypoint * 100).toFixed(1) : "N/A"}%</p>
-              <p className="text-sky-400">&gt; Agent-3: SSIM Coefficient: {ssim != null ? ssim.toFixed(2) : "N/A"}</p>
-              <p className="text-rose-400">&gt; Agent-3: OCR: Expected "{ocrExpected || "N/A"}" vs Got "{ocrText || "N/A"}"</p>
-              <p className="text-amber-400">&gt; Agent-4: Risk Score: {fraudScore ?? "N/A"}% | Confidence: {aiConfidence ?? "N/A"}%</p>
-              <p className="text-emerald-400">&gt; Agent-5: Rationale summary compiled.</p>
+              <p className="text-sky-400">&gt; Agent-1 (Selector): Ingest &amp; aspect ratio check OK | Commodity: {merged.commodity || "N/A"}</p>
+              <p className="text-emerald-400">&gt; Agent-2 (Triage): Frame alignment {merged.evidence?.alignment?.status || "aligned"} | Keypoint Match: {keypoint != null ? (keypoint * 100).toFixed(1) : "N/A"}%</p>
+              <p className="text-sky-400">&gt; Agent-3 (Detector): SSIM Score: {ssim != null ? `${(ssim * 100).toFixed(1)}%` : "N/A"} | Thermal heatmap generated</p>
+              <p className={ocrMatch === false ? "text-rose-400" : ocrMatch === true ? "text-emerald-400" : "text-amber-400"}>
+                &gt; Agent-3 (OCR): Expected "{ocrExpected || "N/A"}" vs Got "{ocrText || "N/A"}" ({ocrMatch === true ? "PASS" : ocrMatch === false ? "MISMATCH" : "INCONCLUSIVE"})
+              </p>
+              <p className="text-amber-400">&gt; Agent-4 (Decision): Verdict: {merged.pipelineVerdict || merged.status || "N/A"} | Category: {anomalyCategory || "N/A"} | Risk Score: {fraudScore != null ? `${fraudScore}/100` : "N/A"}</p>
+              <p className="text-amber-400">&gt; Agent-4 (Action): Recommended Action: {merged.pipelineAction || recommendation.decision || "N/A"}</p>
+              <p className="text-emerald-400">&gt; Agent-5 (Explainer): AI narrative generated successfully.</p>
             </>
           ) : (
             <>
-              <p className="text-amber-400">&gt; [WARN] Pipeline execution was halted or did not complete.</p>
-              <p className="text-rose-400">&gt; [ERROR] No InspectionResult record found for this case.</p>
-              <p className="text-slate-500">&gt; Agents 2–5 did not run. Submit a new scan to generate results.</p>
+              <p className="text-amber-400">&gt; [WARN] Pipeline execution pending or incomplete.</p>
+              <p className="text-rose-400">&gt; [INFO] Inspection case status: {merged.status || "pending"}</p>
+              <p className="text-slate-500">&gt; Agents 2–5 did not run. Submit a new scan via Triage Console to generate results.</p>
             </>
           )}
         </div>

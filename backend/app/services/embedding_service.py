@@ -12,18 +12,34 @@ logger = logging.getLogger(__name__)
 EMBEDDING_DIM = 512
 MIN_REFERENCE_MATCH_SCORE = 0.55
 
-# Lazy-loaded global CLIP model instance & transform
+# Lazy-loaded global CLIP model instance & transform.
+# _clip_model states: None = not yet attempted, "FAILED" = init tried and
+# failed, model object = ready. Previously a failed load cached `False`
+# forever, so once CLIP failed once in a process, EVERY subsequent case
+# silently used the much weaker OpenCV histogram fallback with no further
+# log signal — this is the "vector_embedding_match always looks off" bug.
 _clip_model = None
 _clip_preprocess = None
 _clip_device = None
+_clip_init_error = None
 
-def _load_clip():
+def _load_clip(retry: bool = False):
     """
     Lazy-loads Open_CLIP model (ViT-B-32 pretrained on OpenAI) once into memory.
     Uses GPU CUDA if available, else CPU.
+
+    Returns (model, preprocess, device) on success, or (None, None, None) if
+    unavailable — callers already branch on `if model and preprocess and device`,
+    so this keeps that contract. Failure is logged at CRITICAL once per
+    process (not spammed per-request) and can be retried via retry=True from
+    an ops endpoint without a process restart.
     """
-    global _clip_model, _clip_preprocess, _clip_device
-    if _clip_model is None:
+    global _clip_model, _clip_preprocess, _clip_device, _clip_init_error
+
+    if _clip_model == "FAILED" and not retry:
+        return None, None, None
+
+    if _clip_model is None or _clip_model == "FAILED":
         try:
             import torch
             import open_clip
@@ -35,10 +51,19 @@ def _load_clip():
                 "ViT-B-32", pretrained="openai"
             )
             _clip_model = _clip_model.to(_clip_device).eval()
+            _clip_init_error = None
             logger.info("[Embedding Service] Open_CLIP model successfully loaded and ready.")
         except Exception as err:
-            logger.error(f"[Embedding Service] Failed to load Open_CLIP model: {err}. Will fallback to OpenCV.")
-            _clip_model = False  # Mark failed to avoid retrying continuously
+            _clip_model = "FAILED"
+            _clip_preprocess = None
+            _clip_device = None
+            _clip_init_error = str(err)
+            logger.critical(
+                f"[Embedding Service] Open_CLIP failed to load — ALL embedding comparisons for this "
+                f"process will silently use the weaker OpenCV histogram fallback. "
+                f"Check 'pip show torch open_clip_torch' in this environment. Cause: {err}"
+            )
+            return None, None, None
 
     return _clip_model, _clip_preprocess, _clip_device
 
