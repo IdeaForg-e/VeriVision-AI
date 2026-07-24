@@ -84,6 +84,8 @@ class InspectionResultResponse(BaseModel):
     recommended_action: str
     explanation: Optional[str] = None
     heatmap_path: Optional[str] = None
+    diagnostic_path: Optional[str] = None
+    evidence_json: Optional[Dict[str, Any]] = None
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)

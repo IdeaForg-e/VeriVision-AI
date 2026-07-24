@@ -3,6 +3,7 @@ import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from sqlalchemy import inspect, text
 
 from app.config import settings
 from app.database import engine, Base
@@ -21,6 +22,25 @@ logger.info("Initializing VeriVision-AI Engine...")
 
 # Create all database tables on startup
 Base.metadata.create_all(bind=engine)
+
+def ensure_sqlite_schema_compatibility():
+    if not settings.DATABASE_URL.startswith("sqlite"):
+        return
+    inspector = inspect(engine)
+    if "inspection_results" not in inspector.get_table_names():
+        return
+    existing = {col["name"] for col in inspector.get_columns("inspection_results")}
+    additions = {
+        "diagnostic_path": "VARCHAR",
+        "evidence_json": "JSON",
+    }
+    with engine.begin() as conn:
+        for column_name, column_type in additions.items():
+            if column_name not in existing:
+                conn.execute(text(f"ALTER TABLE inspection_results ADD COLUMN {column_name} {column_type}"))
+
+
+ensure_sqlite_schema_compatibility()
 
 app = FastAPI(
     title="VeriVision-AI Platform",

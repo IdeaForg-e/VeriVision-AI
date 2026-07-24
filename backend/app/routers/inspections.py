@@ -298,12 +298,25 @@ async def create_inspection(
 
     logger.info(f"Pipeline succeeded. Verdict: {pipeline_result['verdict']}, Fraud Score: {pipeline_result['fraud_score']}")
 
+    evidence_json = {
+        "detector_results": pipeline_result.get("detector_results", {}),
+        "anomaly_regions": pipeline_result.get("anomaly_regions", []),
+        "ocr_diff": pipeline_result.get("ocr_diff", {}),
+        "thresholds_used": pipeline_result.get("thresholds_used", {}),
+        "evidence_summary": pipeline_result.get("evidence_summary", {}),
+        "alignment": {
+            "status": pipeline_result.get("alignment_status"),
+            "rate": pipeline_result.get("alignment_rate"),
+            "detail": pipeline_result.get("triage_detail"),
+        },
+        "multimodal_report": pipeline_result.get("multimodal_report"),
+    }
 
     # 6. Commit results to Database
     db_result = models.InspectionResult(
         inspection_id=db_inspection.id,
         ssim_score=pipeline_result["ssim_score"],
-        keypoint_match_rate=pipeline_result["alignment_rate"],
+        keypoint_match_rate=pipeline_result.get("keypoint_ratio"),
         ocr_detected_text=pipeline_result["ocr_detected_text"],
         ocr_expected_text=pipeline_result["ocr_expected_text"],
         fraud_score=pipeline_result["fraud_score"],
@@ -312,7 +325,9 @@ async def create_inspection(
         confidence=pipeline_result["confidence"],
         recommended_action=pipeline_result["recommended_action"],
         explanation=pipeline_result["explanation"],
-        heatmap_path=pipeline_result["heatmap_path"]
+        heatmap_path=pipeline_result["heatmap_path"],
+        diagnostic_path=pipeline_result.get("diagnostic_path"),
+        evidence_json=evidence_json
     )
     db.add(db_result)
 

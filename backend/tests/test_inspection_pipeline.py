@@ -118,6 +118,18 @@ class TestMissingQCLabel:
         assert decision["recommended_action"] == "Quarantine & Escalate"
         assert decision["fraud_score"] >= 50
 
+    def test_4_label_roi_falls_back_to_template_roi(self):
+        """A configured label ROI must also drive missing sticker checks."""
+        src = create_test_image(text_region=False)
+        ref = create_test_image(text_region=True)
+
+        result = match_template_roi(src, ref, {
+            "label_roi": {"x": 400, "y": 30, "w": 200, "h": 90}
+        })
+
+        assert result["template_match_checked"] is True
+        assert result["template_match_found"] is False
+
 
 # =============================================================================
 # TEST CASE 2: Altered Serial Number
@@ -205,8 +217,9 @@ class TestReusedBoard:
         cv2.rectangle(src, (100, 100), (300, 300), (120, 120, 120), -1)
         ref = create_test_image(color=(200, 200, 200))
         
-        ssim_score, heatmap = compute_ssim_diff(src, ref)
+        ssim_score, heatmap, annotated, regions = compute_ssim_diff(src, ref)
         assert 0.50 < ssim_score < 0.95, f"SSIM should be moderate for reused board: {ssim_score}"
+        assert isinstance(regions, list)
 
     def test_2_keypoints_show_moderate_mismatch(self):
         """Keypoint ratio should be moderate for reused components."""
@@ -237,7 +250,7 @@ class TestFalseAlarmLighting:
             cv2.imwrite(ref_path, ref)
             
             result = process_and_validate(temp_path, ref_path)
-            assert result["status"] == "fail", f"Blurry image should fail triage: {result}"
+            assert result["status"] == "retake_needed", f"Blurry image should request retake: {result}"
             assert "blur" in result["detail"].lower(), f"Should mention blur: {result['detail']}"
         finally:
             if os.path.exists(temp_path): os.remove(temp_path)
@@ -255,7 +268,7 @@ class TestFalseAlarmLighting:
             cv2.imwrite(ref_path, ref)
             
             result = process_and_validate(temp_path, ref_path)
-            assert result["status"] == "fail", f"Dark image should fail triage: {result}"
+            assert result["status"] == "retake_needed", f"Dark image should request retake: {result}"
             assert "lighting" in result["detail"].lower() or "brightness" in result["detail"].lower()
         finally:
             if os.path.exists(temp_path): os.remove(temp_path)
@@ -282,7 +295,7 @@ class TestNonOEMLabel:
         result = run_anomaly_ensemble(
             create_test_image(color=(180, 220, 200), text_region=True),
             create_test_image(color=(200, 200, 200), text_region=True),
-            {"label_roi": {"x": 400, "y": 30, "w": 200, "h": 90}, "expected_serial": "ABC123"}
+            {"expected_serial": "ABC123"}
         )
         assert result["color_hist_similarity"] < 0.95, "Color should differ"
 
@@ -299,8 +312,9 @@ class TestSwapDetection:
         src = np.zeros((480, 640, 3), dtype=np.uint8)  # Completely blank/different
         ref = create_test_image(color=(200, 200, 200))
         
-        ssim_score, heatmap = compute_ssim_diff(src, ref)
+        ssim_score, heatmap, annotated, regions = compute_ssim_diff(src, ref)
         assert ssim_score < 0.65, f"SSIM should be low for swapped component: {ssim_score}"
+        assert len(regions) > 0
 
     def test_2_keypoint_mismatch_high(self):
         """Keypoint ratio should be very low for swapped component."""
@@ -347,6 +361,47 @@ class TestCleanPass:
         })
         assert decision["fraud_score"] == 0
         assert decision["verdict"] == "clean"
+
+    def test_multimodal_text_cannot_override_clean_evidence(self):
+        """Unstructured visual-language text is supporting evidence, not a verdict source."""
+        decision = make_decision({
+            "source_reference_identical": False,
+            "ssim_score": 0.98,
+            "ocr_similarity": 1.0,
+            "ocr_mismatches": [],
+            "keypoint_ratio": 0.95,
+            "expected_text": "ABC123",
+            "detected_text": "ABC123",
+            "template_match_score": 0.95,
+            "template_match_found": True,
+            "color_hist_similarity": 0.98,
+            "multimodal_report": "Possible scratch near the label.",
+        })
+
+        assert decision["verdict"] == "clean"
+        assert decision["recommended_action"] == "Accept"
+
+    def test_low_keypoints_with_strong_identity_is_not_swap(self):
+        """A same-family board with local anomalies should not be classified as a full swap."""
+        decision = make_decision({
+            "ssim_score": 0.854,
+            "ocr_similarity": 1.0,
+            "ocr_mismatches": [],
+            "ocr_diff": {"similarity": 1.0, "mismatches": [], "suspicious_confusions": []},
+            "keypoint_ratio": 0.536,
+            "expected_text": "",
+            "detected_text": "",
+            "template_match_score": 1.0,
+            "template_match_found": True,
+            "color_hist_similarity": 0.999,
+            "vector_embedding_match": 99.8,
+            "anomaly_regions": [{"x": 429, "y": 84, "w": 1029, "h": 746, "location": "middle-center"}],
+            "multimodal_report": "Missing component near the KB label.",
+        })
+
+        assert decision["category"] != "Swap detection"
+        assert decision["verdict"] == "missing"
+        assert decision["recommended_action"] == "Quarantine & Escalate"
 
 
 # =============================================================================
@@ -403,6 +458,19 @@ class TestAnomalyEnsembleCompleteness:
         assert result["heatmap_img"] is not None
         assert result["heatmap_img"].shape[0] > 0
         assert result["heatmap_img"].shape[1] > 0
+
+    def test_part_code_is_not_used_as_expected_ocr_serial(self):
+        src = create_test_image(text_region=True)
+        ref = create_test_image(text_region=True)
+
+        result = run_anomaly_ensemble(src, ref, {
+            "label_roi": {"x": 400, "y": 30, "w": 200, "h": 90},
+            "expected_serial": "GOLD-MOTHERBOARD",
+        })
+
+        assert result["expected_text"] != "GOLD-MOTHERBOARD"
+        assert len(result["expected_text"]) <= 64
+        assert result["ocr_similarity"] == 1.0
 
 
 # =============================================================================
@@ -464,3 +532,16 @@ class TestCatalogWorkflow:
                 os.remove(src_path)
             if os.path.exists(ref_path):
                 os.remove(ref_path)
+
+    def test_missing_golden_reference_fails_triage(self):
+        src = create_test_image()
+        src_path = "temp_src_missing_golden.png"
+        cv2.imwrite(src_path, src)
+
+        try:
+            result = process_and_validate(src_path, "does_not_exist_golden.png")
+            assert result["status"] == "failed"
+            assert result["alignment_status"] == "failed"
+        finally:
+            if os.path.exists(src_path):
+                os.remove(src_path)

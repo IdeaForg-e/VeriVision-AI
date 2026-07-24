@@ -37,10 +37,41 @@ def _ensure_gray(img: np.ndarray) -> np.ndarray:
     return cv2.cvtColor(_ensure_rgb(img), cv2.COLOR_BGR2GRAY)
 
 
-def compute_ssim_diff(src_img: np.ndarray, ref_img: np.ndarray) -> tuple[float, np.ndarray, np.ndarray]:
+def _normalize_roi_config(roi_config: dict = None) -> dict:
+    """Use label ROI as the default template/color ROI when only one ROI is configured."""
+    normalized = dict(roi_config or {})
+    label_roi = normalized.get("label_roi")
+    if label_roi:
+        normalized.setdefault("template_roi", label_roi)
+        normalized.setdefault("color_roi", label_roi)
+    return normalized
+
+
+def _region_label(x: int, y: int, w: int, h: int, img_shape: tuple) -> str:
+    img_h, img_w = img_shape[:2]
+    cx = x + (w / 2.0)
+    cy = y + (h / 2.0)
+    horizontal = "left" if cx < img_w / 3 else "right" if cx > (img_w * 2 / 3) else "center"
+    vertical = "top" if cy < img_h / 3 else "bottom" if cy > (img_h * 2 / 3) else "middle"
+    return f"{vertical}-{horizontal}"
+
+
+def _is_plausible_expected_label(text: str) -> bool:
+    cleaned = (text or "").strip()
+    if not cleaned:
+        return False
+    lowered = cleaned.lower()
+    if lowered.startswith(("gold-", "auto-")):
+        return False
+    if lowered in {"motherboard", "ram", "storage", "ssd", "processor", "microchip", "label"}:
+        return False
+    return len(cleaned) <= 64
+
+
+def compute_ssim_diff(src_img: np.ndarray, ref_img: np.ndarray) -> tuple[float, np.ndarray, np.ndarray, list[dict]]:
     """
     Computes SSIM between source and reference.
-    Returns: (ssim_score, realistic_thermal_heatmap_image, annotated_defective_image)
+    Returns: (ssim_score, realistic_thermal_heatmap_image, annotated_defective_image, anomaly_regions)
     
     The realistic_thermal_heatmap_image shows a thermal camera-like overlay where:
       - Blue / Dark areas = identical / no defect
@@ -117,6 +148,7 @@ def compute_ssim_diff(src_img: np.ndarray, ref_img: np.ndarray) -> tuple[float, 
 
     contour_count = 0
     all_defect_regions = []
+    anomaly_regions = []
 
     for c in contours:
         area = cv2.contourArea(c)
@@ -124,6 +156,17 @@ def compute_ssim_diff(src_img: np.ndarray, ref_img: np.ndarray) -> tuple[float, 
             contour_count += 1
             x, y, w, h = cv2.boundingRect(c)
             all_defect_regions.append((x, y, w, h))
+            severity = "critical" if area > 1000 else "moderate"
+            anomaly_regions.append({
+                "detector": "ssim",
+                "x": int(x),
+                "y": int(y),
+                "w": int(w),
+                "h": int(h),
+                "area": float(round(area, 2)),
+                "severity": severity,
+                "location": _region_label(x, y, w, h, src_img.shape),
+            })
 
             # --- Draw on realistic_heatmap ---
             # Draw a subtle bright border around defect on heatmap
@@ -194,8 +237,9 @@ def compute_ssim_diff(src_img: np.ndarray, ref_img: np.ndarray) -> tuple[float, 
         cv2.putText(realistic_heatmap, "CLEAN - No Anomalies", (20, 40),
                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 200, 0), 2, cv2.LINE_AA)
 
+    anomaly_regions.sort(key=lambda r: r["area"], reverse=True)
     logger.info(f"SSIM structural check complete. Score: {score:.4f}, Defect hotspots detected: {contour_count}")
-    return float(score), realistic_heatmap, annotated_target
+    return float(score), realistic_heatmap, annotated_target, anomaly_regions[:12]
 
 
 def extract_ocr_text(img: np.ndarray, roi: dict = None, expected_serial: str = "") -> tuple[str, bool]:
@@ -278,6 +322,7 @@ def calculate_string_diff(str1: str, str2: str) -> dict:
     }
 
     mismatches = []
+    suspicious_confusions = []
     max_len = max(len(s1), len(s2))
     s1_padded = s1.ljust(max_len)
     s2_padded = s2.ljust(max_len)
@@ -286,20 +331,25 @@ def calculate_string_diff(str1: str, str2: str) -> dict:
     for idx in range(max_len):
         char1 = s1_padded[idx]
         char2 = s2_padded[idx]
-        if char1 == char2 or (char1, char2) in confusion_pairs:
+        if char1 == char2:
             matches += 1
         else:
-            mismatches.append({
+            mismatch = {
                 "position": idx,
                 "expected": char2.strip(),
-                "detected": char1.strip()
-            })
+                "detected": char1.strip(),
+                "confusable": (char1, char2) in confusion_pairs
+            }
+            mismatches.append(mismatch)
+            if mismatch["confusable"]:
+                suspicious_confusions.append(mismatch)
 
     similarity = matches / max(max_len, 1)
     logger.info(f"Character validation complete. String similarity rate: {similarity:.2f}, mismatches count: {len(mismatches)}")
     return {
         "similarity": similarity,
-        "mismatches": mismatches
+        "mismatches": mismatches,
+        "suspicious_confusions": suspicious_confusions,
     }
 
 
@@ -345,6 +395,7 @@ def match_keypoints(src_img: np.ndarray, ref_img: np.ndarray) -> dict:
 def match_template_roi(src_img: np.ndarray, ref_img: np.ndarray, roi_config: dict = None) -> dict:
     """Use template matching for ROI/label presence checks."""
     logger.info("Executing Template ROI sticker presence checks...")
+    roi_config = _normalize_roi_config(roi_config)
     if not roi_config:
         logger.info("Skipping template match: roi_config is empty.")
         return {"template_match_score": 1.0, "template_match_found": True, "template_match_checked": False}
@@ -375,8 +426,19 @@ def match_template_roi(src_img: np.ndarray, ref_img: np.ndarray, roi_config: dic
         logger.warning("Cropped template array size is empty.")
         return {"template_match_score": 0.0, "template_match_found": False, "template_match_checked": True}
 
+    if y + h > gray_src.shape[0] or x + w > gray_src.shape[1]:
+        logger.warning("Template ROI parameters exceed target image coordinate layout shapes.")
+        return {"template_match_score": 0.0, "template_match_found": False, "template_match_checked": True}
+
+    src_roi = gray_src[y:y + h, x:x + w]
+    if src_roi.size == 0:
+        logger.warning("Cropped source ROI array size is empty.")
+        return {"template_match_score": 0.0, "template_match_found": False, "template_match_checked": True}
+
     result = cv2.matchTemplate(gray_src, template, cv2.TM_CCOEFF_NORMED)
-    score = float(result.max()) if result.size else 0.0
+    global_score = float(result.max()) if result.size else 0.0
+    roi_score = 1.0 - (float(np.mean(cv2.absdiff(src_roi, template))) / 255.0)
+    score = min(global_score, roi_score)
     threshold = float(roi_config.get("template_threshold", 0.6))
     found = bool(score >= threshold)
 
@@ -391,6 +453,7 @@ def match_template_roi(src_img: np.ndarray, ref_img: np.ndarray, roi_config: dic
 def compare_color_histograms(src_img: np.ndarray, ref_img: np.ndarray, roi_config: dict = None) -> dict:
     """Compare color histogram similarity for font/color consistency checks."""
     logger.info("Executing 3D Color Histogram similarity check...")
+    roi_config = _normalize_roi_config(roi_config)
     color_roi = None
     if roi_config:
         color_roi = roi_config.get("color_roi")
@@ -582,6 +645,7 @@ def run_anomaly_ensemble(src_img: np.ndarray, ref_img: np.ndarray, roi_config: d
     t0 = time.time()
     logger.info("⚡ [Agent 3: Detector] Starting Parallel Vision Anomaly Ensemble processing...")
     errors = []
+    roi_config = _normalize_roi_config(roi_config)
 
     label_roi = None
     expected_serial = ""
@@ -595,7 +659,7 @@ def run_anomaly_ensemble(src_img: np.ndarray, ref_img: np.ndarray, roi_config: d
             return compute_ssim_diff(src_img, ref_img)
         except Exception as e:
             logger.error(f"SSIM computation failed: {e}")
-            return 0.0, src_img.copy(), src_img.copy()
+            return 0.0, src_img.copy(), src_img.copy(), []
 
     def task_multimodal():
         if src_image_path and ref_image_path:
@@ -657,7 +721,7 @@ def run_anomaly_ensemble(src_img: np.ndarray, ref_img: np.ndarray, roi_config: d
         f_feat = executor.submit(task_features)
         f_emb = executor.submit(task_embedding)
 
-        ssim_val, heatmap_img, annotated_target = f_ssim.result(timeout=10.0)
+        ssim_val, heatmap_img, annotated_target, anomaly_regions = f_ssim.result(timeout=10.0)
         try:
             multimodal_report = f_multi.result(timeout=10.0)
         except Exception as e:
@@ -676,11 +740,14 @@ def run_anomaly_ensemble(src_img: np.ndarray, ref_img: np.ndarray, roi_config: d
         errors.append("card_generation_failed")
 
     # Dynamic Ground-Truth OCR Determination:
-    # Golden Reference Image extracted OCR text is the primary ground truth.
-    master_expected_text = golden_text if (golden_text and len(golden_text.strip()) > 0) else expected_serial
+    # Prefer explicit catalog serial text. Use golden OCR only when it is a
+    # short, plausible label; never turn full-frame board text into a serial.
+    explicit_expected = expected_serial if _is_plausible_expected_label(expected_serial) else ""
+    golden_expected = golden_text if _is_plausible_expected_label(golden_text) else ""
+    master_expected_text = explicit_expected or golden_expected
 
-    ocr_diff = {"similarity": 1.0, "mismatches": []}
-    if ocr_engine_available and master_expected_text:
+    ocr_diff = {"similarity": 1.0, "mismatches": [], "suspicious_confusions": []}
+    if ocr_engine_available and master_expected_text and detected_text:
         ocr_diff = calculate_string_diff(detected_text, master_expected_text)
 
     score_components = [keypoint_results["keypoint_match_score"]]
@@ -700,12 +767,48 @@ def run_anomaly_ensemble(src_img: np.ndarray, ref_img: np.ndarray, roi_config: d
         f"SSIM: {ssim_val:.3f}, Keypoint: {keypoint_results['keypoint_match_score']:.3f}, Matching Score: {matching_score:.3f}"
     )
 
+    expected_text_value = master_expected_text
+    detector_results = {
+        "ssim": {
+            "score": ssim_val,
+            "threshold": float(getattr(settings, "SSIM_THRESHOLD", 0.80)),
+            "regions": anomaly_regions,
+        },
+        "ocr": {
+            "engine_available": ocr_engine_available,
+            "detected_text": detected_text,
+            "expected_text": expected_text_value,
+            "similarity": ocr_diff["similarity"],
+            "mismatches": ocr_diff["mismatches"],
+            "suspicious_confusions": ocr_diff.get("suspicious_confusions", []),
+        },
+        "keypoints": {
+            "score": keypoint_results["keypoint_match_score"],
+            "good_matches": keypoint_results["good_matches"],
+            "total_matches": keypoint_results["total_matches"],
+        },
+        "template": template_results,
+        "color": color_results,
+        "embedding": {
+            "similarity_pct": vector_embedding_match,
+        },
+    }
+    evidence_summary = {
+        "checked_components": checked_components,
+        "top_regions": anomaly_regions[:5],
+        "ocr_issue_count": len(ocr_diff["mismatches"]),
+        "template_missing": bool(template_results.get("template_match_checked") and not template_results.get("template_match_found")),
+        "color_similarity": color_results["color_hist_similarity"],
+        "keypoint_ratio": keypoint_results["keypoint_match_score"],
+    }
+
     return {
         "ssim_score": ssim_val,
         "detected_text": detected_text,
-        "expected_text": master_expected_text if master_expected_text else expected_serial,
+        "expected_text": expected_text_value,
         "ocr_similarity": ocr_diff["similarity"],
         "ocr_mismatches": ocr_diff["mismatches"],
+        "ocr_diff": ocr_diff,
         "ocr_engine_available": ocr_engine_available,
         "keypoint_ratio": keypoint_results["keypoint_match_score"],
         "keypoint_matches": keypoint_results["good_matches"],
@@ -717,6 +820,17 @@ def run_anomaly_ensemble(src_img: np.ndarray, ref_img: np.ndarray, roi_config: d
         "heatmap_img": heatmap_img,
         "annotated_target": annotated_target,
         "diagnostic_card": diagnostic_card,
+        "anomaly_regions": anomaly_regions,
+        "detector_results": detector_results,
+        "evidence_summary": evidence_summary,
+        "thresholds_used": {
+            "ssim": float(getattr(settings, "SSIM_THRESHOLD", 0.80)),
+            "template": float((roi_config or {}).get("template_threshold", 0.6)),
+            "blur": float(getattr(settings, "BLUR_THRESHOLD", 100.0)),
+            "brightness_min": int(getattr(settings, "BRIGHTNESS_MIN", 40)),
+            "brightness_max": int(getattr(settings, "BRIGHTNESS_MAX", 220)),
+            "keypoint_match_min": float(getattr(settings, "KEYPOINT_MATCH_MIN", 0.60)),
+        },
         "checked_components": checked_components,
         "errors": errors,
         "multimodal_report": multimodal_report,

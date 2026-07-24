@@ -72,6 +72,8 @@ def generate_explanation(metrics: dict) -> str:
     recommended_action = metrics.get("recommended_action", "Accept")
     decision_reasoning = metrics.get("reasoning", "")
     multimodal_report = metrics.get("multimodal_report", "")
+    anomaly_regions = metrics.get("anomaly_regions", []) or []
+    keypoint_ratio = metrics.get("keypoint_ratio")
 
     temp_score = metrics.get("template_match_score", 1.0)
     temp_found = metrics.get("template_match_found", True)
@@ -82,7 +84,8 @@ def generate_explanation(metrics: dict) -> str:
     openrouter_key = settings.OPENROUTER_API_KEY
     openrouter_model = settings.OPENROUTER_MODEL
 
-    if openrouter_key:
+    use_llm_explainer = os.getenv("ENABLE_LLM_EXPLAINER", "false").lower() == "true"
+    if openrouter_key and use_llm_explainer:
         prompt = _build_prompt(
             ssim, verdict, fraud_score, detected_text, expected_text,
             ocr_mismatches, recommended_action, temp_score, temp_found,
@@ -126,33 +129,42 @@ def generate_explanation(metrics: dict) -> str:
 
     ssim_pct = ssim * 100
     color_pct = color_sim * 100
+    if anomaly_regions:
+        region_text = "; ".join(
+            f"{r.get('location', 'unknown')} region at x={r.get('x')}, y={r.get('y')}, w={r.get('w')}, h={r.get('h')}"
+            for r in anomaly_regions[:3]
+        )
+    else:
+        region_text = "no localized anomaly boxes above the configured contour threshold"
 
     # --- 1. SSIM / Heatmap paragraph ---
     if ssim >= 0.85:
         heatmap_part = (
             f"SSIM heatmap analysis registered a structural similarity index of {ssim:.2f} ({ssim_pct:.0f}%), "
             f"indicating the component surface matches the golden reference within acceptable tolerances. "
-            f"Pixel-level comparison shows no significant deviations in the inspected regions."
+            f"Pixel-level comparison produced {region_text}."
         )
     elif ssim >= 0.65:
         heatmap_part = (
             f"SSIM heatmap analysis recorded a structural similarity score of {ssim:.2f} ({ssim_pct:.0f}%), "
-            f"which falls moderately below the ideal threshold. The heatmap overlay reveals mild structural "
-            f"differences concentrated around specific zones of the component, suggesting surface-level wear "
+            f"which falls moderately below the ideal threshold. The heatmap overlay reports {region_text}, suggesting surface-level wear "
             f"or potential localized tampering. These regions appear as warmer (red/orange) areas in the "
             f"difference heatmap, indicating pixel-level discrepancy between the uploaded part and the golden reference."
         )
     else:
         heatmap_part = (
             f"SSIM heatmap analysis returned a critically low structural similarity index of {ssim:.2f} ({ssim_pct:.0f}%), "
-            f"well below the acceptable threshold. The anomaly heatmap shows extensive red-highlighted regions "
-            f"across the component surface, indicating substantial structural deviation from the golden reference. "
-            f"These high-discrepancy zones are distributed across multiple areas, suggesting either a different "
+            f"well below the acceptable threshold. The anomaly heatmap reports {region_text}, indicating substantial structural deviation from the golden reference. "
+            f"These high-discrepancy regions suggest either a different "
             f"manufacturing revision, significant physical damage, or a counterfeit replacement part."
         )
 
     # --- 2. OCR / Label paragraph ---
-    if verdict == "clean" or (expected_text and detected_text and expected_text == detected_text):
+    if not expected_text:
+        ocr_part = (
+            "OCR label verification was not used for the final decision because no audit-grade expected serial or label text was configured for this case."
+        )
+    elif expected_text and detected_text and expected_text == detected_text:
         ocr_part = (
             f"OCR-based label verification confirmed that the printed label text '{detected_text}' "
             f"exactly matches the expected golden reference '{expected_text}', with zero character mismatches. "
@@ -193,6 +205,10 @@ def generate_explanation(metrics: dict) -> str:
             f"deviation in surface material properties compared to the OEM golden reference. "
             f"This discrepancy suggests the use of non-original materials, possibly from an alternate supplier "
             f"or a counterfeit manufacturing source."
+        )
+    if keypoint_ratio is not None:
+        extra_parts.append(
+            f"Keypoint matching produced a feature agreement score of {keypoint_ratio:.2f}, which was included in the decision score."
         )
 
     # --- 4. Verdict & Conclusion ---

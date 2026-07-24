@@ -150,6 +150,7 @@ def process_and_validate(image_path: str, golden_path: str) -> dict:
         "alignment_rate": 0.0,
         "alignment_reliable": False,
         "alignment_skipped": False,
+        "alignment_status": "not_run",
         "aligned_image": None
     }
 
@@ -165,7 +166,7 @@ def process_and_validate(image_path: str, golden_path: str) -> dict:
     if is_blurry:
         detail_msg = f"Image quality is too poor (blurry, clarity score {blur_val:.1f} < threshold {settings.BLUR_THRESHOLD}). Retake required: Please hold camera steady and capture a high-focus close-up of the component label."
         logger.warning(f"Validation failure details: {detail_msg}")
-        result.update({"status": "fail", "detail": detail_msg})
+        result.update({"status": "retake_needed", "detail": detail_msg})
         return result
 
     # 2. Check Brightness
@@ -178,7 +179,7 @@ def process_and_validate(image_path: str, golden_path: str) -> dict:
             guidance = "Image is overexposed/glared. Please adjust light positioning to reduce camera glare over the component label."
         detail_msg = f"Image quality is too poor (lighting intensity {light_val:.1f}). Retake required: {guidance}"
         logger.warning(f"Validation failure details: {detail_msg}")
-        result.update({"status": "fail", "detail": detail_msg})
+        result.update({"status": "retake_needed", "detail": detail_msg})
         return result
 
     # Load golden reference image
@@ -187,15 +188,15 @@ def process_and_validate(image_path: str, golden_path: str) -> dict:
     logger.info(f"Loading golden reference template from {golden_path}")
     ref = cv2.imread(golden_path)
     if ref is None:
-        logger.warning("Golden reference file not found or unreadable. Bypassing image registration.")
-        # Previously this reported alignment_rate=1.0, which misleadingly
-        # implied a perfect alignment had been performed. No alignment was
-        # attempted at all, so downstream agents need to know that clearly.
+        logger.warning("Golden reference file not found or unreadable. Failing inspection before detection.")
         result.update({
+            "status": "failed",
+            "detail": "Golden reference image is missing or unreadable. Cannot perform audit-grade comparison.",
             "aligned_image": src,
             "alignment_rate": 0.0,
             "alignment_reliable": False,
             "alignment_skipped": True,
+            "alignment_status": "failed",
         })
         return result
 
@@ -214,6 +215,7 @@ def process_and_validate(image_path: str, golden_path: str) -> dict:
             "detail": detail_msg,
             "alignment_rate": align_rate,
             "alignment_reliable": False,
+            "alignment_status": "semantic_fallback",
             "aligned_image": src
         })
         return result
@@ -230,6 +232,7 @@ def process_and_validate(image_path: str, golden_path: str) -> dict:
     result["aligned_image"] = aligned_img
     result["alignment_rate"] = align_rate
     result["alignment_reliable"] = is_reliable
+    result["alignment_status"] = "aligned"
 
     logger.info("Image intake preprocessing tasks finished successfully.")
-    return result
+    return result

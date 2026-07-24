@@ -10,6 +10,7 @@ from app import models
 logger = logging.getLogger(__name__)
 
 EMBEDDING_DIM = 512
+MIN_REFERENCE_MATCH_SCORE = 0.55
 
 # Lazy-loaded global CLIP model instance & transform
 _clip_model = None
@@ -200,11 +201,23 @@ def search_reference_library(uploaded_image_path: str, db: Session) -> Dict[str,
 
     ranked_matches.sort(key=lambda x: x["similarity_score"], reverse=True)
     top = ranked_matches[0]
+    top_score = top["similarity_score"] / 100.0
 
     logger.info(
         f"[Embedding Service] Top Match Found: '{top['part_number']}' "
         f"({top['name']}) with {top['similarity_score']}% Vector Cosine Similarity"
     )
+
+    if top_score < MIN_REFERENCE_MATCH_SCORE:
+        return {
+            "matched": False,
+            "detail": (
+                f"Closest golden reference '{top['part_number']}' only matched at "
+                f"{top['similarity_score']}%, below the {MIN_REFERENCE_MATCH_SCORE * 100:.0f}% minimum."
+            ),
+            "top_match": top,
+            "candidates": ranked_matches[:3],
+        }
 
     return {
         "matched": True,

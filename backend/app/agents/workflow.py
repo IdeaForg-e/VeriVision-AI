@@ -37,8 +37,16 @@ class InspectionState(TypedDict):
     template_match_score: Optional[float]
     template_match_found: Optional[bool]
     color_hist_similarity: Optional[float]
+    vector_embedding_match: Optional[float]
+    anomaly_regions: Optional[List[dict]]
+    detector_results: Optional[dict]
+    ocr_diff: Optional[dict]
+    thresholds_used: Optional[dict]
+    evidence_summary: Optional[dict]
+    alignment_status: Optional[str]
     source_reference_identical: bool
     heatmap_path: Optional[str]
+    diagnostic_path: Optional[str]
     multimodal_report: Optional[str]
     
     # Decision/Policy results
@@ -65,15 +73,17 @@ def triage_node(state: InspectionState) -> Dict[str, Any]:
     
     triage_result = services.process_and_validate(image_path, golden_path)
     
-    if triage_result["status"] == "fail":
+    if triage_result["status"] in {"fail", "retake_needed", "failed"}:
         logger.warning(f"❌ [Node: Triage] Validation failed for Case {case_id}: {triage_result['detail']}")
         logger.info("\n" + "="*80 + f"\n⏹️ [FINISHED] NODE: triage (FAILED) - Case {case_id}\n" + "="*80)
+        workflow_status = "retake_needed" if triage_result["status"] in {"fail", "retake_needed"} else "failed"
         return {
             "triage_status": "fail",
             "triage_detail": triage_result["detail"],
             "blur_score": triage_result.get("blur_score", 0.0),
             "brightness_score": triage_result.get("brightness_score", 0.0),
-            "status": "retake_needed"
+            "alignment_status": triage_result.get("alignment_status", "not_run"),
+            "status": workflow_status
         }
     
     logger.info(f"⚙️ [Node: Triage] Clarity: {triage_result.get('blur_score'):.1f}, Brightness: {triage_result.get('brightness_score'):.1f}, Alignment matches: {triage_result.get('alignment_rate'):.3f}")
@@ -85,6 +95,7 @@ def triage_node(state: InspectionState) -> Dict[str, Any]:
         "brightness_score": triage_result.get("brightness_score", 0.0),
         "alignment_rate": triage_result.get("alignment_rate", 0.0),
         "aligned_image": triage_result.get("aligned_image"),
+        "alignment_status": triage_result.get("alignment_status", "aligned" if triage_result.get("alignment_reliable") else "semantic_fallback"),
         "status": "processing"
     }
 
@@ -108,7 +119,7 @@ def select_reference_node(state: InspectionState) -> Dict[str, Any]:
         
     logger.info(f"🏷️ [Node: Ref Selector] Dynamic part classification loaded: '{state.get('commodity')}'")
     logger.info("\n" + "="*80 + f"\n✅ [FINISHED] NODE: select_reference (SUCCESS) - Case {case_id}\n" + "="*80)
-    return {}
+    return {"triage_detail": viability_result.get("detail", "")}
 
 
 # 3. Anomaly Detection Ensemble Node
@@ -187,6 +198,7 @@ def detect_anomalies_node(state: InspectionState) -> Dict[str, Any]:
             logger.error(f"❌ [Node: Anomaly Ensemble] Failed to save annotated target scan: {e}")
 
     # Also save the dynamic diagnostic card to a separate file (for audits/reports)
+    diag_path = None
     if ensemble_results.get("diagnostic_card") is not None:
         diag_name = f"{case_id}_diagnostic{file_ext}"
         diag_path = os.path.join(settings.UPLOAD_DIR, diag_name)
@@ -204,12 +216,19 @@ def detect_anomalies_node(state: InspectionState) -> Dict[str, Any]:
         "ocr_expected_text": ensemble_results.get("expected_text") or state["expected_serial"],
         "ocr_similarity": ensemble_results["ocr_similarity"],
         "ocr_mismatches": ensemble_results["ocr_mismatches"],
+        "ocr_diff": ensemble_results.get("ocr_diff"),
         "keypoint_ratio": ensemble_results["keypoint_ratio"],
         "template_match_score": ensemble_results.get("template_match_score", 1.0),
         "template_match_found": ensemble_results.get("template_match_found", True),
         "color_hist_similarity": ensemble_results.get("color_hist_similarity", 1.0),
+        "vector_embedding_match": ensemble_results.get("vector_embedding_match"),
+        "anomaly_regions": ensemble_results.get("anomaly_regions", []),
+        "detector_results": ensemble_results.get("detector_results", {}),
+        "evidence_summary": ensemble_results.get("evidence_summary", {}),
+        "thresholds_used": ensemble_results.get("thresholds_used", {}),
         "source_reference_identical": source_reference_identical,
         "heatmap_path": heatmap_path,
+        "diagnostic_path": diag_path,
         "multimodal_report": ensemble_results.get("multimodal_report", "No visual report generated.")
     }
 
@@ -229,12 +248,18 @@ def decision_node(state: InspectionState) -> Dict[str, Any]:
         "ssim_score": state["ssim_score"],
         "ocr_similarity": state["ocr_similarity"],
         "ocr_mismatches": state["ocr_mismatches"],
+        "ocr_diff": state.get("ocr_diff"),
         "keypoint_ratio": state["keypoint_ratio"],
-        "expected_text": state["expected_serial"],
+        "expected_text": state.get("ocr_expected_text") or state["expected_serial"],
         "detected_text": state["ocr_detected_text"],
         "template_match_score": state.get("template_match_score", 1.0),
         "template_match_found": state.get("template_match_found", True),
         "color_hist_similarity": state.get("color_hist_similarity", 1.0),
+        "vector_embedding_match": state.get("vector_embedding_match"),
+        "anomaly_regions": state.get("anomaly_regions", []),
+        "detector_results": state.get("detector_results", {}),
+        "evidence_summary": state.get("evidence_summary", {}),
+        "thresholds_used": state.get("thresholds_used", {}),
         "source_reference_identical": state.get("source_reference_identical", False),
         "multimodal_report": state.get("multimodal_report", ""),
     }
@@ -269,12 +294,19 @@ def explainer_node(state: InspectionState) -> Dict[str, Any]:
         "verdict": state["verdict"],
         "fraud_score": state["fraud_score"],
         "detected_text": state["ocr_detected_text"],
-        "expected_text": state["expected_serial"],
+        "expected_text": state.get("ocr_expected_text") or state["expected_serial"],
         "ocr_mismatches": state["ocr_mismatches"],
+        "ocr_diff": state.get("ocr_diff"),
         "recommended_action": state["recommended_action"],
         "template_match_score": state.get("template_match_score", 1.0),
         "template_match_found": state.get("template_match_found", True),
         "color_hist_similarity": state.get("color_hist_similarity", 1.0),
+        "keypoint_ratio": state.get("keypoint_ratio"),
+        "anomaly_regions": state.get("anomaly_regions", []),
+        "detector_results": state.get("detector_results", {}),
+        "evidence_summary": state.get("evidence_summary", {}),
+        "thresholds_used": state.get("thresholds_used", {}),
+        "alignment_status": state.get("alignment_status"),
         "reasoning": state.get("triage_detail"),
         "multimodal_report": state.get("multimodal_report", "")
     }
@@ -382,8 +414,16 @@ def run_inspection_pipeline(initial_state: Dict[str, Any]) -> Dict[str, Any]:
         "template_match_score": None,
         "template_match_found": None,
         "color_hist_similarity": None,
+        "vector_embedding_match": None,
+        "anomaly_regions": [],
+        "detector_results": {},
+        "ocr_diff": {},
+        "thresholds_used": {},
+        "evidence_summary": {},
+        "alignment_status": "not_run",
         "source_reference_identical": False,
         "heatmap_path": None,
+        "diagnostic_path": None,
         "multimodal_report": None,
         "fraud_score": None,
         "verdict": None,

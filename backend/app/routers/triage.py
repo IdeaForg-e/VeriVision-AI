@@ -227,9 +227,13 @@ def get_case_detail(
     # Build detector metrics
     metrics = []
     if result:
+        evidence = result.evidence_json or {}
+        detector_results = evidence.get("detector_results", {})
         metrics = [
             {"name": "SSIM Score", "score": result.ssim_score or 0, "unit": "", "icon": "image_search", "description": "Structural similarity to OEM golden image"},
             {"name": "Keypoint Match", "score": result.keypoint_match_rate or 0, "unit": "", "icon": "hub", "description": "ORB/SIFT keypoint match rate"},
+            {"name": "Template Match", "score": detector_results.get("template", {}).get("template_match_score", 1.0), "unit": "", "icon": "verified", "description": "Expected label/seal presence check"},
+            {"name": "Color Match", "score": detector_results.get("color", {}).get("color_hist_similarity", 1.0), "unit": "", "icon": "palette", "description": "Label/material color histogram similarity"},
             {"name": "Fraud Score", "score": result.fraud_score, "unit": "%", "icon": "psychology", "description": "Overall fraud risk assessment"},
             {"name": "AI Confidence", "score": int(result.confidence * 100) if result.confidence else 0, "unit": "%", "icon": "bar_chart", "description": "Overall detector confidence"},
         ]
@@ -275,7 +279,7 @@ def get_case_detail(
                     src_img = cv2.imread(inspection.captured_image_path)
                     ref_img = cv2.imread(golden_ref.image_path)
                     if src_img is not None and ref_img is not None:
-                        _, _, annotated_target = services.compute_ssim_diff(src_img, ref_img)
+                        _, _, annotated_target, _ = services.compute_ssim_diff(src_img, ref_img)
                         gen_path = os.path.join(settings.UPLOAD_DIR, f"{inspection.case_id}_annotated.png")
                         cv2.imwrite(gen_path, annotated_target)
                         annotated_image_url = f"/data/cases/{inspection.case_id}_annotated.png"
@@ -337,8 +341,9 @@ def get_case_detail(
             "decision": result.recommended_action if result else "needs_more_evidence",
             "confidence": int((result.confidence or 0.5) * 100) if result else 50,
             "reasoning": result.explanation if result else "AI confidence is below the auto-decide threshold. Manual review required.",
-            "flags": [],
+            "flags": (result.evidence_json or {}).get("evidence_summary", {}) if result else {},
         },
+        "evidence": result.evidence_json if result else {},
     }
 
 
@@ -380,6 +385,18 @@ def get_case_review_detail(
         golden_image_url = ""
     if not uploaded_image_url:
         uploaded_image_url = ""
+    evidence = result.evidence_json if result and result.evidence_json else {}
+    regions = evidence.get("anomaly_regions", [])
+    if regions:
+        first_region = regions[0]
+        ai_region = {
+            "x": float(first_region.get("x", 0)),
+            "y": float(first_region.get("y", 0)),
+            "w": float(first_region.get("w", 0)),
+            "h": float(first_region.get("h", 0)),
+        }
+    else:
+        ai_region = {"x": 0, "y": 0, "w": 0, "h": 0}
 
     return schemas.ReviewDetailResponse(
         id=inspection.case_id,
@@ -389,10 +406,10 @@ def get_case_review_detail(
         imageHash=f"0x{abs(hash(inspection.case_id)):08X}",
         goldenImageUrl=golden_image_url,
         uploadedImageUrl=uploaded_image_url,
-        aiRegion={"x": 25, "y": 25, "w": 25, "h": 25},
+        aiRegion=ai_region,
         neuralModel="FraudSense v4.2",
         targetResolutionMinutes=15,
-        elapsedMinutes=10.8,
+        elapsedMinutes=0.0,
         status=inspection.status if not result else "needs_evidence",
     )
 

@@ -174,11 +174,25 @@ def generate_pdf_report(inspection_id: int, db: Session) -> str:
 
         # ===== DETAILED FINDINGS =====
         story.append(Paragraph("Detailed Inspection Findings", section_heading))
+        evidence = res.evidence_json or {}
+        detector_results = evidence.get("detector_results", {})
+        template_ev = detector_results.get("template", {})
+        color_ev = detector_results.get("color", {})
+        regions = evidence.get("anomaly_regions", [])
+        region_summary = "; ".join(
+            [
+                f"{r.get('location', 'unknown')} x={r.get('x')} y={r.get('y')} w={r.get('w')} h={r.get('h')}"
+                for r in regions[:3]
+            ]
+        ) if regions else "None above threshold"
         
         metrics_data = [
             ["Metric Analyzed", "Raw Value / Status"],
             ["SSIM Index (Structure)", f"{res.ssim_score:.3f}" if res.ssim_score else "N/A"],
             ["Keypoint Matches (Components)", f"{res.keypoint_match_rate * 100:.1f}%" if res.keypoint_match_rate else "N/A"],
+            ["Template / ROI Presence", f"{'FOUND' if template_ev.get('template_match_found', True) else 'MISSING'} ({template_ev.get('template_match_score', 1.0):.3f})"],
+            ["Color / Material Similarity", f"{color_ev.get('color_hist_similarity', 1.0):.3f}"],
+            ["Top Anomaly Regions", region_summary],
             ["OCR Expected Markings", res.ocr_expected_text or "N/A"],
             ["OCR Detected Markings", res.ocr_detected_text or "N/A"]
         ]

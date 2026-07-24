@@ -8,6 +8,11 @@ VALID_ACTIONS = {
     "Quarantine & Escalate",
     "Request Vendor Verification",
     "Request Additional Angle",
+    "Request additional angle",
+    "Retake",
+    "Escalate with evidence",
+    "Escalate to vendor",
+    "Triage Agent requests retake",
 }
 
 def make_decision(ensemble_results: dict) -> dict:
@@ -35,12 +40,15 @@ def make_decision(ensemble_results: dict) -> dict:
     kp_ratio = ensemble_results.get("keypoint_ratio", 1.0)
     expected_text = ensemble_results.get("expected_text", "")
     detected_text = ensemble_results.get("detected_text", "")
+    ocr_diff = ensemble_results.get("ocr_diff") or {}
+    suspicious_confusions = ocr_diff.get("suspicious_confusions", [])
 
     temp_score = ensemble_results.get("template_match_score", 1.0)
     temp_found = ensemble_results.get("template_match_found", True)
     color_sim = ensemble_results.get("color_hist_similarity", 1.0)
     vec_match = float(ensemble_results.get("vector_embedding_match", 85.0))
     source_reference_identical = bool(ensemble_results.get("source_reference_identical", False))
+    anomaly_regions = ensemble_results.get("anomaly_regions", [])
 
     logger.info(
         f"[Agent 4] Decision inputs: SSIM={ssim:.3f}, OCR Sim={ocr_sim:.2f}, "
@@ -67,9 +75,23 @@ def make_decision(ensemble_results: dict) -> dict:
     color_loss = max(0.0, 1.0 - color_sim)
     vec_loss = max(0.0, (100.0 - vec_match) / 100.0)
     template_loss = 0.0 if temp_found else 1.0
+    multimodal_report = ensemble_results.get("multimodal_report", "")
+    multimodal_lower = multimodal_report.lower()
+    mentions_missing_component = "missing component" in multimodal_lower or "absent" in multimodal_lower
+    strong_identity_match = ssim >= 0.80 and vec_match >= 90.0
+    strong_swap_evidence = (
+        kp_ratio < 0.35
+        or (kp_ratio < 0.55 and (ssim < 0.65 or vec_match < 75.0))
+    )
+    localized_structural_issue = ssim < max(ssim_target, 0.85) or bool(anomaly_regions)
     # OCR mismatch severity: count how many characters are different
     ocr_mismatch_count = len(ocr_mismatches)
-    has_ocr_mismatch = ocr_mismatch_count > 0 and (ocr_sim * 100) < ocr_fuzzy
+    has_ocr_mismatch = (
+        expected_text
+        and detected_text
+        and ocr_mismatch_count > 0
+        and ((ocr_sim * 100) < ocr_fuzzy or bool(suspicious_confusions))
+    )
 
     # --- DETERMINE VERDICT (Priority order: Most Severe → Least Severe) ---
 
@@ -95,7 +117,7 @@ def make_decision(ensemble_results: dict) -> dict:
         logger.info(f"[Agent 4] Decision: MISSING QC LABEL → Quarantine. Fraud Score: {fraud_score}")
 
     # 2. TAMPERED / SWAP DETECTION → Keypoints don't match (different component)
-    elif kp_loss > 0.30:
+    elif strong_swap_evidence and not strong_identity_match:
         category = "Swap detection"
         verdict = "tampered"
         recommended_action = "Quarantine & Escalate"
@@ -109,6 +131,19 @@ def make_decision(ensemble_results: dict) -> dict:
         logger.info(f"[Agent 4] Decision: SWAP DETECTION → Quarantine. Fraud Score: {fraud_score}")
 
     # 3. ALTERED SERIAL NUMBER → OCR mismatch detected
+    elif mentions_missing_component and strong_identity_match and localized_structural_issue:
+        category = "Localized missing component"
+        verdict = "missing"
+        recommended_action = "Quarantine & Escalate"
+        confidence = 0.82
+        fraud_score = 58
+        reason_note = (
+            f"LOCALIZED MISSING COMPONENT: Board identity remains consistent (SSIM={ssim:.2f}, vector match={vec_match:.1f}%), "
+            f"but localized anomaly evidence indicates a possible absent part rather than a full board swap. "
+            f"Keypoint agreement is {kp_ratio:.1%}, which is treated as alignment/local difference evidence, not standalone swap proof."
+        )
+        logger.info(f"[Agent 4] Decision: LOCALIZED MISSING COMPONENT -> Quarantine. Fraud Score: {fraud_score}")
+
     elif has_ocr_mismatch:
         category = "Altered serial number"
         verdict = "mismatched"
@@ -180,18 +215,11 @@ def make_decision(ensemble_results: dict) -> dict:
                 fraud_score = max(0, fraud_score - 5)
         else:
             logger.info(f"[Agent 4] Multimodal Vision flagged: {multimodal_report[:100]}...")
-            # Escalate verdict if multimodal found something
             if verdict == "clean":
-                category = "AI-flagged defect"
-                verdict = "reused"
-                recommended_action = "Request additional angle"
-                confidence = 0.50
-                fraud_score = max(fraud_score, 45)
-                reason_note = f"Mathematical checks passed, but Visual AI flagged discrepancies: {multimodal_report[:300]}"
+                reason_note += f" Visual AI noted possible differences, but deterministic detectors did not corroborate them: {multimodal_report[:200]}"
             else:
-                # Boost confidence and score for detected issues
-                fraud_score = min(100, fraud_score + 10)
-                reason_note += f" Visual AI confirmation: {multimodal_report[:200]}"
+                fraud_score = min(100, fraud_score + 5)
+                reason_note += f" Visual AI supporting note: {multimodal_report[:200]}"
 
     # --- COMPUTE WEIGHTED FRAUD SCORE (if not already set by specific verdict) ---
     if verdict in ("clean", "reused") and not source_reference_identical:
@@ -216,6 +244,17 @@ def make_decision(ensemble_results: dict) -> dict:
     if 40 <= fraud_score <= 70:
         confidence = min(confidence, 0.45)
         reason_note += " [BORDERLINE: Fraud score 40-70 range → Human review recommended.]"
+
+    if anomaly_regions:
+        region_bits = [
+            f"{r.get('location', 'unknown')} x={r.get('x')} y={r.get('y')} w={r.get('w')} h={r.get('h')}"
+            for r in anomaly_regions[:3]
+        ]
+        reason_note += f" Evidence regions: {'; '.join(region_bits)}."
+
+    if recommended_action not in VALID_ACTIONS:
+        logger.warning(f"[Agent 4] Invalid recommended action '{recommended_action}'. Falling back to Quarantine & Escalate.")
+        recommended_action = "Quarantine & Escalate"
 
     logger.info(f"[Agent 4] FINAL DECISION: Verdict={verdict.upper()}, Score={fraud_score}/100, Confidence={confidence:.2f}, Action={recommended_action}")
 

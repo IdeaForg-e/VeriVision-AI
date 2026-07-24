@@ -84,6 +84,8 @@ class InspectionResult(Base):
     recommended_action = Column(String, nullable=False)  # Accept, Quarantine & Escalate, Retake, etc.
     explanation = Column(Text, nullable=True)
     heatmap_path = Column(String, nullable=True)
+    diagnostic_path = Column(String, nullable=True)
+    evidence_json = Column(JSON, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     inspection = relationship("Inspection", back_populates="result")

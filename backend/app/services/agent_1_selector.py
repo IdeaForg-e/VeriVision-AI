@@ -47,8 +47,14 @@ def verify_comparison_viability(src_image_path: str, ref_image_path: str) -> dic
             good_matches = [m for m in matches if m.distance < 50]
             if len(good_matches) < 3:
                 logger.info("[Agent 1: Selector] Low ORB keypoint match agreement (likely severe structural defect/burn). Proceeding with AI anomaly ensemble.")
+                layout_warning = "Low visual keypoint agreement; this may indicate a wrong reference or severe structural anomaly."
+            else:
+                layout_warning = ""
         except Exception as match_err:
             logger.error(f"[Agent 1: Selector] Keypoint matching failed during viability check: {match_err}")
+            layout_warning = "Unable to complete layout keypoint agreement check."
+    else:
+        layout_warning = "Unable to extract enough visual keypoints for reference agreement check."
 
     # 3. Aspect Ratio Check
     h_ref, w_ref = ref.shape[:2]
@@ -62,6 +68,7 @@ def verify_comparison_viability(src_image_path: str, ref_image_path: str) -> dic
         logger.info("[Agent 1: Selector] Aspect ratio mismatch detected. Bypassing pixel alignment.")
         return {
             "viable": True,
+            "warning": True,
             "detail": f"Aspect ratio mismatch detected (Golden: {ar_ref:.2f}, Captured: {ar_src:.2f}). Bypassing pixel alignment for semantic AI comparison."
         }
 
@@ -74,11 +81,12 @@ def verify_comparison_viability(src_image_path: str, ref_image_path: str) -> dic
         logger.info("[Agent 1: Selector] Resolution scale mismatch detected. Bypassing pixel alignment.")
         return {
             "viable": True,
+            "warning": True,
             "detail": f"Resolution scale difference detected (Captured: {w_src}x{h_src}, Golden: {w_ref}x{h_ref}). Bypassing pixel alignment for semantic AI comparison."
         }
 
     logger.info("[Agent 1: Selector] Images verified as viable for standard pixel comparison.")
-    return {"viable": True, "detail": ""}
+    return {"viable": True, "warning": bool(layout_warning), "detail": layout_warning}
 
 
 def classify_part_commodity(image_path: str) -> str:
