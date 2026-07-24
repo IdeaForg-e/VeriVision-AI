@@ -199,7 +199,7 @@ class TestAlteredSerialNumber:
             "color_hist_similarity": 0.95
         }
         explanation = generate_explanation(metrics)
-        assert "mismatch" in explanation.lower(), "Explainer should mention mismatch"
+        assert "not match" in explanation.lower() or "mismatch" in explanation.lower(), "Explainer should mention text difference"
         assert "91165" in explanation, "Explainer should reference detected/expected text"
 
 

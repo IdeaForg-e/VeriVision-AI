@@ -162,15 +162,15 @@ def compute_ssim_diff(src_img: np.ndarray, ref_img: np.ndarray) -> tuple[float, 
     realistic_heatmap = cv2.filter2D(realistic_heatmap, -1, sharpen_kernel)
 
     # === STEP 2: Detect anomaly regions using adaptive thresholding ===
-    # Use Otsu's adaptive threshold for better separation in varying conditions
-    _, anomaly_mask = cv2.threshold(blurred_diff, 35, 255, cv2.THRESH_BINARY)
+    # Lower threshold to catch subtle text/label changes
+    _, anomaly_mask = cv2.threshold(blurred_diff, 25, 255, cv2.THRESH_BINARY)
 
     # Morphological operations to clean up noise
-    kernel_clean = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
+    kernel_clean = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
     anomaly_mask = cv2.morphologyEx(anomaly_mask, cv2.MORPH_OPEN, kernel_clean)
     
     # Dilate to merge nearby defect regions
-    kernel_dilate = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (11, 11))
+    kernel_dilate = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (7, 7))
     dilated_mask = cv2.dilate(anomaly_mask, kernel_dilate, iterations=1)
 
     # Find contours of defect regions
@@ -189,7 +189,7 @@ def compute_ssim_diff(src_img: np.ndarray, ref_img: np.ndarray) -> tuple[float, 
 
     for c in contours:
         area = cv2.contourArea(c)
-        if area > 150:  # Noise threshold filter
+        if area > 50:  # Lower noise threshold to catch smaller text/label defects
             contour_count += 1
             x, y, w, h = cv2.boundingRect(c)
             all_defect_regions.append((x, y, w, h))
@@ -206,66 +206,64 @@ def compute_ssim_diff(src_img: np.ndarray, ref_img: np.ndarray) -> tuple[float, 
             })
 
             # --- Draw on realistic_heatmap ---
-            # Draw a subtle bright border around defect on heatmap
-            cv2.rectangle(realistic_heatmap, (x, y), (x + w, y + h), (255, 255, 255), 1, cv2.LINE_AA)
+            # Draw a prominent bright border around defect on heatmap
+            cv2.rectangle(realistic_heatmap, (x, y), (x + w, y + h), (255, 255, 255), 3, cv2.LINE_AA)
 
             # --- Draw on annotated_target (defective image) ---
             # 1. Fill the defect region with semi-transparent red overlay
             cv2.rectangle(defect_overlay, (x, y), (x + w, y + h), (0, 0, 255), -1)
             
-            # 2. Draw bright outer glow box (yellow outer + red inner)
-            cv2.rectangle(annotated_target, (x - 2, y - 2), (x + w + 2, y + h + 2), (0, 255, 255), 2, cv2.LINE_AA)  # Yellow glow
-            cv2.rectangle(annotated_target, (x, y), (x + w, y + h), (0, 0, 255), 2, cv2.LINE_AA)  # Red inner box
+            # 2. Draw BRIGHT outer glow box (yellow outer + red inner) — THICK
+            cv2.rectangle(annotated_target, (x - 4, y - 4), (x + w + 4, y + h + 4), (0, 255, 255), 4, cv2.LINE_AA)
+            cv2.rectangle(annotated_target, (x, y), (x + w, y + h), (0, 0, 255), 4, cv2.LINE_AA)
 
-            # 3. Draw crosshair markers at corners to emphasize defect region
-            marker_len = min(15, w // 4, h // 4)
-            # Top-left corner crosshair
-            cv2.line(annotated_target, (x, y + marker_len), (x, y), (0, 255, 255), 1)
-            cv2.line(annotated_target, (x, y), (x + marker_len, y), (0, 255, 255), 1)
-            # Top-right corner crosshair
-            cv2.line(annotated_target, (x + w - marker_len, y), (x + w, y), (0, 255, 255), 1)
-            cv2.line(annotated_target, (x + w, y), (x + w, y + marker_len), (0, 255, 255), 1)
-            # Bottom-left corner crosshair
-            cv2.line(annotated_target, (x, y + h - marker_len), (x, y + h), (0, 255, 255), 1)
-            cv2.line(annotated_target, (x, y + h), (x + marker_len, y + h), (0, 255, 255), 1)
-            # Bottom-right corner crosshair
-            cv2.line(annotated_target, (x + w - marker_len, y + h), (x + w, y + h), (0, 255, 255), 1)
-            cv2.line(annotated_target, (x + w, y + h), (x + w, y + h - marker_len), (0, 255, 255), 1)
+            # 3. Draw LARGE crosshair markers at corners
+            marker_len = min(30, w // 3, h // 3)
+            cv2.line(annotated_target, (x, y + marker_len), (x, y), (0, 255, 255), 3)
+            cv2.line(annotated_target, (x, y), (x + marker_len, y), (0, 255, 255), 3)
+            cv2.line(annotated_target, (x + w - marker_len, y), (x + w, y), (0, 255, 255), 3)
+            cv2.line(annotated_target, (x + w, y), (x + w, y + marker_len), (0, 255, 255), 3)
+            cv2.line(annotated_target, (x, y + h - marker_len), (x, y + h), (0, 255, 255), 3)
+            cv2.line(annotated_target, (x, y + h), (x + marker_len, y + h), (0, 255, 255), 3)
+            cv2.line(annotated_target, (x + w - marker_len, y + h), (x + w, y + h), (0, 255, 255), 3)
+            cv2.line(annotated_target, (x + w, y + h), (x + w, y + h - marker_len), (0, 255, 255), 3)
 
             # 4. Draw filled contour outline for organic-shaped defects
-            cv2.drawContours(annotated_target, [c], -1, (0, 0, 255), 1, cv2.LINE_AA)
-            cv2.drawContours(annotated_target, [c], -1, (0, 255, 255), 1, cv2.LINE_AA)
+            cv2.drawContours(annotated_target, [c], -1, (0, 0, 255), 2, cv2.LINE_AA)
+            cv2.drawContours(annotated_target, [c], -1, (0, 255, 255), 2, cv2.LINE_AA)
 
-            # 5. Draw DEFECT badge label with severity indicator
+            # 5. Draw LARGE DEFECT badge label with severity indicator
             if area > 1000:
-                badge_label = f"DEFECT #{contour_count}  ⚠"
-                badge_color = (0, 0, 200)  # Dark red for large defects
+                badge_label = f"!! DEFECT #{contour_count} !!"
+                badge_color = (0, 0, 220)
                 text_color = (255, 255, 255)
             else:
                 badge_label = f"DEFECT #{contour_count}"
-                badge_color = (0, 0, 150)
+                badge_color = (0, 0, 180)
                 text_color = (255, 255, 200)
 
-            (tw, th), _ = cv2.getTextSize(badge_label, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 1)
-            label_y = max(0, y - th - 10)
+            font_scale = 0.7
+            thickness = 2
+            (tw, th), _ = cv2.getTextSize(badge_label, cv2.FONT_HERSHEY_SIMPLEX, font_scale, thickness)
+            label_y = max(0, y - th - 16)
             
-            # Draw badge background with rounded rectangle feel
-            cv2.rectangle(annotated_target, (x, label_y), (x + tw + 12, y), badge_color, -1)
-            cv2.rectangle(annotated_target, (x, label_y), (x + tw + 12, y), (255, 255, 255), 1)
+            # Draw badge background
+            cv2.rectangle(annotated_target, (x, label_y), (x + tw + 20, y), badge_color, -1)
+            cv2.rectangle(annotated_target, (x, label_y), (x + tw + 20, y), (255, 255, 255), 2)
             
             # Draw label text
-            cv2.putText(annotated_target, badge_label, (x + 6, label_y + th + 4), 
-                       cv2.FONT_HERSHEY_SIMPLEX, 0.5, text_color, 1, cv2.LINE_AA)
+            cv2.putText(annotated_target, badge_label, (x + 10, label_y + th + 6), 
+                       cv2.FONT_HERSHEY_SIMPLEX, font_scale, text_color, thickness, cv2.LINE_AA)
 
     # Apply the semi-transparent red overlay to annotated_target
     if contour_count > 0:
-        # Blend the red overlay with alpha=0.25 for semi-transparent defect highlighting
+        # Blend the red overlay with alpha=0.45 for stronger defect highlighting
         mask_3ch = np.zeros_like(src_img)
         for (x, y, w, h) in all_defect_regions:
             mask_3ch[y:y+h, x:x+w] = 1.0
         
-        annotated_target = (annotated_target.astype(np.float32) * (1.0 - mask_3ch * 0.30) + 
-                           defect_overlay.astype(np.float32) * (mask_3ch * 0.30)).astype("uint8")
+        annotated_target = (annotated_target.astype(np.float32) * (1.0 - mask_3ch * 0.45) + 
+                           defect_overlay.astype(np.float32) * (mask_3ch * 0.45)).astype("uint8")
 
     # If no defects found, show "NO DEFECTS DETECTED" badge
     if contour_count == 0:

@@ -138,14 +138,15 @@ def make_decision(ensemble_results: dict, thresholds: dict | None = None) -> dic
     multimodal_report = ensemble_results.get("multimodal_report", "")
     multimodal_lower = multimodal_report.lower()
     mentions_missing_component = "missing component" in multimodal_lower or "absent" in multimodal_lower
-    strong_identity_match = ssim >= 0.80 and vec_match >= 90.0
-    # SSIM and ORB keypoint ratio are only meaningful when the two images are
-    # pixel-registered. If Agent 2's homography didn't converge, both metrics
-    # mostly encode pose/perspective difference rather than fraud evidence —
-    # do not let them drive a swap/reused/false-alarm verdict in that case.
-    strong_swap_evidence = alignment_reliable and (
+    # A very high vector-embedding match (>= 90%) is strong evidence that the
+    # target and reference are the SAME part, even if keypoint ratios are low
+    # due to text changes, minor alignment drift, or ROI differences.
+    # Do not let keypoint-driven swap evidence override high vector identity.
+    high_vector_identity = vec_match_available and vec_match >= 90.0
+    strong_identity_match = (ssim >= 0.80 and vec_match >= 90.0) or high_vector_identity
+    strong_swap_evidence = alignment_reliable and not high_vector_identity and (
         kp_ratio < 0.35
-        or (kp_ratio < 0.55 and (ssim < 0.65 or vec_match < 75.0))
+        or (kp_ratio < 0.55 and (ssim < 0.65 or (vec_match_available and vec_match < 75.0)))
     )
     localized_structural_issue = alignment_reliable and (ssim < max(ssim_target, 0.85) or bool(anomaly_regions))
     # OCR mismatch severity: count how many characters are different
@@ -316,7 +317,8 @@ def make_decision(ensemble_results: dict, thresholds: dict | None = None) -> dic
     # clean just because the numeric thresholds were borderline/inconclusive.
     # This never *overrides* a verdict a deterministic rule already reached
     # above — it only fills in when nothing else claimed the case.
-    if verdict == "clean" and multimodal_report and not source_reference_identical:
+    is_strongly_clean = (ssim >= 0.90 and kp_ratio >= 0.85 and ocr_sim >= 0.95 and temp_found and color_sim >= 0.90)
+    if verdict == "clean" and multimodal_report and not source_reference_identical and not is_strongly_clean:
         mm_category, mm_verdict, mm_action, mm_score, mm_confidence = _classify_multimodal_keywords(multimodal_report)
         if mm_verdict is not None:
             category = mm_category
