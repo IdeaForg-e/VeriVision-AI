@@ -320,37 +320,49 @@ export default function UploadInspectionModal({ open, onClose, onSuccess }) {
               </div>
 
               {selectedCatalogItem && (
-                <div className="lab-card-raised p-3 flex gap-3 items-center flex-1">
+                <div className="lab-card-raised p-3 flex flex-col gap-2.5 flex-1 min-h-[18rem]">
                   {goldenImageUrl ? (
-                    <div className="h-24 w-24 rounded-md bg-slate-900 border border-slate-800 flex items-center justify-center overflow-hidden shrink-0">
+                    <div className="relative h-56 md:h-64 bg-slate-950/90 rounded-xl border border-slate-800/80 flex items-center justify-center p-2.5 overflow-hidden group shadow-inner">
                       <img
                         src={goldenImageUrl}
-                        className="w-full h-full object-contain"
+                        className="w-full h-full object-contain filter drop-shadow-md transition-transform duration-300 group-hover:scale-105"
                         alt="Golden Standard Preview"
                         onError={(e) => {
                           e.target.style.display = "none";
                         }}
                       />
+                      <div className="absolute top-2 left-2 bg-sky-950/80 backdrop-blur-md border border-sky-500/30 text-sky-300 px-2 py-0.5 rounded text-[9px] font-mono font-bold tracking-wider uppercase flex items-center gap-1 shadow">
+                        <Sparkles size={10} className="text-sky-400" /> OEM Master Reference
+                      </div>
                     </div>
                   ) : (
-                    <div className="h-24 w-24 rounded-md bg-slate-900 border border-slate-800 flex items-center justify-center shrink-0">
-                      <Cpu size={24} className="text-slate-600" />
+                    <div className="h-56 md:h-64 rounded-xl bg-slate-950/90 border border-slate-800/80 flex flex-col items-center justify-center gap-2 text-slate-500">
+                      <Cpu size={36} className="text-slate-600 animate-pulse" />
+                      <p className="text-xs font-mono">No Reference Image Preview</p>
                     </div>
                   )}
 
-                  <div className="min-w-0 flex-1 text-[11px] space-y-1">
-                    <p className="font-bold text-slate-900 dark:text-slate-100 truncate">
-                      {selectedCatalogItem.name}
-                    </p>
-                    <p className="text-[10px] text-slate-500 font-mono">
-                      PN: <span className="text-sky-600 dark:text-sky-400 font-semibold">{selectedCatalogItem.part_number}</span>
-                    </p>
-                    <p className="text-[10px] text-slate-500 font-mono">
-                      Type: <span className="text-slate-700 dark:text-slate-300 font-semibold uppercase">{selectedCatalogItem.commodity}</span>
-                    </p>
-                    <p className="text-[10px] text-slate-500 font-mono truncate">
-                      Expected S/N: {selectedGoldenRef?.expected_serial || "OEM STANDARD"}
-                    </p>
+                  <div className="grid grid-cols-2 gap-2 text-[11px] bg-slate-900/60 dark:bg-slate-950/60 p-2.5 rounded-lg border border-slate-800/60">
+                    <div className="col-span-2 flex items-center justify-between">
+                      <p className="font-bold text-slate-100 text-xs truncate">
+                        {selectedCatalogItem.name}
+                      </p>
+                      <span className="text-[9px] font-mono font-bold px-2 py-0.5 rounded bg-sky-500/10 text-sky-400 border border-sky-500/20 uppercase">
+                        {selectedCatalogItem.commodity}
+                      </span>
+                    </div>
+                    <div>
+                      <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Part Number</p>
+                      <p className="font-mono text-sky-400 font-semibold text-[11px] truncate">
+                        {selectedCatalogItem.part_number}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Expected S/N</p>
+                      <p className="font-mono text-slate-300 font-semibold text-[11px] truncate">
+                        {selectedGoldenRef?.expected_serial || selectedCatalogItem.part_number}
+                      </p>
+                    </div>
                   </div>
                 </div>
               )}

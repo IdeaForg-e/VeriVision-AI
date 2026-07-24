@@ -179,11 +179,11 @@ export default function TargetScanCaptureZone({
       </div>
 
       {targetMode === "upload" && (
-        <div className="relative flex-1 flex flex-col min-h-[14rem]">
+        <div className="relative flex-1 flex flex-col min-h-[18rem]">
           {targetPreview ? (
             <div className="lab-card overflow-hidden flex flex-col flex-1">
-              <div className="relative h-48 bg-slate-950 flex items-center justify-center overflow-hidden">
-                <img src={targetPreview} className="w-full h-full object-contain" alt="Target Scan" />
+              <div className="relative h-56 md:h-64 bg-slate-950 flex items-center justify-center overflow-hidden p-2.5">
+                <img src={targetPreview} className="w-full h-full object-contain filter drop-shadow-md" alt="Target Scan" />
               </div>
               <div className="px-3 py-2 flex items-center justify-between bg-slate-50 dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800">
                 <div className="min-w-0 text-[10px]">
@@ -204,14 +204,14 @@ export default function TargetScanCaptureZone({
               </div>
             </div>
           ) : (
-            <label className="flex flex-col items-center justify-center gap-2 min-h-[14rem] flex-1 rounded-lg border-2 border-dashed border-slate-300 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/30 hover:bg-slate-100 dark:hover:bg-slate-900/60 cursor-pointer transition">
+            <label className="flex flex-col items-center justify-center gap-2.5 min-h-[18rem] flex-1 rounded-xl border-2 border-dashed border-slate-300 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/40 hover:bg-slate-100 dark:hover:bg-slate-900/60 cursor-pointer transition">
               <input type="file" accept="image/*" onChange={handleTargetChange} className="hidden" disabled={disabled} />
-              <div className="h-10 w-10 rounded-full bg-slate-200 dark:bg-slate-800 flex items-center justify-center text-slate-500">
-                <Camera size={18} />
+              <div className="h-12 w-12 rounded-full bg-sky-500/10 border border-sky-500/20 flex items-center justify-center text-sky-400">
+                <Camera size={22} />
               </div>
-              <div className="text-center">
-                <p className="text-xs font-bold text-slate-800 dark:text-slate-200">Upload Target Scan</p>
-                <p className="text-[10px] text-slate-500">Drag file or click to browse</p>
+              <div className="text-center space-y-0.5">
+                <p className="text-xs font-bold text-slate-800 dark:text-slate-200">Upload Target Hardware Scan</p>
+                <p className="text-[10px] text-slate-500 font-medium">Drag file here or click to browse image</p>
               </div>
             </label>
           )}
@@ -223,8 +223,8 @@ export default function TargetScanCaptureZone({
           {targetPreview ? (
             <div className="flex flex-col gap-2">
               <div className="lab-card overflow-hidden">
-                <div className="relative h-48 bg-slate-950 flex items-center justify-center overflow-hidden">
-                  <img src={targetPreview} className="w-full h-full object-contain" alt="Webcam capture" />
+                <div className="relative h-56 md:h-64 bg-slate-950 flex items-center justify-center overflow-hidden p-2.5">
+                  <img src={targetPreview} className="w-full h-full object-contain filter drop-shadow-md" alt="Webcam capture" />
                 </div>
                 <div className="px-3 py-2 flex items-center justify-between bg-slate-50 dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 text-[10px]">
                   <p className="font-bold text-slate-800 dark:text-slate-200 truncate">{customFile?.name}</p>
@@ -252,9 +252,9 @@ export default function TargetScanCaptureZone({
               )}
             </div>
           ) : (
-            <div className="relative rounded-lg overflow-hidden border border-slate-300 dark:border-slate-800 bg-slate-950 min-h-[14rem]">
+            <div className="relative rounded-xl overflow-hidden border border-slate-300 dark:border-slate-800 bg-slate-950 min-h-[18rem]">
               {webcamError ? (
-                <div className="h-48 flex flex-col items-center justify-center gap-2 p-4 text-center">
+                <div className="h-56 md:h-64 flex flex-col items-center justify-center gap-2 p-4 text-center">
                   <ZapOff size={20} className="text-rose-400" />
                   <p className="text-xs text-slate-400">{webcamError}</p>
                   <Button variant="outline" size="sm" onClick={startWebcam}>
@@ -274,7 +274,7 @@ export default function TargetScanCaptureZone({
                     playsInline
                     muted
                     onCanPlay={() => setWebcamReady(true)}
-                    className="w-full h-48 object-cover bg-slate-950"
+                    className="w-full h-56 md:h-64 object-cover bg-slate-950"
                   />
                   <canvas ref={canvasRef} className="hidden" />
                 </div>
