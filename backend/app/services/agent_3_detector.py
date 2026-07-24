@@ -410,8 +410,8 @@ def inspect_anomalies_multimodal(src_image_path: str, ref_image_path: str, commo
             ]
         }
 
-        # Set 5s timeout for vision model inference to keep pipeline ultra-fast
-        response = requests.post(url, json=payload, headers=headers, timeout=5)
+        # Set 10s timeout for vision model inference
+        response = requests.post(url, json=payload, headers=headers, timeout=10)
         if response.status_code == 200:
             res_data = response.json()
             description = res_data["choices"][0]["message"]["content"].strip()
@@ -421,7 +421,7 @@ def inspect_anomalies_multimodal(src_image_path: str, ref_image_path: str, commo
             logger.error(f"[Agent 3: Detector] OpenRouter API returned status {response.status_code}: {response.text}")
             return f"Visual comparison failed: API returned status {response.status_code}."
     except requests.exceptions.Timeout:
-        logger.warning("[Agent 3: Detector] OpenRouter API request timed out (5s limit reached).")
+        logger.warning("[Agent 3: Detector] OpenRouter API request timed out (10s limit reached).")
         return "Visual comparison skipped: OpenRouter API timeout."
     except Exception as e:
         logger.error(f"[Agent 3: Detector] Multimodal vision query failed: {e}")
@@ -556,7 +556,7 @@ def run_anomaly_ensemble(src_img: np.ndarray, ref_img: np.ndarray, roi_config: d
 
         ssim_val, heatmap_img, annotated_target = f_ssim.result(timeout=10.0)
         try:
-            multimodal_report = f_multi.result(timeout=5.0)
+            multimodal_report = f_multi.result(timeout=10.0)
         except Exception as e:
             logger.warning(f"[Agent 3: Detector] Multimodal vision task timed out or failed: {e}")
             multimodal_report = "Visual comparison skipped: Multimodal response timeout."

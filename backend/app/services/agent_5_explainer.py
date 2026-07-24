@@ -103,7 +103,7 @@ def generate_explanation(metrics: dict) -> str:
         for attempt in range(1, MAX_LLM_ATTEMPTS + 1):
             logger.info(f"Querying OpenRouter Explainer model (attempt {attempt}/{MAX_LLM_ATTEMPTS}): {openrouter_model}")
             try:
-                response = requests.post(url, json=payload, headers=headers, timeout=3)
+                response = requests.post(url, json=payload, headers=headers, timeout=10)
                 if response.status_code != 200:
                     logger.warning(f"Explainer model endpoint returned status {response.status_code}. Details: {response.text}")
                     continue
