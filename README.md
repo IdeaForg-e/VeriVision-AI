@@ -66,6 +66,9 @@ The industry needs an AI system that can see what humans miss — automatically,
 
 ## 💡 Our Solution — VeriVision AI
 
+> [!NOTE]
+> **Executive Summary**: VeriVision AI reduces inspection latency from 4+ hours per pallet down to milliseconds per part while capturing subtle fraud indicators like 0-to-O character alterations on serial stickers, missing QC tags, non-OEM replacement covers, and reused boards.
+
 **VeriVision AI** is an end-to-end **Agentic AI platform** that replaces manual visual inspection with a deterministic, explainable, **5-agent computer vision pipeline** built on **LangGraph**. 
 
 Upload an image of a part. The system automatically:
@@ -95,6 +98,9 @@ No manual pairing. No subjective judgment. No inconsistency between sites.
 <p align="center">
   <img src="frontend/public/images/architecture.png" alt="VeriVision AI System Architecture" width="100%" />
 </p>
+
+> [!IMPORTANT]
+> **Deterministic 5-Agent Pipeline**: Powered by a **LangGraph State Machine** (`workflow.py`), every hardware scan follows a strict state transition path. Low-quality scans trigger instant retake guidance, preventing distorted images from wasting inference compute.
 
 The following diagram illustrates the high-level architecture of **VeriVision AI**, highlighting the flow of data from the User Interface down to the 5-Agent LangGraph State Machine, Parallel Detection Ensemble, and Persistence Layer:
 

@@ -34,6 +34,9 @@
 
 ## 🌐 High-Level Platform Overview
 
+> [!NOTE]
+> **Autonomous Multi-Agent Architecture**: VeriVision AI orchestrates 5 autonomous AI agents built on **LangGraph**. Each agent operates as a specialized micro-service node, executing vector retrieval, quality triage, parallel computer vision, weighted risk fusion, and LLM audit explanations.
+
 **VeriVision AI** automates hardware quality assurance and return fraud detection across global repair centers and manufacturing lines. By replacing manual visual inspection with an autonomous **5-Agent Computer Vision pipeline**, VeriVision reduces inspection times from hours to milliseconds while capturing subtle fraud indicators like 0-to-O character alterations on serial stickers, missing QC tags, non-OEM replacement covers, and reused boards.
 
 <p align="center">
