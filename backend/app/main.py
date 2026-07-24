@@ -56,6 +56,17 @@ dataset_dir = os.path.abspath(os.path.join(os.path.dirname(os.path.dirname(os.pa
 if os.path.exists(dataset_dir):
     app.mount("/dataset", StaticFiles(directory=dataset_dir), name="dataset")
 
+@app.on_event("startup")
+def auto_sync_golden_catalog():
+    try:
+        import sys
+        sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        from seed_db import seed
+        logger.info("[AutoSync] Syncing Golden_Images folder catalog with database on startup...")
+        seed()
+    except Exception as err:
+        logger.warning(f"[AutoSync] Startup catalog sync notice: {err}")
+
 @app.get("/")
 def read_root():
     return {
