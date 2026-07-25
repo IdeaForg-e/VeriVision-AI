@@ -31,7 +31,7 @@
 
 | Name | Role |
 |:---|:---|
-| **Disha** | Team Member |
+| **Disha** | Team Leader |
 | **Anil** | Team Member |
 | **Priyanka** | Team Member |
 | **Chaitanya** | Team Member |
