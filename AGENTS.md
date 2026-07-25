@@ -11,7 +11,7 @@
 <h1 align="center">🤖 VeriVision AI — Agentic Workflow, User Roles & Deep-Dive Architecture</h1>
 
 <p align="center">
-  <em>Comprehensive guide covering the 5-Agent Computer Vision pipeline, User vs. Admin workflows, PDF reporting, and Human-in-the-Loop (HITL) active learning loop.</em>
+  <em>Comprehensive technical deep dive into the 5-Agent Computer Vision pipeline, FastAPI backend services, User vs. Admin workflows, PDF reporting engine, and Human-in-the-Loop (HITL) active learning loop.</em>
 </p>
 
 ---
@@ -21,21 +21,22 @@
 2. [👥 User Roles: Operator vs. Admin Workspace](#-user-roles-operator-vs-admin-workspace)
 3. [🚀 End-to-End User Demo Workflow](#-end-to-end-user-demo-workflow)
 4. [🛠️ Deep Dive: The 5 LangGraph Agents](#️-deep-dive-the-5-langgraph-agents)
-   - [Agent 1: Selector & Gatekeeper](#agent-1--product-selector--gatekeeper-agent_1_selectorpy)
-   - [Agent 2: Triage & Aligner](#agent-2--triage--aligner-agent_2_triagepy)
-   - [Agent 3: Vision-AI Anomaly Detector Ensemble](#agent-3--vision-ai-anomaly-detector-ensemble-agent_3_detectorpy)
-   - [Agent 4: Decision & Fusion Judge](#agent-4--decision--fusion-judge-agent_4_decisionpy)
-   - [Agent 5: Audit Explainer & Report Engine](#agent-5--audit-explainer--report-engine-agent_5_explainerpy)
+   - [Agent 1: Selector & Gatekeeper (`agent_1_selector.py`)](#agent-1--product-selector--gatekeeper-agent_1_selectorpy)
+   - [Agent 2: Triage & Aligner (`agent_2_triage.py`)](#agent-2--ingest--triage-aligner-agent_2_triagepy)
+   - [Agent 3: Vision-AI Anomaly Detector Ensemble (`agent_3_detector.py` & `agent_3_multimodal.py`)](#agent-3--vision-ai-anomaly-detector-ensemble-agent_3_detectorpy--agent_3_multimodalpy)
+   - [Agent 4: Decision & Fusion Judge (`agent_4_decision.py`)](#agent-4--decision--fusion-judge-agent_4_decisionpy)
+   - [Agent 5: Audit Explainer & Report Engine (`agent_5_explainer.py` & `reporting.py`)](#agent-5--audit-explainer--report-engine-agent_5_explainerpy--reportingpy)
 5. [📄 Audit-Ready PDF & CSV Reporting System](#-audit-ready-pdf--csv-reporting-system)
 6. [🧠 Human-in-the-Loop (HITL) Active Learning & Feedback Loop](#-human-in-the-loop-hitl-active-learning--feedback-loop)
 7. [📊 Live Telemetry & Analytics Dashboard](#-live-telemetry--analytics-dashboard)
+8. [⚡ Auto-Sync & Startup Background Warmup (`main.py` & `seed_db.py`)](#-auto-sync--startup-background-warmup-mainpy--seed_dbpy)
 
 ---
 
 ## 🌐 High-Level Platform Overview
 
 > [!NOTE]
-> **Autonomous Multi-Agent Architecture**: VeriVision AI orchestrates 5 autonomous AI agents built on **LangGraph**. Each agent operates as a specialized micro-service node, executing vector retrieval, quality triage, parallel computer vision, weighted risk fusion, and LLM audit explanations.
+> **Autonomous Multi-Agent Architecture**: VeriVision AI orchestrates 5 autonomous AI agents built on **LangGraph** (`backend/app/agents/workflow.py`). Each agent operates as a specialized micro-service node, executing vector retrieval, quality triage, parallel computer vision, weighted risk fusion, and LLM audit explanations.
 
 **VeriVision AI** automates hardware quality assurance and return fraud detection across global repair centers and manufacturing lines. By replacing manual visual inspection with an autonomous **5-Agent Computer Vision pipeline**, VeriVision reduces inspection times from hours to milliseconds while capturing subtle fraud indicators like 0-to-O character alterations on serial stickers, missing QC tags, non-OEM replacement covers, and reused boards.
 
@@ -113,7 +114,7 @@ mindmap
       Monitor Vendor & Site Analytics
 ```
 
-### 1. 👷 Operator Inspector (`user@verivision.com`)
+### 1. 👷 Operator Inspector (`user@verivision.com` / `user123`)
 *Target User: Line Engineers, Warehouse Technicians, QA Inspectors*
 - **Primary Goal:** Rapidly verify incoming return parts, view AI findings, and process flagged items.
 - **Access Scope:**
@@ -123,7 +124,7 @@ mindmap
   - **Human-in-the-Loop Review:** Approve AI verdicts or flag items for supervisor escalation.
   - **PDF Export:** Generate and download official laboratory inspection certificates.
 
-### 2. 🔐 Admin Supervisor (`admin@verivision.com`)
+### 2. 🔐 Admin Supervisor (`admin@verivision.com` / `admin123`)
 *Target User: Quality Managers, Technical Directors, Supply Chain Analysts*
 - **Primary Goal:** Calibrate AI detection sensitivity, manage catalog references, enforce compliance policies, and analyze vendor fraud trends.
 - **Access Scope:**
@@ -182,19 +183,6 @@ sequenceDiagram
     Gateway-->>Operator: Deliver ReportLab PDF Compliance Certificate
 ```
 
-### Detailed Step Walkthrough:
-
-1. **Session Login:** The user signs into the system using JWT-authenticated credentials.
-2. **Scan Submission:** On the **AI Inspection Page**, the user uploads a hardware component image (e.g., a Dell laptop motherboard, DDR5 RAM stick, or M.2 SSD).
-3. **Automated Vector Pairing:** User leaves part selection on `Auto-Detect (Vector Search)`. Agent 1 instantly calculates the image's visual embedding and pairs it with the correct OEM master catalog entry.
-4. **Execution Telemetry:** The backend executes all 5 agents in parallel, returning full metrics and annotated heatmaps in under **3 to 5 seconds**.
-5. **Interactive Evidence Audit:** The user opens the **Inspection Detail Workbench**:
-   - **Visual Comparison Slider:** Compare golden vs target scan side-by-side.
-   - **Thermal SSIM Overlay:** Toggle the JET heatmap highlighting missing capacitors or damaged traces in neon red.
-   - **OCR Diff Table:** View expected serial numbers vs. detected text with exact character-level mismatch highlighting.
-6. **Human Review & Feedback:** If the case falls into a borderline confidence range (40-70% score), the operator provides supervisor sign-off, adding audit notes that feed back into the learning loop.
-7. **Report Download:** The operator clicks **Download PDF Report** to generate a laboratory audit document ready for vendor disputes.
-
 ---
 
 ## 🛠️ Deep Dive: The 5 LangGraph Agents
@@ -228,21 +216,12 @@ graph TD
 Identifies the exact OEM part catalog model from an incoming scan and verifies image comparison viability before heavy computation begins.
 
 #### Technical Highlights
-- **512-Dimensional Vector Indexing:** Utilizes **Open_CLIP (ViT-B/32)** to extract a visual embedding vector. Performs Cosine Similarity search against indexed Golden References in `<10ms`.
-- **Multimodal Commodity Classifier:** If API keys are active, calls OpenRouter multimodal vision models to auto-classify the hardware commodity (`motherboard`, `ram`, `storage`, `microchip`, `label`).
+- **512-Dimensional Vector Indexing:** Utilizes **Open_CLIP (ViT-B/32)** (`embedding_service.py`) to extract a normalized 512-dimensional visual embedding vector. Performs Cosine Similarity search against indexed Golden References in `<10ms`.
+- **Local OCR-Based Commodity Classifier:** Uses OCR text extraction combined with keyword mappings (`motherboard`, `label`, `microchip`, `processor`, `ram`, `storage`, `gpu`, `battery`) to auto-classify component type.
 - **Viability Gatekeeper:**
-  - Decodability check on disk
-  - Aspect ratio orientation verification (prevents comparing portrait vs landscape)
-  - Resolution scale difference checks (prevents comparing 200px thumbnails against 4K images)
-
-```python
-# Agent 1 State Output Example
-{
-  "commodity": "ram",
-  "golden_path": "data/golden/dell_ddr5_ram.png",
-  "source_reference_identical": False
-}
-```
+  - File existence and decodability check on disk.
+  - Aspect ratio orientation verification ($|\text{ar}_{\text{ref}} - \text{ar}_{\text{src}}| \le 0.4$, prevents comparing portrait vs landscape).
+  - Resolution scale difference checks ($0.25 \le \text{ratio} \le 4.0$, prevents comparing 200px thumbnails against 4K images).
 
 ---
 
@@ -252,42 +231,47 @@ Identifies the exact OEM part catalog model from an incoming scan and verifies i
 Evaluates camera clarity, lighting conditions, and performs geometric image registration so target scans align perfectly with golden references.
 
 #### Technical Highlights
-- **Blur Detection (Laplacian Variance):** Computes $\text{Var}(\nabla^2 I)$. If score $< 100.0$, flags as blurry and requests a re-scan.
+- **Blur Detection (Laplacian Variance):** Computes $\text{Var}(\nabla^2 I)$. If score $< 100.0$, flags as blurry and requests an instant re-scan with user guidance (*"Hold camera steady and capture close-up"*).
 - **Lighting Intensity Range:** Calculates mean pixel intensity $\mu$. Verifies brightness is within optimal bounds ($40 \le \mu \le 220$).
 - **ORB Feature Homography Alignment:**
-  - Extracts 2,000 ORB keypoints from both images
-  - Matches descriptors using `BFMatcher(NORM_HAMMING)`
-  - Calculates RANSAC Homography matrix $H$
-  - Warps target scan to match golden reference dimensions
-  - Enforces a minimum RANSAC inlier ratio ($\ge 15\%$) to prevent invalid warping distortions
+  - Extracts 2,000 ORB keypoints from both images.
+  - Matches descriptors using `BFMatcher(NORM_HAMMING)`.
+  - Calculates RANSAC Homography matrix $H$ with 5.0 pixel error threshold.
+  - Enforces minimum RANSAC inlier ratio ($\ge 15\%$) and inlier count ($\ge 10$) to prevent invalid warping distortions.
+- **Illumination Normalization:** Applies mean/std contrast matching in Lab color space ($L_{\text{norm}} = \frac{L_{\text{src}} - \mu_{\text{src}}}{\sigma_{\text{src}}} \cdot \sigma_{\text{ref}} + \mu_{\text{ref}}$) to standardize brightness across different factory lighting setups.
 
 ---
 
-### Agent 3 — Vision-AI Anomaly Detector Ensemble (`agent_3_detector.py`)
+### Agent 3 — Vision-AI Anomaly Detector Ensemble (`agent_3_detector.py` & `agent_3_multimodal.py`)
 
 #### Primary Responsibility
-Executes **5 specialized sub-agents** concurrently using Python `ThreadPoolExecutor`, eliminating bottlenecks and maximizing pipeline throughput.
+Executes **6 specialized sub-detectors** concurrently using Python `ThreadPoolExecutor`, eliminating bottlenecks and maximizing pipeline throughput (~3-5 seconds execution time).
 
-#### The 5 Sub-Agents:
+#### The 6 Sub-Agents:
 
-| Sub-Agent | Tech Stack / Engine | What It Catches | Target Latency / Metrics |
+| Sub-Agent | Tech Stack / Engine | What It Catches | Metrics / Visual Output |
 |:---|:---|:---|:---|
-| **Agent 3A: Structural Inspector** | `skimage.metrics.structural_similarity` | Component swaps, missing chips, burnt traces, PCB layout changes | **~150ms** (`ssim_score`, JET thermal heatmap) |
-| **Agent 3B: OCR & Label Agent** | Google Vision API + `difflib` | Altered serial numbers, missing stickers, 0↔O character diffs | **~800ms** (`ocr_similarity`, `ocr_mismatches` array) |
-| **Agent 3C: Feature & Template Agent** | `cv2.ORB` + `cv2.matchTemplate` + `cv2.calcHist` | Assembly variations, swapped board layouts, non-OEM paint hues | **~100ms** (`keypoint_ratio`, `template_match_score`, `color_hist_similarity`) |
-| **Agent 3D: Multimodal Vision Agent** | **NVIDIA NIM** (`meta/llama-3.2-11b-vision-instruct`) | Semantic defects (scratches, cracks, solder residue, pin damage) | **~1.2s** (`multimodal_report` narrative text) |
-| **Agent 3E: Visual Embedding Agent** | **Open_CLIP** (`ViT-B/32`) | Overall visual identity confirmation against catalog golden reference | **~80ms** (`vector_embedding_match` % score) |
+| **Agent 3A: Structural Inspector** | `skimage.metrics.structural_similarity` | Component swaps, missing chips, burnt traces, PCB layout changes | `ssim_score`, JET thermal heatmap, annotated target scan |
+| **Agent 3B: OCR & Label Agent** | EasyOCR + `difflib.SequenceMatcher` | Altered serial numbers, missing stickers, character diffs | `ocr_similarity`, `ocr_mismatches` array with confusable tags |
+| **Agent 3C: Keypoint Matcher** | `cv2.ORB` + Lowe's ratio test (0.75) | Assembly variations, swapped board layouts | `keypoint_ratio`, `good_matches` count |
+| **Agent 3D: Template ROI Check** | `cv2.matchTemplate(TM_CCOEFF_NORMED)` | Missing QC seals, logo sticker presence | `template_match_score`, `template_match_found` boolean |
+| **Agent 3E: Color Histogram** | `cv2.calcHist` (3D RGB/HSV correlation) | Non-OEM label paint hues, material deviations | `color_hist_similarity` correlation index |
+| **Agent 3F: Multimodal Vision Agent** | **NVIDIA NIM** (`meta/llama-3.2-11b-vision-instruct`) | Semantic visual defects (scratches, cracks, solder residue, pin damage) | `multimodal_report` narrative text |
 
-#### Visual Outputs Generated by Agent 3:
-1. **SSIM Heatmap Overlay:** Generates glowing neon-red bounding box overlays on top of high-delta difference regions.
-2. **Side-by-Side Diagnostic Card:** Merges Golden Standard, Target Scan (Defects Marked), and Heatmap into a unified composite card.
+#### Visual Evidence Outputs Generated by Agent 3:
+1. **SSIM Thermal Heatmap:** Generates glowing neon-red JET heatmap overlays highlighting structural difference zones.
+2. **Annotated Target Scan:** Draws yellow and red bounding boxes around detected anomaly hotspots.
+3. **Side-by-Side Diagnostic Card:** Merges Golden Standard, Target Scan (Defects Marked), and Thermal Heatmap into a unified composite image.
 
 ---
 
 ### Agent 4 — Decision & Fusion Judge (`agent_4_decision.py`)
 
 #### Primary Responsibility
-Evaluates the outputs of all 6 detectors, applies calibrated business weights, and assigns a final fraud score, verdict category, and recommended action.
+Evaluates detector outputs against strict business rules, applies weighted risk scoring, and assigns a final fraud score, verdict category, and recommended action.
+
+#### Invariant Protection Rule
+If the uploaded scan is pixel-identical to the golden reference (`source_reference_identical == True`), Agent 4 bypasses all risk rules and immediately returns: `verdict = "clean"`, `fraud_score = 0`, `recommended_action = "Accept"`.
 
 #### Mathematical Risk Scoring Formula
 $$\text{Fraud Score} = \min\left(100, \, 1.5 \times \sum (W_i \times L_i)\right)$$
@@ -313,30 +297,32 @@ gantt
     Color Correlation (5%) : 95, 100
 ```
 
-#### Verdict Hierarchy & Recommended Actions:
-- 🟢 **Clean** $\rightarrow$ `Accept` (Score $0-24$)
-- 🟡 **Reused** $\rightarrow$ `Request Vendor Verification` (Score $25-49$)
-- 🟠 **Mismatched / Missing** $\rightarrow$ `Quarantine & Escalate` (Score $50-69$)
-- 🔴 **Tampered** $\rightarrow$ `Quarantine & Escalate` (Score $70-100$)
+#### Verdict Hierarchy:
+1. **Missing QC Label** $\rightarrow$ `missing` (Score $70$, Action: *Quarantine & Escalate*)
+2. **OCR Unreadable** $\rightarrow$ `missing` (Score $25$, Action: *Request Additional Angle*)
+3. **Swap Detection** $\rightarrow$ `tampered` (Score $75$, Action: *Quarantine & Escalate*)
+4. **Altered Serial Number** $\rightarrow$ `mismatched` (Score $50$, Action: *Escalate with evidence*)
+5. **Non-OEM Label** $\rightarrow$ `mismatched` (Score $40$, Action: *Escalate to vendor*)
+6. **Reused Board** $\rightarrow$ `reused` (Score $35$, Action: *Request Additional Angle*)
+7. **Clean Part** $\rightarrow$ `clean` (Score $0-15$, Action: *Accept*)
 
-#### Bonus Feature: Multi-Angle Fusion Engine
+#### Multi-Angle Fusion Engine
 Combines evaluation scores from 2–3 camera views (e.g., Top 0°, Side 45°, Profile 90°) of the same part using **Noisy-OR Probabilistic Fusion**:
 $$P(\text{Fraud}_{\text{fused}}) = 1 - \prod_{i=1}^{N} \left(1 - \frac{S_i}{100}\right)$$
-Cross-angle evidence agreement boosts combined decision confidence by **+5% per agreeing view**.
 
 ---
 
-### Agent 5 — Audit Explainer & Report Engine (`agent_5_explainer.py`)
+### Agent 5 — Audit Explainer & Report Engine (`agent_5_explainer.py` & `reporting.py`)
 
 #### Primary Responsibility
 Translates complex mathematical metrics into audit-ready, fluent natural language narratives for executive compliance reports.
 
-#### Technical Highlights & Natural Language Formatting
-- **Primary LLM Generation:** Sends metrics to OpenRouter LLM (`openrouter_model`) with strict executive grounding instructions:
-  - *Natural Language Rules:* ABSOLUTELY NO raw pixel math, coordinate tuples like `(x=137, y=109)`, or raw code variables in customer-facing audit reports.
-  - *Human-Centric Wording:* Converts pixel locations into plain English (e.g., *"center label zone"*, *"upper PCB component area"*).
-  - *Strict Grounding:* Ensures the narrative matches Agent 4's verdict without introducing hallucinated numbers or contradictions.
-- **Deterministic Local Template Fallback:** If offline or API fails, uses a multi-paragraph template generator that dynamically constructs bullet summaries and structured explanation sections for SSIM, OCR character diffs, template presence, color correlation, and verdict rationale.
+#### Technical Highlights
+- **Primary LLM Generation:** Calls NVIDIA NIM Text LLM (`meta/llama-3.1-8b-instruct`) with strict grounding rules:
+  - ABSOLUTELY NO raw pixel math or coordinate tuples like `(x=137, y=109)`.
+  - Converts pixel locations into plain English (e.g., *"center label zone"*, *"upper PCB component area"*).
+  - Grounded strictly in Agent 4's verdict and decision reasoning.
+- **Deterministic Local Template Fallback:** If offline or API fails, constructs a structured bullet summary (`• Part Status`, `• Visual Findings`, `• Serial Check`, `• Inspector Action Item`) followed by a multi-sentence executive narrative paragraph.
 
 ---
 
@@ -347,7 +333,7 @@ VeriVision AI generates laboratory-grade PDF reports via **ReportLab** (`backend
 ### PDF Audit Certificate Contents:
 1. **Document Header:** Company logo, document title, timestamp, case UUID.
 2. **Metadata Grid:** Case ID, Part Code, Capture Site, Camera Angle, Inspector Email, Pipeline Version (`FraudSense v4.2`), Image Hash.
-3. **Verdict Banner:** Color-coded verdict (`CLEAN`, `TAMPERED`, `MISSING`, `MISMATCHED`), Fraud Score (0-100), AI Confidence %, Recommended Action.
+3. **Verdict Banner:** Color-coded verdict (`CLEAN`, `TAMPERED`, `MISSING`, `MISMATCHED`, `REUSED`), Fraud Score (0-100), AI Confidence %, Recommended Action.
 4. **Visual Evidence Triad:** Side-by-side display of **Golden Reference**, **Target Scan**, and **SSIM Anomaly Heatmap**.
 5. **Detector Metrics Table:** SSIM index, keypoint match %, expected vs detected OCR string.
 6. **OCR Character-Level Diff Grid:** Table mapping each string position, expected character, detected character, and match status (`MATCH` / `MISMATCH`).
@@ -384,41 +370,24 @@ flowchart LR
     class I,J memory;
 ```
 
-### Key HITL Features:
-1. **Low-Confidence Auto-Routing:** Any inspection with confidence $< 70\%$ or borderline score ($40-70$) is automatically held for QA review.
-2. **Interactive ROI Canvas Editor:** Inspectors can drag and resize bounding boxes over problem areas (`label_roi`, `template_roi`), updating ROI configurations for future scans.
-3. **Verdict Override Controls:**
-   - **Approve:** Validates AI finding and sets confidence to $100\%$.
-   - **Reject:** Overrides false positive, reclassifies part, and updates fraud score to $95$.
-   - **Override:** Allows custom verdict selection (`Clean`, `Tampered`, `Missing`, `Mismatched`, `Reused`) with mandatory supervisor comment.
-4. **Active Learning Audit Memory:** Every reviewer action creates an immutable `AuditLog` entry, refining OCR dictionaries and tuning threshold parameters over time.
-
 ---
 
 ## 📊 Live Telemetry & Analytics Dashboard
 
-The **Analytics Dashboard** (`frontend/src/pages/AnalyticsDashboardPage.jsx`) provides global supply chain visibility across three core dimensions:
-
-```mermaid
-flowchart LR
-    classDef vendor fill:#0284c7,stroke:#38bdf8,stroke-width:2px,color:#ffffff;
-    classDef site fill:#7c3aed,stroke:#a78bfa,stroke-width:2px,color:#ffffff;
-    classDef trend fill:#059669,stroke:#34d399,stroke-width:2px,color:#ffffff;
-
-    A["🏢 Vendor Risk Rankings\n(Fraud frequency & trust scores)"]
-    B["📍 Site Anomaly Breakdown\n(Defect volumes by repair site)"]
-    C["📈 Monthly Fraud Trends\n(Fraud rates over time in Recharts)"]
-
-    class A vendor;
-    class B site;
-    class C trend;
-```
-
-### Key Telemetry Metrics Tracked:
+The **Analytics Dashboard** (`frontend/src/pages/AnalyticsDashboardPage.jsx`) provides global supply chain visibility:
 - **Vendor Trust Index:** $100 - (\text{Fraud Rate} \times 1.5)$
 - **Repeat Offender Alerts:** Flags vendors supplying $\ge 3$ fraud cases within 30 days.
-- **Commodity Breakdown:** Heatmap distribution of defects across motherboards, RAM, storage, and processors.
+- **Commodity Breakdown:** Distribution of defects across motherboards, RAM, storage, GPUs, microchips.
 - **Bulk CSV Export:** One-click CSV download of all case outcomes formatted for ERP ingestion.
+
+---
+
+## ⚡ Auto-Sync & Startup Background Warmup (`main.py` & `seed_db.py`)
+
+To ensure FastAPI starts listening on port 8000 in under **200ms** without blocking HTTP requests or causing connection refusals:
+1. `main.py` launches a background daemon thread (`start_background_warmup()`).
+2. The thread pre-warms **EasyOCR** and **Open_CLIP** models into memory.
+3. Automatically executes `seed_db.py` to sync any images placed in the `Golden_Images` root folder directly into `verivision.db` and extract 512-dim visual embeddings.
 
 ---
 

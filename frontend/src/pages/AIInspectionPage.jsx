@@ -99,7 +99,7 @@ export default function AIInspectionPage() {
 
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [statusFilter]);
 
   const handleRefresh = () => {
     setSearch("");

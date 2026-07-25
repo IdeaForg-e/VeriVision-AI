@@ -21,6 +21,7 @@
   <img src="https://img.shields.io/badge/CLIP-ViT_B32-FF6F00?style=flat-square" />
   <img src="https://img.shields.io/badge/EasyOCR-Text_Detection-00C853?style=flat-square" />
   <img src="https://img.shields.io/badge/PyTorch-Deep_Learning-EE4C2C?style=flat-square&logo=pytorch" />
+  <img src="https://img.shields.io/badge/NVIDIA-NIM_Microservices-76B900?style=flat-square&logo=nvidia" />
   <img src="https://img.shields.io/badge/SQLite-Database-003B57?style=flat-square&logo=sqlite" />
 </p>
 
@@ -72,11 +73,11 @@ The industry needs an AI system that can see what humans miss — automatically,
 **VeriVision AI** is an end-to-end **Agentic AI platform** that replaces manual visual inspection with a deterministic, explainable, **5-agent computer vision pipeline** built on **LangGraph**. 
 
 Upload an image of a part. The system automatically:
-1. **Finds** the matching golden reference from a visual embedding library
-2. **Validates** image quality (blur, lighting, alignment)  
-3. **Inspects** for anomalies using 6 parallel detection methods
-4. **Judges** the evidence with a weighted scoring matrix
-5. **Explains** the verdict in natural language for audit compliance
+1. **Finds** the matching golden reference from a 512-dim visual embedding library (Open_CLIP ViT-B/32).
+2. **Validates** image quality (blur, lighting, alignment) and warps target scan using ORB homography.
+3. **Inspects** for anomalies using 6 parallel detection methods (SSIM, EasyOCR, Keypoint matching, Template ROI, 3D Color Histograms, Multimodal Vision LLM).
+4. **Judges** the evidence with a weighted scoring matrix and Noisy-OR Multi-Angle Fusion engine.
+5. **Explains** the verdict in natural language (NVIDIA NIM Text LLM or rule-based template) and exports a laboratory-grade PDF report.
 
 No manual pairing. No subjective judgment. No inconsistency between sites.
 
@@ -84,10 +85,10 @@ No manual pairing. No subjective judgment. No inconsistency between sites.
 
 | Dimension | Traditional QC | VeriVision AI |
 |:---|:---|:---|
-| **Speed** | 4+ hours per pallet | Seconds per part |
+| **Speed** | 4+ hours per pallet | ~3-5 seconds per part |
 | **Consistency** | Varies by inspector, shift, fatigue | Deterministic — same input, same verdict |
-| **Evidence** | Handwritten notes, verbal reports | Heatmaps, OCR diffs, PDF audit trail |
-| **Scalability** | 1 inspector per station | Unlimited concurrent inspections |
+| **Evidence** | Handwritten notes, verbal reports | JET Heatmaps, OCR character diffs, PDF audit trail |
+| **Scalability** | 1 inspector per station | Unlimited concurrent parallel inspections |
 | **Learning** | Tribal knowledge, no feedback loop | HITL feedback refines thresholds over time |
 | **Fraud Types** | Catches obvious tampering | Catches 0→O character swaps, hue shifts, missing stickers, component swaps |
 
@@ -101,8 +102,6 @@ No manual pairing. No subjective judgment. No inconsistency between sites.
 
 > [!IMPORTANT]
 > **Deterministic 5-Agent Pipeline**: Powered by a **LangGraph State Machine** (`workflow.py`), every hardware scan follows a strict state transition path. Low-quality scans trigger instant retake guidance, preventing distorted images from wasting inference compute.
-
-The following diagram illustrates the high-level architecture of **VeriVision AI**, highlighting the flow of data from the User Interface down to the 5-Agent LangGraph State Machine, Parallel Detection Ensemble, and Persistence Layer:
 
 ```mermaid
 flowchart TB
@@ -142,7 +141,7 @@ flowchart TB
         ORB["3. ORB Keypoint Rate\n(BFMatcher KNN)"]
         TMPL["4. Template ROI Check\n(cv2.matchTemplate)"]
         COLOR["5. 3D Color Histogram\n(RGB Correlation)"]
-        VLLM["6. Multimodal Vision LLM\n(OpenRouter API)"]
+        VLLM["6. Multimodal Vision LLM\n(NVIDIA NIM)"]
     end
 
     subgraph STORAGE ["🗄️ Persistence & Media Storage Layer"]
@@ -182,343 +181,81 @@ flowchart TB
 | Layer / Category | Technology | Version / Spec | Purpose & Role |
 |:---|:---|:---|:---|
 | **Frontend Framework** | ![React](https://img.shields.io/badge/-React_18-61DAFB?style=flat-square&logo=react&logoColor=black) | `18.3.1` | Modern component-based Single Page Application (SPA) |
-| **Frontend Build Tool** | ![Vite](https://img.shields.io/badge/-Vite_5-646CFF?style=flat-square&logo=vite&logoColor=white) | `5.2.0` | Lightning-fast development server with Hot Module Replacement (HMR) |
-| **Styling & Theme** | ![Tailwind CSS](https://img.shields.io/badge/-Tailwind_CSS_v3-06B6D4?style=flat-square&logo=tailwindcss&logoColor=white) | `3.4.3` | Utility-first styling with custom dark/light mode theme tokens |
+| **Frontend Build Tool** | ![Vite](https://img.shields.io/badge/-Vite_5-646CFF?style=flat-square&logo=vite&logoColor=white) | `5.2.0` | Development server with Hot Module Replacement (HMR) |
+| **Styling & Theme** | ![Tailwind CSS](https://img.shields.io/badge/-Tailwind_CSS_v3-06B6D4?style=flat-square&logo=tailwindcss&logoColor=white) | `3.4.3` | Utility-first styling with custom dark/light mode glassmorphic tokens |
 | **UI Components & Icons** | ![Lucide](https://img.shields.io/badge/-Lucide_Icons-F56565?style=flat-square&logo=lucide&logoColor=white) | `0.344.0` | Industrial QA icon set for audit status & navigation |
 | **Data Visualization** | ![Recharts](https://img.shields.io/badge/-Recharts_v3-22B5BF?style=flat-square&logo=chartdotjs&logoColor=white) | `3.9.2` | Interactive charts for vendor risk, site breakdown, and monthly fraud trends |
 | **Routing & Protection** | ![React Router](https://img.shields.io/badge/-React_Router_v6-CA4245?style=flat-square&logo=reactrouter&logoColor=white) | `6.22.3` | Declarative client-side routing with role-based `ProtectedRoute` guards |
-| **Backend API Gateway** | ![FastAPI](https://img.shields.io/badge/-FastAPI-009688?style=flat-square&logo=fastapi&logoColor=white) | `0.100.0+` | High-performance asynchronous REST API framework |
-| **Server ASGI** | ![Uvicorn](https://img.shields.io/badge/-Uvicorn-499848?style=flat-square&logo=python&logoColor=white) | `0.22.0+` | ASGI web server running the backend API endpoints |
-| **Agentic Workflow** | ![LangGraph](https://img.shields.io/badge/-LangGraph_StateGraph-FF4081?style=flat-square&logo=diagramsdotnet&logoColor=white) | `0.0.1+` | Directed acyclic graph orchestrating the 5 autonomous AI agents |
-| **Deep Learning Engine** | ![PyTorch](https://img.shields.io/badge/-PyTorch_v2-EE4C2C?style=flat-square&logo=pytorch&logoColor=white) | `torch 2.0+` | Deep learning execution framework for neural visual embeddings |
+| **Backend API Gateway** | ![FastAPI](https://img.shields.io/badge/-FastAPI-009688?style=flat-square&logo=fastapi&logoColor=white) | `0.100.0+` | Asynchronous REST API framework |
+| **Server ASGI** | ![Uvicorn](https://img.shields.io/badge/-Uvicorn-499848?style=flat-square&logo=python&logoColor=white) | `0.22.0+` | ASGI web server running backend endpoints |
+| **Agentic Workflow** | ![LangGraph](https://img.shields.io/badge/-LangGraph_StateGraph-FF4081?style=flat-square&logo=diagramsdotnet&logoColor=white) | `0.0.1+` | Directed acyclic graph orchestrating 5 autonomous AI agents |
+| **Deep Learning Engine** | ![PyTorch](https://img.shields.io/badge/-PyTorch_v2-EE4C2C?style=flat-square&logo=pytorch&logoColor=white) | `torch 2.0+` | Deep learning framework for visual neural embeddings |
 | **Neural Vector Search** | ![CLIP](https://img.shields.io/badge/-Open__CLIP_ViT--B/32-FF6F00?style=flat-square&logo=openai&logoColor=white) | `ViT-B/32` | Extracts 512-dimensional visual embeddings for sub-10ms similarity matching |
-| **Computer Vision Engine** | ![OpenCV](https://img.shields.io/badge/-OpenCV_4-5C3EE8?style=flat-square&logo=opencv&logoColor=white) | `4.7.0+` | Homography image registration, Laplacian blur check, and heatmap overlays |
-| **Structural Metrics** | ![scikit-image](https://img.shields.io/badge/-scikit--image-3776AB?style=flat-square&logo=scikitlearn&logoColor=white) | `0.20.0+` | Structural Similarity Index (SSIM) pixel delta matrix calculation |
+| **Computer Vision Engine** | ![OpenCV](https://img.shields.io/badge/-OpenCV_4-5C3EE8?style=flat-square&logo=opencv&logoColor=white) | `4.7.0+` | Homography image registration, Laplacian blur check, and JET heatmap overlays |
+| **Structural Metrics** | ![scikit-image](https://img.shields.io/badge/-scikit--image-3776AB?style=flat-square&logo=scikitlearn&logoColor=white) | `0.20.0+` | Structural Similarity Index (SSIM) matrix calculation |
 | **Text Extraction (OCR)** | ![EasyOCR](https://img.shields.io/badge/-EasyOCR-00C853?style=flat-square&logo=googlecloud&logoColor=white) | `1.7.0+` | Optical Character Recognition for serial numbers & character diffs |
-| **Multimodal Vision & LLM** | ![NVIDIA NIM](https://img.shields.io/badge/-NVIDIA_NIM_Microservices-76B900?style=flat-square&logo=nvidia&logoColor=black) | REST Endpoint (`meta/llama-3.2-11b-vision-instruct` & `meta/llama-3.1-8b-instruct`) | TensorRT-LLM hosted vision inspection (~1.2s) & executive audit explainer (~0.3s) |
+| **Multimodal Vision & LLM** | ![NVIDIA NIM](https://img.shields.io/badge/-NVIDIA_NIM_Microservices-76B900?style=flat-square&logo=nvidia&logoColor=black) | REST API (`meta/llama-3.2-11b-vision-instruct` & `meta/llama-3.1-8b-instruct`) | TensorRT-LLM hosted vision inspection (~1.2s) & executive audit explainer (~0.3s) |
 | **PDF Report Generator** | ![ReportLab](https://img.shields.io/badge/-ReportLab_PDF-E11D48?style=flat-square&logo=adobeacrobatreader&logoColor=white) | `4.0.0+` | Generates laboratory compliance PDF certificates with embedded heatmaps |
 | **Database Engine** | ![SQLite](https://img.shields.io/badge/-SQLite_3-003B57?style=flat-square&logo=sqlite&logoColor=white) | SQLite 3 | Embedded relational database storing cases, products, and audit trails |
-| **Database ORM** | ![SQLAlchemy](https://img.shields.io/badge/-SQLAlchemy_2-D71F00?style=flat-square&logo=sqlalchemy&logoColor=white) | `2.0.0+` | Python ORM with 7 relational tables and session management |
-| **Security & Auth** | ![JWT Auth](https://img.shields.io/badge/-JWT_&_Bcrypt-000000?style=flat-square&logo=jsonwebtokens&logoColor=white) | `python-jose 3.3+` | JWT token authentication with bcrypt password encryption |
 
 ---
 
-## 🤖 Detailed Breakdown of the 5 LangGraph Agents & Sub-Agents
+## ⚡ Quick Start & One-Click Setup Guide
 
-VeriVision's core is a **LangGraph StateGraph** — a directed acyclic graph where each node is a specialized AI agent microservice. The graph supports conditional routing: if triage fails, the pipeline short-circuits to request a retake instead of producing a false verdict.
+### Option A: One-Click PowerShell Launcher (Windows)
+Double-click `run.ps1` in the root directory. It automatically sets up Python virtual environments, installs frontend/backend dependencies, starts the FastAPI backend, and launches the Vite React dev server.
 
-#### Agent 1 — Selector & Gatekeeper (`agent_1_selector.py`)
-- **CLIP ViT-B/32 Embedding Engine**: Extracts 512-dimensional visual feature vectors from uploaded images.
-- **Cosine Similarity Search**: Matches the upload against the entire Golden Reference catalog in <10ms.
-- **Multimodal Commodity Classifier**: Auto-classifies parts (motherboard, RAM, SSD, label, etc.).
-- **Viability Gate**: Validates aspect ratio alignment, resolution scale, and visual layout agreement before proceeding.
-
-#### Agent 2 — Triage & Aligner (`agent_2_triage.py`)
-- **Blur Detection**: Laplacian variance analysis with configurable threshold ($\text{Var}(\nabla^2 I) \ge 100.0$).
-- **Lighting Validation**: Mean pixel intensity range checks ($40 \le \mu \le 220$).
-- **ORB Keypoint Alignment**: 2000-feature ORB descriptor extraction → BFMatcher → RANSAC homography registration.
-- **Illumination Normalization**: Adaptive histogram equalization applied when alignment is geometrically reliable ($\ge 15\%$ RANSAC inlier ratio).
-
-#### Agent 3 — Vision-AI Hybrid Inspector (`agent_3_detector.py`)
-Modularized into **5 parallel Sub-Agents** executed concurrently via `ThreadPoolExecutor`:
-
-| Sub-Agent | Name & Tech Stack | Responsibilities & What It Catches | Output Metrics |
-|:--|:---|:---|:---|
-| **Agent 3A** | **Structural SSIM Sub-Agent** (`skimage.metrics`) | Computes structural similarity index, renders JET thermal heatmaps, and draws bright defect overlays on target images. | `ssim_score` ($0.0 - 1.0$) & JET Heatmap |
-| **Agent 3B** | **OCR & Label Sub-Agent** (`Google Vision API` + `difflib`) | Extracts sticker/serial text, compares against OEM catalog master text, and highlights 0↔O, 1↔I character diffs. | `ocr_similarity` & `ocr_mismatches` array |
-| **Agent 3C** | **Feature & Template Sub-Agent** (`cv2.ORB`, `cv2.matchTemplate`, `cv2.calcHist`) | Performs KNN keypoint matching, checks for presence of OEM warranty seals, and measures 3D RGB color histogram correlation. | `keypoint_ratio`, `template_match_score`, `color_hist_similarity` |
-| **Agent 3D** | **Multimodal Vision Sub-Agent** (`NVIDIA NIM` / `OpenRouter`) | Queries `meta/llama-3.2-11b-vision-instruct` (~1.2s latency) to identify semantic defects (scratches, cracks, solder residue, burnt pins). | `multimodal_report` narrative text |
-| **Agent 3E** | **Visual Embedding Sub-Agent** (`Open_CLIP ViT-B/32`) | Calculates 512-dim visual embedding similarity to confirm target scan identity against golden reference. | `vector_embedding_match` (% score) |
-
-Generates:
-- **SSIM Anomaly Heatmap**: Real image with neon-red bounding box overlays on high-delta regions.
-- **Side-by-Side Diagnostic Card**: Unified composite card featuring Golden Standard, Target Scan with Defects Marked, and Thermal Heatmap.
-
-#### Agent 4 — Decision Judge (`agent_4_decision.py`)
-- **Weighted Scoring Matrix**: SSIM ($35\%$) + OCR ($20\%$) + Vector Embedding ($15\%$) + Keypoints ($15\%$) + Template ($10\%$) + Color ($5\%$).
-- **Fraud Score**: $0-100$ scale with calibrated loss amplification.
-- **5 Verdict Categories**: `Clean` | `Tampered` | `Missing` | `Mismatched` | `Reused`
-- **4 Action Recommendations**: `Accept` | `Quarantine & Escalate` | `Request Vendor Verification` | `Request Additional Angle`
-- **Leet-Speak & Confusable OCR Handling**: Distinguishes OCR visual confusions (0↔O, 1↔I, S↔5) from genuine tampering.
-- **Multi-Angle Fusion Engine**: Noisy-OR probabilistic fusion across 2–3 camera angles with $+5\%$ confidence boost per agreeing view.
-
-<<<<<<< HEAD
-#### Agent 5 — Executive Explainer & Report Engine (`agent_5_explainer.py`)
-- **Primary**: OpenRouter LLM generates fluent, executive-level audit explanations with strict natural language rules (no raw pixel math coordinates, no code variables).
-- **Fallback**: Rich local template generator produces structured bullet summaries and detailed audit paragraphs covering SSIM, OCR character diffs, template presence, color correlation, and verdict rationale.
-=======
-<<<<<<< Updated upstream
-#### Agent 5 — LLM Explainer (`agent_5_explainer.py`)
-- **Primary**: OpenRouter LLM generates fluent, audit-ready explanations grounded in Agent 4's reasoning
-- **Fallback**: Rich rule-based template generator produces structured paragraphs covering SSIM, OCR, template, color, and verdict
-=======
-#### Agent 5 — Executive Explainer & Report Engine (`agent_5_explainer.py`)
-- **NVIDIA NIM Fast Explainer**: Queries `meta/llama-3.1-8b-instruct` (~0.3s latency) to generate audit-ready, executive English reports adhering to strict non-technical natural language rules.
-- **Fallback Engine**: OpenRouter API fallback or local multi-paragraph rule-based template generator.
->>>>>>> Stashed changes
->>>>>>> fae3d01 (changed the architecture)
-- **Grounding Constraint**: The explainer cannot contradict the decision agent — it only narrates the pre-determined verdict
-
----
-
-## 🧩 Full Feature Set
-
-### Core Platform Capabilities
-
-| Feature | Description |
-|:---|:---|
-| **🔬 AI Inspection Pipeline** | Upload a part image → automatic golden reference matching → 6-method anomaly detection → verdict + PDF report |
-| **📊 Triage Queue** | Real-time case monitoring dashboard with filtering by status, verdict, site, and vendor |
-| **🔍 Split-Panel Audit Workbench** | Side-by-side golden vs defective comparison with interactive SSIM heatmap overlays and OCR text diffs |
-| **👤 Human-in-the-Loop Review** | Approve / Reject / Override verdicts with mandatory comments — all actions logged in audit trail |
-| **⚙️ Admin Calibration Console** | Tune SSIM thresholds, keypoint delta, OCR fuzzy tolerance — changes apply to future inspections in real-time |
-| **📈 Analytics Dashboard** | Vendor fraud rates, site breakdowns, monthly trend charts, repeat offender detection (Recharts) |
-| **📄 PDF Audit Reports** | ReportLab-generated reports with metadata, verdict summary, side-by-side images, OCR character diffs, pipeline thresholds |
-| **📥 CSV Bulk Export** | Case outcomes export: case_id, part_number, site, category, fraud_score, action |
-| **🎨 ROI Region Editor** | Admin-configurable label, template, and color ROI regions per golden reference |
-| **🧠 CLIP Reference Library** | 512-dim visual embedding index for fast golden reference auto-selection |
-| **🌓 Dark/Light Mode** | Industrial QA-optimized dual theme UI |
-| **🔐 JWT Authentication** | Role-based access control (Admin / Operator) with secure token management |
-
-### Bonus Challenges Implemented
-
-| Bonus Challenge | Status | Implementation |
-|:---|:---|:---|
-| **Multi-Angle Fusion** | ✅ Complete | Noisy-OR probabilistic fusion across 2–3 angles with agreement confidence multiplier |
-| **Self-Serve ROI Editor** | ✅ Complete | Admin can configure label, template, and color ROI coordinates per golden reference |
-| **Reference Library with Embeddings** | ✅ Complete | CLIP ViT-B/32 vectors indexed in SQLite; cosine similarity retrieval |
-| **Analytics Dashboard** | ✅ Complete | Vendor risk, site breakdown, monthly trends, repeat offenders — live data (not mock) |
-| **Mobile-Readiness Design** | ✅ Documented | REST API contracts designed for future mobile capture integration |
-
----
-
-## 🗄️ Data Model
-
-```mermaid
-erDiagram
-    users {
-        int id PK
-        string name
-        string email UK
-        string hashed_password
-        string role
-        datetime created_at
-    }
-
-    products {
-        int id PK
-        string part_number UK
-        string name
-        string commodity
-        datetime created_at
-    }
-
-    golden_references {
-        int id PK
-        int product_id FK
-        string image_path
-        string expected_serial
-        json roi_config
-        string angle
-        json embedding_vector
-        datetime created_at
-    }
-
-    inspections {
-        int id PK
-        string case_id UK
-        int product_id FK
-        int user_id FK
-        string captured_image_path
-        string capture_site
-        string capture_angle
-        string vendor
-        string component_name
-        string date
-        string status
-        datetime created_at
-    }
-
-    inspection_results {
-        int id PK
-        int inspection_id FK
-        float ssim_score
-        float keypoint_match_rate
-        string ocr_detected_text
-        string ocr_expected_text
-        int fraud_score
-        string verdict
-        float confidence
-        string recommended_action
-        text explanation
-        string heatmap_path
-        datetime created_at
-    }
-
-    reports {
-        int id PK
-        int inspection_id FK
-        string pdf_path
-        string html_path
-        text csv_data
-        datetime created_at
-    }
-
-    audit_logs {
-        int id PK
-        int inspection_id FK
-        string actor
-        string action
-        text comments
-        string previous_verdict
-        string new_verdict
-        datetime timestamp
-    }
-
-    users ||--o{ inspections : "submits"
-    products ||--o{ golden_references : "has"
-    products ||--o{ inspections : "inspected as"
-    inspections ||--o| inspection_results : "produces"
-    inspections ||--o{ reports : "has"
-    inspections ||--o{ audit_logs : "tracked in"
+```powershell
+.\run.ps1
 ```
 
----
+### Option B: Manual Step-by-Step Setup
 
-## 📂 Repository Structure
-
-```
-VeriVision-AI/
-│
-├── backend/                            ← Python FastAPI application
-│   ├── app/
-│   │   ├── agents/
-│   │   │   └── workflow.py             ← LangGraph 5-agent state machine
-│   │   ├── routers/
-│   │   │   ├── analytics.py            ← Vendor/site/monthly analytics endpoints
-│   │   │   ├── auth.py                 ← Login, register, /me endpoints
-│   │   │   ├── inspections.py          ← Case submission, listing, deletion
-│   │   │   ├── products.py             ← Golden Reference catalog CRUD
-│   │   │   ├── reports.py              ← PDF export, CSV bulk export
-│   │   │   ├── reviews.py              ← HITL review actions + pending queue
-│   │   │   └── triage.py               ← Case queue, pipeline config, ROI updates
-│   │   ├── services/
-│   │   │   ├── agent_1_selector.py     ← CLIP vector search + commodity classifier
-│   │   │   ├── agent_2_triage.py       ← Blur/brightness checks + ORB alignment
-│   │   │   ├── agent_3_detector.py     ← SSIM diff, OCR parsing, keypoint/color analysis
-│   │   │   ├── agent_4_decision.py     ← Weighted rule-based scoring matrix
-│   │   │   ├── agent_5_explainer.py    ← LLM + rule-based natural language generator
-│   │   │   ├── embedding_service.py    ← CLIP vector extraction + cosine similarity search
-│   │   │   └── reporting.py            ← PDF + CSV report generators
-│   │   ├── config.py                   ← Settings class (env vars + defaults)
-│   │   ├── database.py                 ← SQLite engine + session factory
-│   │   ├── main.py                     ← FastAPI app entry point + router registration
-│   │   ├── models.py                   ← SQLAlchemy table definitions (7 tables)
-│   │   ├── schemas.py                  ← Pydantic request/response schemas
-│   │   └── utils.py                    ← JWT auth helpers, image loader
-│   ├── data/
-│   │   ├── cases/                      ← Uploaded inspection scan images + heatmaps
-│   │   ├── golden/                     ← Golden reference images
-│   │   └── reports/                    ← Generated PDF reports
-│   ├── .env.example                    ← Template for .env setup
-│   ├── requirements.txt                ← All Python dependencies
-│   └── seed_db.py                      ← DB migration + default user/catalog seeder
-│
-├── frontend/                           ← React Vite SPA
-│   ├── src/
-│   │   ├── components/
-│   │   │   ├── Auth.jsx                ← Login form component
-│   │   │   ├── Case.jsx                ← Case card and detail components
-│   │   │   ├── Common.jsx              ← Shared UI: badge, spinner, modal
-│   │   │   ├── Feedback.jsx            ← Toast notifications and alerts
-│   │   │   ├── Layout.jsx              ← Sidebar navigation + top header
-│   │   │   ├── Review.jsx              ← HITL review action panel
-│   │   │   ├── TargetScanCaptureZone.jsx ← Image upload drag-and-drop
-│   │   │   ├── Triage.jsx              ← Triage queue table rows
-│   │   │   └── UploadInspectionModal.jsx ← New inspection submission modal
-│   │   ├── context/
-│   │   │   └── AuthContext.jsx         ← JWT session provider (login/logout state)
-│   │   ├── pages/
-│   │   │   ├── AIInspectionPage.jsx    ← Upload submission page
-│   │   │   ├── AdminConsolePage.jsx    ← Admin calibration console
-│   │   │   ├── AnalyticsDashboardPage.jsx ← Full analytics dashboard
-│   │   │   ├── HumanReviewPage.jsx     ← HITL review workbench
-│   │   │   ├── InspectionDetailPage.jsx ← Split-panel detail + heatmap workbench
-│   │   │   └── LandingPage.jsx         ← Triage queue (main home page)
-│   │   ├── routes/
-│   │   │   └── AppRoutes.jsx           ← Route definitions + ProtectedRoute wrapper
-│   │   ├── services/                   ← API service layer (fetch wrappers)
-│   │   └── utils/                      ← Utility helpers
-│   ├── package.json                    ← Frontend dependencies & scripts
-│   ├── tailwind.config.js              ← Custom color palette + font configuration
-│   └── vite.config.js                  ← Dev server proxy (port 5173 → 8000)
-│
-├── Golden_Images/                      ← Seed golden reference images (16 images)
-├── AGENTS.md                           ← Deep dive 5-Agent & Workflow documentation
-├── verivision.db                       ← SQLite database (auto-created)
-├── start.bat                           ← One-click Windows launcher script
-└── README.md                           ← Master system documentation
-```
-
----
-
-## ⚡ Quick Start
-
-### Option A: One-Click Launch (Windows)
-
-```cmd
-start.bat
-```
-
-This script automatically:
-- Checks for Python venv and Node modules
-- Kills conflicting processes on ports 8000/5173
-- Seeds the database with default accounts and golden reference catalog
-- Launches backend (FastAPI on port 8000) and frontend (Vite on port 5173)
-- Opens Chrome to `http://localhost:5173`
-
-### Option B: Manual Setup
-
-#### 1. Backend
+#### 1. Backend Service Setup
 ```bash
 cd backend
 python -m venv venv
-
-# Windows:
-venv\Scripts\activate
-# Linux/macOS:
-# source venv/bin/activate
+# On Windows PowerShell:
+.\venv\Scripts\Activate.ps1
+# On Linux/macOS:
+source venv/bin/activate
 
 pip install -r requirements.txt
 python seed_db.py
 uvicorn app.main:app --reload --port 8000
 ```
 
-#### 2. Frontend
+#### 2. Frontend SPA Setup
 ```bash
 cd frontend
 npm install
 npm run dev
 ```
 
-#### 3. Environment Variables (Optional)
-Copy `backend/.env.example` to `backend/.env` and configure:
+#### 3. Environment Variables Configuration (`backend/.env`)
+Copy `backend/.env.example` to `backend/.env`:
 ```env
-# 🔌 OpenRouter API Integration (Bypasses Google regional/rate limits)
-OPENROUTER_API_KEY=your_openrouter_api_key_here
-OPENROUTER_MODEL=nvidia/nemotron-3-ultra-550b-a55b:free
-
-# 🛡️ Security & Authentication (Change in production)
+# Security & Authentication
 SECRET_KEY=verivision_super_secret_key_change_me_in_production
 ALGORITHM=HS256
 ACCESS_TOKEN_EXPIRE_MINUTES=1440
 
-# 🗄️ Database Connection
+# NVIDIA NIM Integration (Ultra Low Latency TensorRT-LLM Microservices)
+NVIDIA_NIM_API_KEY=your_nvidia_nim_api_key_here
+NVIDIA_NIM_BASE_URL=https://integrate.api.nvidia.com/v1
+NVIDIA_VISION_MODEL=meta/llama-3.2-11b-vision-instruct
+NVIDIA_TEXT_MODEL=meta/llama-3.1-8b-instruct
+
+# OpenRouter API Integration (Fallback Provider)
+OPENROUTER_API_KEY=your_openrouter_api_key_here
+OPENROUTER_MODEL=nvidia/nemotron-nano-12b-v2-vl:free
+
+# Database Connection
 DATABASE_URL=sqlite:///./verivision.db
 ```
 
 > [!NOTE]
-> **Graceful Fallback**: VeriVision AI works fully out-of-the-box without an OpenRouter API key. Multimodal vision comparisons and LLM audit explanations gracefully fall back to local rule-based deterministic alternatives.
+> **Graceful Fallback**: VeriVision AI functions fully out-of-the-box offline. EasyOCR, Open_CLIP embeddings, SSIM, and local template explainers run completely locally without requiring external API keys.
 
 ---
 
@@ -526,25 +263,8 @@ DATABASE_URL=sqlite:///./verivision.db
 
 | Role | Email | Password | Access |
 |:---|:---|:---|:---|
-| **Admin** | `admin@verivision.com` | `admin123` | Full access: Triage, Catalog, HITL Review, Analytics, Config |
-| **Operator** | `user@verivision.com` | `user123` | Triage Queue, Inspection Submission, Human Review |
-
----
-
-## 🔄 How It Works — End-to-End Workflow
-
-```
-1. UPLOAD        → Operator uploads a part image via drag-and-drop
-2. AUTO-MATCH    → CLIP embeddings auto-select the best golden reference
-3. TRIAGE        → Image quality validated (blur, lighting, alignment)
-4. INSPECT       → 6 detection methods run in parallel (~3-5 seconds)
-5. DECIDE        → Weighted scoring matrix produces fraud_score + verdict
-6. EXPLAIN       → LLM generates audit-ready natural language rationale
-7. REPORT        → PDF report generated with heatmaps, OCR diffs, metadata
-8. REVIEW        → HITL panel for Approve / Reject / Override with comments
-9. AUDIT TRAIL   → Every action logged: who, when, what changed, why
-10. ANALYTICS    → Dashboard updates: vendor risk, site trends, monthly fraud rates
-```
+| **Admin** | `admin@verivision.com` | `admin123` | Full access: Triage Queue, Catalog Portal, Calibration Console, Analytics, Reviews |
+| **Operator** | `user@verivision.com` | `user123` | Triage Queue, Inspection Submission, Human Review Workbench |
 
 ---
 
@@ -553,41 +273,11 @@ DATABASE_URL=sqlite:///./verivision.db
 | # | Scenario | Detection Method | Category | Expected Action |
 |:--|:---|:---|:---|:---|
 | 1 | Missing QC label | Template ROI + SSIM delta | Missing | Quarantine & Escalate |
-| 2 | Altered serial number (0→O) | OCR + Levenshtein diff | Mismatched | Escalate with evidence |
+| 2 | Altered serial number (0→O) | EasyOCR + Levenshtein diff | Mismatched | Escalate with evidence |
 | 3 | Reused board with residue | SSIM + keypoint anomaly | Reused / Tampered | Request additional angle |
 | 4 | False alarm (lighting) | Triage agent detects exposure issue | Clean (after retake) | Triage requests retake |
-| 5 | Non-OEM label (different hue) | Color histogram correlation | Mismatched | Vendor verification |
+| 5 | Non-OEM label (different hue) | 3D Color histogram correlation | Mismatched | Vendor verification |
 | 6 | Component swap | Keypoint mismatch spike | Tampered | Quarantine & Escalate |
-
----
-
-## 🔮 Extensibility Roadmap & Mobile / API Extension Blueprint
-
-VeriVision AI is architected for Phase I delivery with explicit design hooks for future expansion:
-
-| Phase | Scope | Extension Blueprint & Current Design Hooks |
-|:---|:---|:---|
-| **Phase I** (Current) | Image Comparison Prototype + Reporting | Complete — 5-agent pipeline, PDF reports, CSV export, HITL feedback |
-| **Phase II** | Enterprise REST APIs & ERP Integration | REST API contracts defined; OpenAPI Swagger live at `/docs`; OAuth2 JWT RBAC; SQLite to PostgreSQL migration path |
-| **Phase III** | Mobile AI Capture App | API accepts multipart image uploads; quality triage returns live framing guidance (`RETAKE_NEEDED`); JSON payload formatted for mobile camera SDKs |
-
-### 📱 How to Extend VeriVision to Mobile & External APIs
-1. **Mobile Camera Capture Integration:** Field engineers capture images via a React Native or Flutter mobile app. The app posts images to `POST /api/inspections` with device GPS and site metadata headers.
-2. **Real-time Mobile Framing Guidance:** If Agent 2 detects blur or glare, the API returns a structured JSON response (`status: "retake_needed", guidance: "Please frame top-right label close-up"`). The mobile app displays an on-screen camera overlay guiding the technician.
-3. **Offline Ingestion & Sync:** Scans taken offline in low-connectivity repair warehouses are queued locally in SQLite/WatermelonDB and batch-synced to `/api/inspections` upon network reconnection.
-
----
-
-## 🔬 Model Choices & Technical Justifications
-
-| Component | Model / Algorithm Chosen | Alternatives Evaluated | Technical Justification |
-|:---|:---|:---|:---|
-| **Visual Embeddings** | **Open_CLIP (ViT-B/32)** | ResNet-50, VGG-16 | Zero-shot visual representation trained on 400M image-text pairs; extracts 512-dim feature vectors in <10ms for sub-pixel similarity search. |
-| **Feature Alignment** | **ORB + RANSAC Homography** | SIFT, SURF | ORB is patent-free, computationally lightweight, and fast on CPU, making keypoint extraction and planar warping instantaneous. |
-| **Structural Difference** | **SSIM (skimage metrics)** | Pixel MSE, Absolute Diff | SSIM accounts for visual perception (luminance, contrast, structure) rather than raw pixel intensity shifts caused by lighting. |
-| **OCR Text Engine** | **EasyOCR Engine** | Tesseract OCR | EasyOCR provides higher accuracy on low-resolution, angled, or worn serial numbers printed on metallic/shiny hardware labels. |
-| **Agent Orchestration** | **LangGraph StateGraph** | CrewAI, AutoGen | LangGraph provides deterministic graph execution with state persistence, conditional branching (triage short-circuit), and zero race conditions. |
-| **Multimodal Vision** | **OpenRouter Vision Models** | Local LLaVA | Cloud multimodal LLMs handle complex visual reasoning (identifying solder residue, component revisions) without requiring heavy local GPU clusters. |
 
 ---
 
@@ -595,7 +285,7 @@ VeriVision AI is architected for Phase I delivery with explicit design hooks for
 
 ### 1. Scan Submission Contract (`POST /api/inspections`)
 ```json
-// Request: Multipart Form-Data (image: File, payload: JSON)
+// Request: Multipart Form-Data (image: File, metadata: Form)
 {
   "product_id": 1,
   "capture_site": "Repair Center Alpha - Austin",
@@ -630,61 +320,6 @@ VeriVision AI is architected for Phase I delivery with explicit design hooks for
 }
 ```
 
-### 3. Mobile Capture API Input / Output Schema Mapping (Phase III)
-
-This mapping defines how a field engineer's mobile camera capture app connects directly to the 5-Agent pipeline:
-
-| Mobile Capture API Field | Agent Pipeline Mapping | Direction | Purpose & Behavior |
-|:---|:---|:---|:---|
-| `camera_frame_binary` | `Agent 2 (Triage)` & `Agent 1` | Input | High-res camera snapshot or frame buffer from mobile app |
-| `device_telemetry` | `Inspection.capture_site` / `angle` | Input | GPS coordinates, device ID, lens angle (0°, 45°, 90°) |
-| `triage_feedback` | `Agent 2 (Triage)` Output | Output | Immediate camera overlay feedback (`PASS` or `RETAKE_NEEDED`) |
-| `framing_guidance` | `Agent 2` Detail Message | Output | Real-time text overlay: *"Image blurry (45 < 100). Turn on flashlight & hold steady."* |
-| `fraud_verdict` | `Agent 4 (Decision)` Output | Output | Instant visual alert on phone screen: `CLEAN` (Green) or `QUARANTINE` (Red) |
-| `anomaly_roi_boxes` | `Agent 3 (Detector)` Overlay | Output | JSON bounding box coordinates rendered directly on the phone camera viewfinder |
-| `pdf_audit_url` | `Agent 5 (Explainer)` Output | Output | Download URL for field technician to view laboratory audit certificate |
-
-```json
-// Mobile API Response Payload Schema (`POST /api/mobile/v1/scan`)
-{
-  "case_id": "c9a4f210-5b8e-4a1d-9e32-123456789abc",
-  "triage": {
-    "status": "retake_needed",
-    "clarity_score": 45.2,
-    "framing_guidance": "⚠️ RETAKE NEEDED: Image is blurry. Please illuminate label area and hold camera steady."
-  },
-  "pipeline_result": {
-    "fraud_score": 85,
-    "verdict": "MISMATCHED",
-    "confidence_pct": 92.5,
-    "action_recommended": "Quarantine & Escalate",
-    "bounding_box_rois": [
-      { "field": "serial_number", "x": 120, "y": 85, "w": 200, "h": 60, "status": "OCR_MISMATCH" }
-    ],
-    "pdf_report_download": "http://api.verivision.com/api/reports/report_c9a4f210.pdf"
-  }
-}
-```
-
----
-
-## ⚠️ Known Limitations & Edge Cases
-
-1. **Specular Glare on Metallic Surfaces:** Direct overhead lighting on shiny metallic shields (e.g., SSD heat spreaders) can trigger minor false-positive SSIM hotspots. *Mitigation:* Agent 2 detects brightness anomalies and Agent 4 checks color correlation to prevent false quarantine.
-2. **Extreme Physical Breakage:** Severely fractured boards with >80% missing structure may fail RANSAC keypoint homography alignment. *Mitigation:* Agent 1 gatekeeper detects aspect/scale mismatch and bypasses pixel warping for visual LLM comparison.
-3. **CPU Memory Footprint during EasyOCR Cold-Start:** Initializing PyTorch/EasyOCR models on CPU-only machines takes ~2 seconds on first invocation. *Mitigation:* Models are lazy-loaded once into memory upon server startup.
-
----
-
-## 🔒 Security & Privacy
-
-- **JWT Authentication** with bcrypt password hashing and configurable token expiry
-- **Role-Based Access Control**: Admin vs Operator permissions
-- **Audit Trail**: Every verdict override, review action, and feedback is logged with actor, timestamp, previous/new state
-- **Image Hash Provenance**: Case IDs and file hashes stored for traceability
-- **Minimal Metadata Storage**: Only fields required for fraud decision and audit compliance
-- **API-Ready for Cybersecurity Review**: Clean data contracts (Pydantic schemas) designed for future security hardening
-
 ---
 
 ## 📊 Judging Alignment
@@ -692,14 +327,14 @@ This mapping defines how a field engineer's mobile camera capture app connects d
 | # | Criterion | How VeriVision Addresses It |
 |:--|:---|:---|
 | 1 | Solution Quality | End-to-end pipeline: upload → detect → score → explain → report → review |
-| 2 | Tool Stack Used | LangGraph, CLIP, PyTorch, OpenCV, EasyOCR, OpenRouter LLM, FastAPI, React, Recharts |
+| 2 | Tool Stack Used | LangGraph, CLIP, PyTorch, OpenCV, EasyOCR, NVIDIA NIM, FastAPI, React 18, Recharts |
 | 3 | Presentation & Pitch | Narrative README, live demo, architecture diagrams |
 | 4 | Feasibility & Integration | REST API design, one-click launcher, configurable thresholds, SQLite portability |
 | 5 | Innovation & Originality | 6-method parallel ensemble, Noisy-OR multi-angle fusion, CLIP auto-reference matching |
 | 6 | Modularity & Reusability | Each agent is an independent service; LangGraph nodes are plug-and-play |
 | 7 | Impact Potential | Addresses $100B+ electronics fraud problem; scales to any repair/logistics operation |
 | 8 | Testing & Validation | 6 test scenarios covering all fraud categories including false-alarm handling |
-| 9 | User Experience & Design | Dark/light mode, drag-and-drop upload, split-panel workbench, interactive analytics |
+| 9 | User Experience & Design | Glassmorphism UI, light/dark mode, drag-and-drop upload, split-panel workbench |
 | 10 | Documentation Clarity | This README + `AGENTS.md` + inline code documentation + API docs at `/docs` |
 | 11 | Security & Privacy | JWT auth, RBAC, audit logging, hash provenance, minimal data retention |
 | 12 | Explainability & Transparency | Per-region heatmaps, OCR character diffs, LLM narratives grounded in measured metrics |
