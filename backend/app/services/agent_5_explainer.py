@@ -78,7 +78,7 @@ def generate_explanation(metrics: dict) -> str:
     logger.info(f"Generate Explanation called for verdict={verdict.upper()}, fraud_score={fraud_score}")
 
     openrouter_key = settings.OPENROUTER_API_KEY
-    openrouter_model = settings.OPENROUTER_MODEL
+    models_to_try = [settings.OPENROUTER_MODEL] + [m for m in getattr(settings, "FALLBACK_VISION_MODELS", []) if m != settings.OPENROUTER_MODEL]
 
     use_llm_explainer = os.getenv("ENABLE_LLM_EXPLAINER", "true").lower() == "true"
     if openrouter_key and use_llm_explainer:
@@ -94,25 +94,25 @@ def generate_explanation(metrics: dict) -> str:
             "HTTP-Referer": "https://github.com/IdeaForg-e/VeriVision-AI",
             "X-Title": "VeriVision QC Platform",
         }
-        payload = {
-            "model": openrouter_model,
-            "messages": [{"role": "user", "content": prompt}],
-        }
 
-        for attempt in range(1, MAX_LLM_ATTEMPTS + 1):
-            logger.info(f"Querying OpenRouter Explainer model (attempt {attempt}/{MAX_LLM_ATTEMPTS}): {openrouter_model}")
+        for model_name in models_to_try:
+            logger.info(f"Querying OpenRouter Explainer model: {model_name}")
+            payload = {
+                "model": model_name,
+                "messages": [{"role": "user", "content": prompt}],
+            }
             try:
-                response = requests.post(url, json=payload, headers=headers, timeout=10)
+                response = requests.post(url, json=payload, headers=headers, timeout=12)
                 if response.status_code == 200:
                     res_data = response.json()
                     explanation = res_data["choices"][0]["message"]["content"].strip()
                     if explanation:
-                        logger.info("Explainer model returned response successfully.")
+                        logger.info(f"Explainer model '{model_name}' returned response successfully.")
                         return explanation
                 else:
-                    logger.warning(f"Explainer model endpoint returned status {response.status_code}.")
+                    logger.warning(f"Explainer model '{model_name}' returned status {response.status_code}. Trying fallback...")
             except Exception as e:
-                logger.error(f"Explainer LLM Agent attempt {attempt}/{MAX_LLM_ATTEMPTS} failed: {e}.")
+                logger.error(f"Explainer LLM Agent call to '{model_name}' failed: {e}. Trying fallback...")
 
         logger.warning("All Explainer LLM attempts exhausted. Falling back to template explainer...")
 
