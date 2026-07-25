@@ -262,3 +262,6 @@ class MonthlyBreakdownItem(BaseModel):
     total_inspections: int
     fraud_cases: int
     fraud_rate: float
+
+class MultiAngleFusionRequest(BaseModel):
+    case_ids: List[str]
