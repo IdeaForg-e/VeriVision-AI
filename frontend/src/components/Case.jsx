@@ -279,10 +279,17 @@ export function ImageComparison({ goldenUrl, uploadedUrl, imageHash }) {
 }
 
 export function MetadataCard({ caseData = {}, extra = [] }) {
+  const angleLabel = caseData.captureAngle
+    ? caseData.captureAngle === "angled" || caseData.captureAngle === "side"
+      ? `${caseData.captureAngle.toUpperCase()} (Multi-Angle Fusion)`
+      : caseData.captureAngle.toUpperCase()
+    : null;
+
   const rows = [
     { label: "Case ID", value: caseData.id },
     { label: "Part Code", value: caseData.partCode },
     { label: "Commodity", value: caseData.commodity },
+    { label: "Capture Angle", value: angleLabel },
     { label: "Status", value: caseData.status?.replace(/_/g, " ") },
     { label: "Image Hash", value: caseData.imageHash },
     { label: "Neural Model", value: caseData.neuralModel },

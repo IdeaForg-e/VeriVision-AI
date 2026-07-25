@@ -158,7 +158,14 @@ export function QueueRow({ item }) {
 
       {/* Part */}
       <td className="px-4 py-3">
-        <p className="font-semibold text-slate-800 dark:text-slate-200">{item.partNumber}</p>
+        <div className="flex items-center gap-1.5">
+          <p className="font-semibold text-slate-800 dark:text-slate-200">{item.partNumber}</p>
+          {(item.captureAngle === "angled" || item.captureAngle === "side" || item.isMultiAngle) && (
+            <span className="px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-400 border border-purple-500/30 text-[9px] font-mono font-bold uppercase tracking-tight">
+              📐 MULTI-ANGLE
+            </span>
+          )}
+        </div>
         <p className="text-[10px] font-mono text-slate-500">{item.batch || "STANDARD"}</p>
       </td>
 

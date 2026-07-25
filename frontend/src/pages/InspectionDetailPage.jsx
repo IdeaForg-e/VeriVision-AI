@@ -510,7 +510,7 @@ export default function InspectionDetailPage() {
       {/* Header Banner */}
       <div className="lab-card p-4 mb-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
         <div className="space-y-1">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <button
               onClick={() => navigate(ROUTES.CASE_DETAIL)}
               className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-xs font-bold font-mono"
@@ -520,6 +520,11 @@ export default function InspectionDetailPage() {
             <span className="text-slate-400">/</span>
             <span className="font-mono font-bold text-xs text-sky-600 dark:text-sky-400">#{merged.id}</span>
             <Badge status={merged.status} size="sm" />
+            {(merged.captureAngle === "angled" || merged.captureAngle === "side" || merged.multiAngleViews?.length > 0) && (
+              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-purple-500/10 text-purple-400 border border-purple-500/30 flex items-center gap-1.5 uppercase">
+                📐 Multi-Angle Fusion ({merged.captureAngle?.toUpperCase() || "ANGLED"})
+              </span>
+            )}
           </div>
           <h1 className="text-base font-bold text-slate-900 dark:text-slate-100">
             Audit Report: <span className="font-mono">{merged.partCode}</span>
