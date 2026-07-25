@@ -1,16 +1,9 @@
 import { Link } from "react-router-dom";
 import {
-  ArrowRight,
-  Cpu,
-  ScanSearch,
-  Fingerprint,
-  ShieldCheck,
-  Activity,
-  Scan,
-  AlertTriangle,
+  ArrowRight, Cpu, ScanSearch, Fingerprint, ShieldCheck,
+  Activity, Scan, AlertTriangle, Zap, Database, BarChart3, Eye,
 } from "lucide-react";
 import { ROUTES } from "../utils/constants.js";
-import { Button } from "../components/Common.jsx";
 
 const platformFeatures = [
   {
@@ -19,6 +12,9 @@ const platformFeatures = [
     tag: "Computer Vision",
     description: "Automated homography alignment and structural deviation detection against OEM reference models.",
     icon: Cpu,
+    accentColor: "rgba(0,125,184,0.15)",
+    accentBorder: "rgba(0,125,184,0.30)",
+    accentText: "var(--primary)",
   },
   {
     id: 2,
@@ -26,6 +22,9 @@ const platformFeatures = [
     tag: "Serial Check",
     description: "Extracts degraded serial numbers and revision codes with string distance verification.",
     icon: ScanSearch,
+    accentColor: "rgba(76,215,246,0.10)",
+    accentBorder: "rgba(76,215,246,0.25)",
+    accentText: "#4cd7f6",
   },
   {
     id: 3,
@@ -33,6 +32,9 @@ const platformFeatures = [
     tag: "Embedding Match",
     description: "Sub-10ms Cosine Similarity search across catalog references with high precision.",
     icon: Fingerprint,
+    accentColor: "rgba(124,58,237,0.10)",
+    accentBorder: "rgba(124,58,237,0.25)",
+    accentText: "#a78bfa",
   },
   {
     id: 4,
@@ -40,154 +42,463 @@ const platformFeatures = [
     tag: "Operator Feedback",
     description: "Interactive ROI overrides and training feedback loops for automated compliance reports.",
     icon: ShieldCheck,
+    accentColor: "rgba(16,185,129,0.10)",
+    accentBorder: "rgba(16,185,129,0.25)",
+    accentText: "var(--success)",
   },
+];
+
+const agentSteps = [
+  { num: "01", label: "Selector", desc: "512-Dim CLIP Vector Match" },
+  { num: "02", label: "Triage",   desc: "ORB Homography Alignment" },
+  { num: "03", label: "Detector", desc: "6-Sub-Agent CV Ensemble" },
+  { num: "04", label: "Decision", desc: "Weighted Risk Fusion" },
+  { num: "05", label: "Explainer", desc: "LLM Rationale & PDF Export" },
 ];
 
 export default function LandingPage() {
   return (
-    <div className="min-h-screen flex flex-col bg-[#090d16] text-slate-100 font-sans antialiased">
-      {/* Navigation Header */}
-      <header className="sticky top-0 z-50 border-b border-slate-800 bg-[#090d16]/95 backdrop-blur-md">
-        <div className="max-w-[1360px] mx-auto px-4 sm:px-6 h-16 flex justify-between items-center">
+    <div
+      className="min-h-screen flex flex-col antialiased"
+      style={{ background: "var(--surface)", fontFamily: "var(--font-body)" }}
+    >
+      {/* ── Navigation Header ────────────────────────────────────────── */}
+      <header
+        className="sticky top-0 z-50"
+        style={{
+          background: "rgba(17,19,24,0.85)",
+          backdropFilter: "blur(20px)",
+          WebkitBackdropFilter: "blur(20px)",
+          borderBottom: "1px solid var(--border-hairline)",
+        }}
+      >
+        <div className="max-w-[1360px] mx-auto px-5 sm:px-8 h-16 flex justify-between items-center">
           <Link to={ROUTES.LANDING} className="flex items-center gap-3 group">
-            <div className="h-9 w-9 rounded-xl overflow-hidden bg-[#090d16] border border-sky-500/30 flex items-center justify-center shadow-md">
+            <div
+              className="h-9 w-9 rounded-xl overflow-hidden flex items-center justify-center transition-all duration-300
+                         group-hover:shadow-[0_0_20px_rgba(0,125,184,0.30)]"
+              style={{
+                background: "var(--surface-lowest)",
+                border: "1px solid rgba(0,125,184,0.30)",
+                boxShadow: "0 0 12px rgba(0,125,184,0.12)",
+              }}
+            >
               <img src="/images/logo.png" alt="VeriVision Logo" className="w-full h-full object-cover" />
             </div>
             <div>
-              <p className="text-xs font-black tracking-widest text-white uppercase font-mono">
-                VERIVISION <span className="text-sky-400">AI</span>
+              <p className="text-[11px] font-bold tracking-[0.12em] uppercase"
+                 style={{ color: "var(--on-surface)", fontFamily: "var(--font-body)" }}>
+                VERIVISION <span style={{ color: "var(--primary)" }}>AI</span>
               </p>
-              <p className="text-[10px] text-slate-400 font-mono">Visual Hardware Verification</p>
+              <p className="text-[9px] tracking-widest uppercase"
+                 style={{ color: "var(--on-surface-muted)", fontFamily: "var(--font-body)" }}>
+                Visual Hardware Verification
+              </p>
             </div>
           </Link>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2.5">
             <Link to={`${ROUTES.LOGIN}?role=user`}>
-              <Button variant="outline" size="sm">
+              <button
+                className="h-8 px-4 rounded-lg text-[11px] font-semibold transition-all duration-200 hover:bg-[var(--glass-bg)]"
+                style={{
+                  color: "var(--on-surface-variant)",
+                  border: "1px solid var(--border-default)",
+                  fontFamily: "var(--font-body)",
+                }}
+              >
                 Operator Sign In
-              </Button>
+              </button>
             </Link>
             <Link to={`${ROUTES.LOGIN}?role=admin`}>
-              <Button variant="primary" size="sm" icon={<ArrowRight size={14} />}>
-                Admin Workspace
-              </Button>
+              <button
+                className="h-8 px-4 rounded-lg text-[11px] font-semibold text-white transition-all duration-200
+                           hover:shadow-[0_0_16px_var(--primary-glow)] hover:-translate-y-[1px]"
+                style={{
+                  background: "var(--primary-container)",
+                  border: "1px solid rgba(0,125,184,0.30)",
+                  boxShadow: "0 0 8px var(--primary-glow-sm)",
+                  fontFamily: "var(--font-body)",
+                }}
+              >
+                Admin Workspace →
+              </button>
             </Link>
           </div>
         </div>
       </header>
 
-      {/* Main Hero */}
-      <main className="flex-1 max-w-[1360px] mx-auto w-full px-4 sm:px-6 py-10 flex flex-col gap-12">
+      {/* ── Main ─────────────────────────────────────────────────────── */}
+      <main className="flex-1 max-w-[1360px] mx-auto w-full px-5 sm:px-8 py-12 flex flex-col gap-16">
+
+        {/* ── Hero ───────────────────────────────────────────────────── */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-center">
           {/* Hero Left */}
-          <div className="lg:col-span-6 space-y-5">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-sky-500/10 border border-sky-500/25 text-sky-400 text-xs font-mono font-semibold">
-              <Activity size={14} /> AI-Powered Hardware Inspection
+          <div className="lg:col-span-6 space-y-6 animate-fade-in">
+            <div
+              className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest"
+              style={{
+                background: "var(--primary-glow-sm)",
+                border: "1px solid rgba(0,125,184,0.25)",
+                color: "var(--primary)",
+                fontFamily: "var(--font-body)",
+              }}
+            >
+              <Zap size={11} /> AI-Powered Hardware Inspection
             </div>
-            <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black text-white tracking-tight leading-tight">
-              AI-Powered Hardware Quality &amp; Fraud Inspection
+
+            <h1
+              className="text-4xl sm:text-5xl font-light leading-tight"
+              style={{ fontFamily: "var(--font-headline)", color: "var(--on-surface)", letterSpacing: "-0.02em" }}
+            >
+              AI-Powered Hardware{" "}
+              <span style={{ color: "var(--primary)" }}>Quality</span>{" "}
+              & Fraud Inspection
             </h1>
-            <p className="text-sm sm:text-base text-slate-300 leading-relaxed max-w-xl">
-              Automatically scan and verify hardware parts using artificial intelligence to detect fake, damaged, or swapped components.
+
+            <p
+              className="text-[14px] leading-relaxed max-w-xl"
+              style={{ fontFamily: "var(--font-body)", color: "var(--on-surface-muted)" }}
+            >
+              Automatically scan and verify hardware parts using a 5-agent AI pipeline to detect fake, damaged,
+              or swapped components with audit-ready reporting.
             </p>
+
             <div className="flex flex-wrap gap-3 pt-2">
               <Link to={`${ROUTES.LOGIN}?role=admin`}>
-                <Button variant="primary" size="md" icon={<Scan size={16} />} className="h-11 px-5 text-sm font-bold">
+                <button
+                  className="h-11 px-6 rounded-xl flex items-center gap-2 text-[13px] font-semibold text-white
+                             transition-all duration-200 hover:shadow-[0_0_24px_var(--primary-glow)] hover:-translate-y-[2px]"
+                  style={{
+                    background: "var(--primary-container)",
+                    border: "1px solid rgba(0,125,184,0.30)",
+                    boxShadow: "0 0 12px var(--primary-glow-sm)",
+                    fontFamily: "var(--font-body)",
+                  }}
+                >
+                  <Scan size={16} />
                   Enter Audit Workspace
-                </Button>
+                </button>
               </Link>
               <Link to={`${ROUTES.LOGIN}?role=user`}>
-                <Button variant="outline" size="md" className="h-11 px-5 text-sm font-semibold">
+                <button
+                  className="h-11 px-6 rounded-xl flex items-center gap-2 text-[13px] font-semibold
+                             transition-all duration-200 hover:bg-[var(--glass-bg)] hover:border-[var(--border-strong)]"
+                  style={{
+                    background: "transparent",
+                    border: "1px solid var(--border-default)",
+                    color: "var(--on-surface-variant)",
+                    fontFamily: "var(--font-body)",
+                  }}
+                >
                   Operator Triage Demo
-                </Button>
+                  <ArrowRight size={14} />
+                </button>
               </Link>
             </div>
           </div>
 
-          {/* Telemetry Mockup Preview */}
-          <div className="lg:col-span-6">
-            <div className="bg-[#0e1626] border border-slate-800 rounded-2xl overflow-hidden shadow-2xl">
-              <div className="px-5 py-3 border-b border-slate-800 bg-[#131e32] flex justify-between items-center text-xs font-mono">
-                <span className="font-bold text-slate-200">INSPECTION PREVIEW</span>
-                <span className="px-2.5 py-0.5 rounded bg-emerald-500/15 text-emerald-400 font-bold text-[10px]">
-                  PIPELINE ONLINE
+          {/* Inspection Preview Card */}
+          <div className="lg:col-span-6 animate-slide-up">
+            <div
+              className="overflow-hidden"
+              style={{
+                background: "var(--glass-bg)",
+                backdropFilter: "var(--glass-blur)",
+                WebkitBackdropFilter: "var(--glass-blur)",
+                border: "1px solid var(--border-default)",
+                borderTopColor: "var(--border-light-top)",
+                borderRadius: "var(--radius-xl)",
+                boxShadow: "var(--glass-shadow), var(--glass-inset)",
+              }}
+            >
+              {/* Card Header */}
+              <div
+                className="px-5 py-3 flex justify-between items-center"
+                style={{ borderBottom: "1px solid var(--border-hairline)", background: "var(--glass-bg)" }}
+              >
+                <div className="flex items-center gap-2">
+                  <span
+                    className="text-[11px] font-bold uppercase tracking-widest"
+                    style={{ fontFamily: "var(--font-body)", color: "var(--on-surface)" }}
+                  >
+                    INSPECTION PREVIEW
+                  </span>
+                </div>
+                <span
+                  className="px-2.5 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-widest"
+                  style={{
+                    background: "var(--success-surface)",
+                    border: "1px solid var(--success-border)",
+                    color: "var(--success)",
+                    fontFamily: "var(--font-body)",
+                  }}
+                >
+                  ● PIPELINE ONLINE
                 </span>
               </div>
 
-              <div className="p-4 bg-[#090d16] grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="bg-[#0e1626] border border-slate-800/80 rounded-xl p-3 space-y-2">
-                  <div className="flex justify-between items-center text-[10px] font-mono">
-                    <span className="text-slate-400 font-bold">OEM REFERENCE</span>
-                    <span className="text-emerald-400 font-bold">Dell DDR5</span>
+              {/* Image Grid */}
+              <div className="p-4 grid grid-cols-2 gap-3" style={{ background: "var(--surface-lowest)" }}>
+                {/* Golden Reference */}
+                <div
+                  className="rounded-xl p-3 space-y-2"
+                  style={{
+                    background: "var(--glass-bg)",
+                    border: "1px solid var(--border-hairline)",
+                  }}
+                >
+                  <div className="flex justify-between items-center">
+                    <span className="text-[9px] font-bold uppercase tracking-widest"
+                          style={{ color: "var(--on-surface-muted)", fontFamily: "var(--font-mono)" }}>
+                      OEM REFERENCE
+                    </span>
+                    <span className="text-[9px] font-bold"
+                          style={{ color: "var(--success)", fontFamily: "var(--font-mono)" }}>
+                      Dell DDR5
+                    </span>
                   </div>
-                  <div className="h-40 sm:h-44 bg-black rounded-lg flex items-center justify-center overflow-hidden p-2 border border-slate-900">
+                  <div className="h-36 sm:h-40 rounded-lg flex items-center justify-center overflow-hidden p-2"
+                       style={{ background: "var(--surface-lowest)", border: "1px solid var(--border-hairline)" }}>
                     <img src="/images/ram_clean.png" alt="Clean RAM" className="h-full object-contain" />
                   </div>
                 </div>
 
-                <div className="bg-[#0e1626] border border-slate-800/80 rounded-xl p-3 space-y-2">
-                  <div className="flex justify-between items-center text-[10px] font-mono">
-                    <span className="text-slate-400 font-bold">TARGET SCAN</span>
-                    <span className="text-rose-400 font-bold flex items-center gap-1">
-                      <AlertTriangle size={12} /> TAMPERED
+                {/* Target Scan */}
+                <div
+                  className="rounded-xl p-3 space-y-2"
+                  style={{
+                    background: "var(--glass-bg)",
+                    border: "1px solid var(--urgent-border)",
+                  }}
+                >
+                  <div className="flex justify-between items-center">
+                    <span className="text-[9px] font-bold uppercase tracking-widest"
+                          style={{ color: "var(--on-surface-muted)", fontFamily: "var(--font-mono)" }}>
+                      TARGET SCAN
+                    </span>
+                    <span className="text-[9px] font-bold flex items-center gap-1"
+                          style={{ color: "var(--urgent)", fontFamily: "var(--font-mono)" }}>
+                      <AlertTriangle size={10} /> TAMPERED
                     </span>
                   </div>
-                  <div className="h-40 sm:h-44 bg-black rounded-lg flex items-center justify-center overflow-hidden p-2 border border-slate-900">
+                  <div className="h-36 sm:h-40 rounded-lg flex items-center justify-center overflow-hidden p-2"
+                       style={{ background: "var(--surface-lowest)", border: "1px solid var(--urgent-border)" }}>
                     <img src="/images/ram_tampered.png" alt="Tampered RAM" className="h-full object-contain" />
                   </div>
                 </div>
               </div>
 
-              <div className="px-5 py-3 border-t border-slate-800 bg-[#131e32] flex items-center justify-between text-xs font-mono">
-                <span className="text-slate-300">SSIM Alignment: <strong className="text-rose-400">34.6%</strong></span>
-                <span className="font-bold text-rose-400 uppercase tracking-wider">QUARANTINE (95% RISK)</span>
+              {/* Card Footer */}
+              <div
+                className="px-5 py-3 flex items-center justify-between"
+                style={{ borderTop: "1px solid var(--border-hairline)", background: "var(--glass-bg)" }}
+              >
+                <span className="text-[11px]" style={{ fontFamily: "var(--font-body)", color: "var(--on-surface-variant)" }}>
+                  SSIM Alignment:{" "}
+                  <strong style={{ color: "var(--urgent)", fontFamily: "var(--font-mono)" }}>34.6%</strong>
+                </span>
+                <span
+                  className="text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full"
+                  style={{
+                    background: "var(--urgent-surface)",
+                    border: "1px solid var(--urgent-border)",
+                    color: "var(--urgent)",
+                    fontFamily: "var(--font-body)",
+                  }}
+                >
+                  QUARANTINE — 95% RISK
+                </span>
               </div>
             </div>
           </div>
         </div>
 
-        {/* 4 Clean Capability Cards */}
-        <div className="pt-6 border-t border-slate-800 space-y-6">
-          <div>
-            <h2 className="text-xl font-bold text-white tracking-tight">
-              Core Inspection Capabilities
+        {/* ── 5-Agent Pipeline Stepper ──────────────────────────────── */}
+        <div
+          className="rounded-2xl p-6"
+          style={{
+            background: "var(--glass-bg)",
+            border: "1px solid var(--border-hairline)",
+            backdropFilter: "var(--glass-blur)",
+          }}
+        >
+          <div className="mb-5">
+            <p className="text-[10px] font-bold uppercase tracking-widest mb-1"
+               style={{ color: "var(--primary)", fontFamily: "var(--font-body)" }}>
+              5-AGENT LANGGRAPH PIPELINE
+            </p>
+            <h2 className="text-xl font-light"
+                style={{ fontFamily: "var(--font-headline)", color: "var(--on-surface)" }}>
+              Autonomous Detection Workflow
             </h2>
-            <p className="text-xs text-slate-400 mt-1">
-              Multi-agent computer vision architecture with real-time operator feedback loop.
+          </div>
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
+            {agentSteps.map((step, i) => (
+              <div key={step.num} className="flex items-center gap-2 flex-1">
+                <div className="flex-1 min-w-0">
+                  <div
+                    className="rounded-xl p-3.5 transition-all duration-200 hover:border-[rgba(0,125,184,0.35)] cursor-default"
+                    style={{
+                      background: "var(--glass-bg)",
+                      border: "1px solid var(--border-hairline)",
+                    }}
+                  >
+                    <p className="text-[9px] font-bold uppercase tracking-widest"
+                       style={{ color: "var(--primary)", fontFamily: "var(--font-mono)" }}>
+                      Agent {step.num}
+                    </p>
+                    <p className="text-[13px] font-medium mt-0.5"
+                       style={{ fontFamily: "var(--font-headline)", color: "var(--on-surface)" }}>
+                      {step.label}
+                    </p>
+                    <p className="text-[10px] mt-0.5"
+                       style={{ color: "var(--on-surface-muted)", fontFamily: "var(--font-body)" }}>
+                      {step.desc}
+                    </p>
+                  </div>
+                </div>
+                {i < agentSteps.length - 1 && (
+                  <ArrowRight
+                    size={14}
+                    className="shrink-0 hidden sm:block"
+                    style={{ color: "var(--on-surface-muted)" }}
+                  />
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* ── Capability Cards ─────────────────────────────────────── */}
+        <div>
+          <div className="mb-6">
+            <p className="text-[10px] font-bold uppercase tracking-widest mb-1"
+               style={{ color: "var(--primary)", fontFamily: "var(--font-body)" }}>
+              CORE CAPABILITIES
+            </p>
+            <h2 className="text-2xl font-light"
+                style={{ fontFamily: "var(--font-headline)", color: "var(--on-surface)" }}>
+              Multi-Agent Computer Vision Architecture
+            </h2>
+            <p className="text-[13px] mt-1.5 max-w-xl"
+               style={{ fontFamily: "var(--font-body)", color: "var(--on-surface-muted)" }}>
+              Real-time operator feedback loop with parallel CV ensemble and LLM audit explanations.
             </p>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {platformFeatures.map((feat) => {
               const Icon = feat.icon;
               return (
                 <div
                   key={feat.id}
-                  className="bg-[#0e1626] border border-slate-800 rounded-2xl p-5 space-y-3 hover:border-sky-500/40 transition duration-200 flex flex-col justify-between"
+                  className="rounded-xl p-5 space-y-4 flex flex-col justify-between
+                             transition-all duration-250 hover:-translate-y-1 cursor-default group"
+                  style={{
+                    background: "var(--glass-bg)",
+                    border: "1px solid var(--border-hairline)",
+                    backdropFilter: "var(--glass-blur)",
+                    WebkitBackdropFilter: "var(--glass-blur)",
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.borderColor = feat.accentBorder;
+                    e.currentTarget.style.boxShadow = `0 8px 24px ${feat.accentColor}`;
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.borderColor = "var(--border-hairline)";
+                    e.currentTarget.style.boxShadow = "none";
+                  }}
                 >
                   <div className="space-y-3">
-                    <div className="flex justify-between items-center">
-                      <div className="w-10 h-10 rounded-xl bg-sky-500/10 text-sky-400 flex items-center justify-center border border-sky-500/20">
+                    <div className="flex justify-between items-start">
+                      <div
+                        className="w-10 h-10 rounded-xl flex items-center justify-center"
+                        style={{ background: feat.accentColor, border: `1px solid ${feat.accentBorder}`, color: feat.accentText }}
+                      >
                         <Icon size={18} />
                       </div>
-                      <span className="text-[10px] font-mono font-bold text-slate-400 uppercase px-2 py-0.5 rounded bg-slate-800/80 border border-slate-700/60">
+                      <span
+                        className="text-[9px] font-bold uppercase px-2 py-0.5 rounded-full"
+                        style={{
+                          background: feat.accentColor,
+                          border: `1px solid ${feat.accentBorder}`,
+                          color: feat.accentText,
+                          fontFamily: "var(--font-body)",
+                        }}
+                      >
                         {feat.tag}
                       </span>
                     </div>
-                    <h3 className="text-sm font-bold text-slate-100">{feat.title}</h3>
+                    <h3
+                      className="text-[14px] font-medium"
+                      style={{ fontFamily: "var(--font-headline)", color: "var(--on-surface)" }}
+                    >
+                      {feat.title}
+                    </h3>
                   </div>
-                  <p className="text-xs text-slate-400 leading-relaxed pt-1">{feat.description}</p>
+                  <p
+                    className="text-[11px] leading-relaxed"
+                    style={{ fontFamily: "var(--font-body)", color: "var(--on-surface-muted)" }}
+                  >
+                    {feat.description}
+                  </p>
                 </div>
               );
             })}
           </div>
         </div>
+
+        {/* ── Stats Row ─────────────────────────────────────────────── */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          {[
+            { value: "< 5s", label: "Pipeline Execution", icon: Zap, color: "var(--primary)" },
+            { value: "6x",   label: "Detection Sub-Agents", icon: Eye, color: "#4cd7f6" },
+            { value: "100%", label: "Audit Trail Coverage", icon: Database, color: "#a78bfa" },
+            { value: "95%",  label: "Fraud Detection Rate", icon: BarChart3, color: "var(--success)" },
+          ].map((stat) => {
+            const Icon = stat.icon;
+            return (
+              <div
+                key={stat.label}
+                className="rounded-xl p-4 text-center transition-all duration-200 hover:-translate-y-0.5"
+                style={{
+                  background: "var(--glass-bg)",
+                  border: "1px solid var(--border-hairline)",
+                  backdropFilter: "var(--glass-blur)",
+                }}
+              >
+                <Icon size={20} className="mx-auto mb-2" style={{ color: stat.color }} />
+                <p className="text-2xl font-light" style={{ fontFamily: "var(--font-headline)", color: stat.color }}>
+                  {stat.value}
+                </p>
+                <p className="text-[10px] mt-1 uppercase tracking-widest font-semibold"
+                   style={{ fontFamily: "var(--font-body)", color: "var(--on-surface-muted)" }}>
+                  {stat.label}
+                </p>
+              </div>
+            );
+          })}
+        </div>
       </main>
 
-      {/* Footer */}
-      <footer className="border-t border-slate-800 bg-[#090d16] py-5 px-6 mt-auto text-xs text-slate-400 flex flex-col sm:flex-row justify-between items-center gap-2">
-        <span className="font-mono font-bold text-white">VERIVISION AI</span>
-        <span>© 2026 Precision Technical Systems. All rights reserved.</span>
+      {/* ── Footer ───────────────────────────────────────────────────── */}
+      <footer
+        className="py-5 px-6 mt-auto flex flex-col sm:flex-row justify-between items-center gap-2 text-[10px]"
+        style={{
+          borderTop: "1px solid var(--border-hairline)",
+          background: "var(--glass-bg)",
+          fontFamily: "var(--font-body)",
+          color: "var(--on-surface-muted)",
+        }}
+      >
+        <span className="font-bold uppercase tracking-widest" style={{ color: "var(--on-surface)" }}>
+          VERIVISION AI
+        </span>
+        <span>© 2026 Team IDEAFORG-E · Dell FutureMind AI Hackathon</span>
+        <span className="font-semibold" style={{ color: "var(--primary)" }}>
+          Grand Final 2026
+        </span>
       </footer>
     </div>
   );

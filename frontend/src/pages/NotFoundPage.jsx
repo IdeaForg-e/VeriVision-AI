@@ -7,21 +7,51 @@ export default function NotFoundPage() {
   const navigate = useNavigate();
 
   return (
-    <div className="min-h-screen bg-app flex flex-col items-center justify-center p-6 text-center font-sans">
-      <div className="space-y-3 max-w-sm">
-        <div className="w-14 h-14 rounded-2xl bg-sky-500/10 text-sky-600 dark:text-sky-400 border border-sky-500/20 flex items-center justify-center mx-auto">
-          <SearchX size={32} />
+    <div
+      className="min-h-screen flex flex-col items-center justify-center p-6 text-center"
+      style={{ background: "var(--surface)", fontFamily: "var(--font-body)" }}
+    >
+      <div className="space-y-5 max-w-sm">
+        {/* Icon */}
+        <div
+          className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto"
+          style={{
+            background: "var(--primary-glow-sm)",
+            border: "1px solid rgba(0,125,184,0.25)",
+            color: "var(--primary)",
+          }}
+        >
+          <SearchX size={28} />
         </div>
-        <h1 className="text-4xl font-bold font-mono text-slate-900 dark:text-slate-100">404</h1>
-        <h2 className="text-base font-bold text-slate-800 dark:text-slate-200">Page Not Found</h2>
-        <p className="text-xs text-slate-500 leading-relaxed">
-          The route you are looking for does not exist in the VeriVision audit application.
+
+        {/* 404 Number */}
+        <p
+          className="text-6xl font-light"
+          style={{ fontFamily: "var(--font-headline)", color: "var(--on-surface)", letterSpacing: "-0.04em" }}
+        >
+          404
         </p>
-        <div className="flex justify-center gap-2 pt-3">
-          <Button variant="outline" size="sm" onClick={() => navigate(-1)} icon={<ArrowLeft size={14} />}>
+
+        <div>
+          <h1
+            className="text-lg font-medium"
+            style={{ fontFamily: "var(--font-headline)", color: "var(--on-surface)" }}
+          >
+            Page Not Found
+          </h1>
+          <p
+            className="text-[12px] mt-2 leading-relaxed"
+            style={{ fontFamily: "var(--font-body)", color: "var(--on-surface-muted)" }}
+          >
+            The route you are looking for does not exist in the VeriVision audit application.
+          </p>
+        </div>
+
+        <div className="flex justify-center gap-2 pt-2">
+          <Button variant="outline" size="sm" onClick={() => navigate(-1)} icon={<ArrowLeft size={13} />}>
             Go Back
           </Button>
-          <Button variant="primary" size="sm" onClick={() => navigate(ROUTES.TRIAGE)} icon={<Home size={14} />}>
+          <Button variant="primary" size="sm" onClick={() => navigate(ROUTES.TRIAGE)} icon={<Home size={13} />}>
             Inspection Triage
           </Button>
         </div>

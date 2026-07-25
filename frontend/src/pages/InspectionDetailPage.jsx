@@ -22,49 +22,64 @@ import {
   Download,
   ShieldAlert,
   Terminal,
-  Cpu,
   FileText,
   ArrowRight,
   AlertTriangle,
   Trash2,
   Search,
   Filter,
-  RefreshCw,
   Clock,
   CheckCircle2,
   XCircle,
   AlertCircle,
   Zap,
-  Activity,
   BarChart3,
   ScanLine,
   Gauge,
   Hash,
-  Image,
-  Text,
-  List,
-  Grid,
 } from "lucide-react";
 
+const cardStyle = {
+  background: "var(--glass-bg)",
+  backdropFilter: "var(--glass-blur)",
+  WebkitBackdropFilter: "var(--glass-blur)",
+  border: "1px solid var(--border-hairline)",
+  borderTopColor: "var(--border-light-top)",
+  borderRadius: "var(--radius-lg)",
+  boxShadow: "var(--glass-shadow-sm), var(--glass-inset)",
+};
+
 function StatCard({ icon: Icon, label, value, sublabel, color = "sky" }) {
-  const c = {
-    sky: "text-sky-600 dark:text-sky-400",
-    rose: "text-rose-600 dark:text-rose-400",
-    emerald: "text-emerald-600 dark:text-emerald-400",
-    amber: "text-amber-600 dark:text-amber-400",
-  }[color] || "text-sky-600 dark:text-sky-400";
+  const themeColors = {
+    sky: { text: "var(--primary)", bg: "var(--primary-glow-sm)" },
+    rose: { text: "var(--urgent)", bg: "var(--urgent-surface)" },
+    emerald: { text: "var(--success)", bg: "var(--success-surface)" },
+    amber: { text: "var(--warning)", bg: "var(--warning-surface)" },
+  }[color] || { text: "var(--primary)", bg: "var(--primary-glow-sm)" };
 
   return (
-    <div className="lab-card p-4 flex flex-col justify-between">
+    <div className="p-4 flex flex-col justify-between" style={cardStyle}>
       <div className="flex items-center justify-between mb-2">
-        <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider font-mono">{label}</span>
-        <div className="p-1.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-500">
-          <Icon size={14} />
+        <span className="text-[9px] font-bold uppercase tracking-widest"
+              style={{ fontFamily: "var(--font-body)", color: "var(--on-surface-muted)" }}>
+          {label}
+        </span>
+        <div className="p-1.5 rounded-lg flex items-center justify-center"
+             style={{ background: themeColors.bg, border: "1px solid var(--border-hairline)" }}>
+          <Icon size={13} style={{ color: themeColors.text }} />
         </div>
       </div>
       <div>
-        <p className={`text-xl font-bold font-mono ${c}`}>{value}</p>
-        {sublabel && <p className="text-[10px] text-slate-500 mt-0.5">{sublabel}</p>}
+        <p className="text-lg font-light"
+           style={{ fontFamily: "var(--font-headline)", color: themeColors.text }}>
+          {value}
+        </p>
+        {sublabel && (
+          <p className="text-[9px] mt-0.5"
+             style={{ fontFamily: "var(--font-body)", color: "var(--on-surface-muted)" }}>
+            {sublabel}
+          </p>
+        )}
       </div>
     </div>
   );
@@ -72,25 +87,30 @@ function StatCard({ icon: Icon, label, value, sublabel, color = "sky" }) {
 
 function MetricBar({ label, value, max = 100, color, icon: Icon, suffix = "%" }) {
   const pct = Math.min((value / max) * 100, 100);
-  const barColor =
-    color || (pct >= 75 ? "bg-rose-500" : pct >= 50 ? "bg-amber-500" : "bg-emerald-500");
+  const barColor = color || (
+    pct >= 75 ? "var(--urgent)" : pct >= 50 ? "var(--warning)" : "var(--success)"
+  );
 
   return (
     <div className="space-y-1">
       <div className="flex items-center justify-between text-xs font-mono">
         <div className="flex items-center gap-1.5">
-          {Icon && <Icon size={13} className="text-slate-400" />}
-          <span className="font-semibold text-slate-700 dark:text-slate-300 uppercase text-[10px]">{label}</span>
+          {Icon && <Icon size={12} style={{ color: "var(--on-surface-muted)" }} />}
+          <span className="font-bold uppercase text-[9px] tracking-wider"
+                style={{ fontFamily: "var(--font-body)", color: "var(--on-surface-muted)" }}>
+            {label}
+          </span>
         </div>
-        <span className="font-bold text-slate-900 dark:text-slate-100">
+        <span className="font-bold" style={{ color: "var(--on-surface)" }}>
           {typeof value === "number" ? value.toFixed(1) : value}
           {suffix}
         </span>
       </div>
-      <div className="w-full h-1.5 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden">
+      <div className="w-full h-1.5 rounded-full overflow-hidden"
+           style={{ background: "rgba(0,0,0,0.25)", border: "1px solid var(--border-hairline)" }}>
         <div
-          className={`h-full rounded-full transition-all duration-500 ${barColor}`}
-          style={{ width: `${pct}%` }}
+          className="h-full rounded-full transition-all duration-500"
+          style={{ width: `${pct}%`, background: barColor }}
         />
       </div>
     </div>
@@ -100,10 +120,10 @@ function MetricBar({ label, value, max = 100, color, icon: Icon, suffix = "%" })
 function DetailSkeleton() {
   return (
     <div className="animate-pulse space-y-4">
-      <div className="lab-card p-6 h-32" />
+      <div className="p-6 h-32" style={cardStyle} />
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[...Array(4)].map((_, i) => (
-          <div key={i} className="lab-card h-24" />
+          <div key={i} className="h-24" style={cardStyle} />
         ))}
       </div>
     </div>
@@ -122,7 +142,6 @@ export default function InspectionDetailPage() {
   const [isEmpty, setIsEmpty] = useState(false);
 
   const [searchQuery, setSearchQuery] = useState("");
-  const [viewMode, setViewMode] = useState("grid");
   const [sortBy, setSortBy] = useState("newest");
   const [showFilters, setShowFilters] = useState(false);
   const [riskFilter, setRiskFilter] = useState("all");
@@ -155,13 +174,10 @@ export default function InspectionDetailPage() {
   }, [id]);
 
   const merged = useMemo(() => ({ ...caseData, ...reviewData }), [caseData, reviewData]);
-
-  // pipelineComplete is true when backend returned result data
   const pipelineComplete = merged.pipelineComplete === true || (merged.metrics && merged.metrics.length > 0 && merged.fraudScore != null);
 
   const ssim = merged.metrics?.find((m) => m.name.includes("SSIM"))?.score ?? null;
   const keypoint = merged.metrics?.find((m) => m.name.includes("Keypoint"))?.score ?? null;
-  // Vector similarity is returned as a separate metric named "Vector Sim" — no fallback to 85.0
   const vectorMatchRaw = merged.metrics?.find((m) => m.name?.includes("Vector"))?.score;
   const vectorMatchScore = vectorMatchRaw != null ? parseFloat(vectorMatchRaw) : null;
   const ocrResults = merged.ocrResults || [];
@@ -170,7 +186,6 @@ export default function InspectionDetailPage() {
   const ocrMatch = !pipelineComplete ? null : (ocrResults[0]?.match ?? (ocrText && ocrExpected && ocrExpected !== "N/A font / board label" ? ocrText === ocrExpected : null));
   const recommendation = merged.recommendation || {};
 
-  // Only map to a verdict when the pipeline actually ran
   const rawAction = recommendation.decision || merged.pipelineAction || merged.recommendation?.decision;
   const recDecision = !pipelineComplete
     ? null
@@ -181,7 +196,6 @@ export default function InspectionDetailPage() {
       : REVIEW_DECISION.NEEDS_MORE_EVIDENCE;
 
   const heatmapUrl = merged.heatmapUrl || null;
-  // null means pipeline didn't run — never fall back to 0
   const fraudScore = merged.fraudScore ?? null;
   const aiConfidence = recommendation.confidence ?? merged.confidencePct ?? null;
 
@@ -193,7 +207,6 @@ export default function InspectionDetailPage() {
   const currentVerdict = (merged.pipelineVerdict || merged.metadata?.status || merged.status || "").toLowerCase();
   const currentAction = (merged.pipelineAction || recommendation.decision || "").toLowerCase();
 
-  // Only compute anomaly category when pipeline finished
   const anomalyCategory = !pipelineComplete
     ? null
     : rawCategory || (
@@ -207,14 +220,6 @@ export default function InspectionDetailPage() {
           ? "Reused board"
           : "Clean (OEM Verified)"
       );
-
-  const ocrFieldsTotal = Math.max(ocrResults.length, 1);
-  const ocrFieldsMatched = ocrResults.filter((r) => r.match === true).length;
-  const ocrFieldsFilled = ocrResults.filter(
-    (r) => r.extracted && r.extracted !== "No text detected"
-  ).length;
-  const ocrAccuracyPct = (ocrFieldsMatched / ocrFieldsTotal) * 100;
-  const ocrCompletenessPct = (ocrFieldsFilled / ocrFieldsTotal) * 100;
 
   const filteredReports = useMemo(() => {
     let r = [...reportsList];
@@ -309,12 +314,15 @@ export default function InspectionDetailPage() {
   if (isEmpty) {
     return (
       <Layout>
-        <div className="flex flex-col items-center justify-center py-20 text-center px-4">
-          <div className="h-16 w-16 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center text-slate-400 mb-4">
+        <div className="flex flex-col items-center justify-center py-20 text-center px-4" style={cardStyle}>
+          <div className="h-16 w-16 rounded-2xl flex items-center justify-center mb-4"
+               style={{ background: "var(--primary-glow-sm)", border: "1px solid rgba(0,125,184,0.25)", color: "var(--primary)" }}>
             <FileText size={28} />
           </div>
-          <h2 className="text-base font-bold text-slate-800 dark:text-slate-200">No Inspection Reports Found</h2>
-          <p className="text-xs text-slate-500 max-w-sm mt-1 mb-6">
+          <h2 className="text-base font-semibold" style={{ fontFamily: "var(--font-headline)", color: "var(--on-surface)" }}>
+            No Inspection Reports Found
+          </h2>
+          <p className="text-xs max-w-sm mt-1.5 mb-6" style={{ fontFamily: "var(--font-body)", color: "var(--on-surface-muted)" }}>
             Run a hardware diagnostic scan to record audit data.
           </p>
           <Button variant="primary" size="md" onClick={() => navigate(ROUTES.TRIAGE)} icon={<Zap size={15} />}>
@@ -329,37 +337,44 @@ export default function InspectionDetailPage() {
   if (!id) {
     return (
       <Layout title="Inspection Reports Archive" subtitle="Review historical RMA compliance reports & audit trails">
-        <div className="lab-card p-4 mb-4 flex flex-col md:flex-row justify-between items-center gap-3">
+        <div className="p-4 mb-4 flex flex-col md:flex-row justify-between items-center gap-3" style={cardStyle}>
           <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-sky-500/10 text-sky-600 dark:text-sky-400 border border-sky-500/20">
-              <FileText size={20} />
+            <div className="p-2.5 rounded-xl text-sky-600 dark:text-sky-400"
+                 style={{ background: "var(--primary-glow-sm)", border: "1px solid rgba(0,125,184,0.20)" }}>
+              <FileText size={18} style={{ color: "var(--primary)" }} />
             </div>
             <div>
-              <h2 className="text-sm font-bold text-slate-900 dark:text-slate-100">Audit Reports Library</h2>
-              <p className="text-xs text-slate-500 font-mono">{reportsList.length} Archived Case Scans</p>
+              <h2 className="text-xs font-bold uppercase tracking-wider"
+                  style={{ fontFamily: "var(--font-headline)", color: "var(--on-surface)" }}>
+                Audit Reports Library
+              </h2>
+              <p className="text-[10px] font-mono mt-0.5" style={{ color: "var(--on-surface-muted)" }}>
+                {reportsList.length} Archived Case Scans
+              </p>
             </div>
           </div>
-          <Button variant="primary" size="sm" onClick={() => navigate(ROUTES.TRIAGE)} icon={<Zap size={14} />}>
+          <Button variant="primary" size="sm" onClick={() => navigate(ROUTES.TRIAGE)} icon={<Zap size={13} />}>
             New Inspection
           </Button>
         </div>
 
         {/* Search & Filter Toolbar */}
-        <div className="lab-card p-3 mb-4 space-y-3">
+        <div className="p-3 mb-4 space-y-3" style={cardStyle}>
           <div className="flex flex-col md:flex-row gap-3">
             <div className="relative flex-1">
-              <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: "var(--on-surface-muted)" }} />
               <input
                 type="text"
                 placeholder="Search by case ID, part code, commodity..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full h-8 pl-9 pr-8 text-xs lab-input"
+                className="w-full h-8 pl-9 pr-8 text-xs aura-input"
               />
               {searchQuery && (
                 <button
                   onClick={() => setSearchQuery("")}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2"
+                  style={{ color: "var(--on-surface-muted)" }}
                 >
                   <XCircle size={14} />
                 </button>
@@ -378,7 +393,7 @@ export default function InspectionDetailPage() {
               <select
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value)}
-                className="h-8 px-3 text-xs lab-input font-bold"
+                className="h-8 px-3 text-xs aura-input font-bold"
               >
                 <option value="newest">Newest First</option>
                 <option value="risk">Highest Risk</option>
@@ -388,26 +403,32 @@ export default function InspectionDetailPage() {
           </div>
 
           {showFilters && (
-            <div className="flex items-center gap-3 pt-2 border-t border-slate-200 dark:border-slate-800 text-xs">
-              <span className="text-[10px] font-bold text-slate-500 uppercase">Risk Level:</span>
+            <div className="flex items-center gap-3 pt-2.5 border-t text-xs" style={{ borderColor: "var(--border-hairline)" }}>
+              <span className="text-[9px] font-bold uppercase tracking-widest" style={{ fontFamily: "var(--font-body)", color: "var(--on-surface-muted)" }}>
+                Risk Level:
+              </span>
               {[
                 { id: "all", label: "All" },
                 { id: "high", label: "Critical" },
                 { id: "medium", label: "Warning" },
                 { id: "low", label: "Clean" },
-              ].map(({ id: fId, label }) => (
-                <button
-                  key={fId}
-                  onClick={() => setRiskFilter(fId)}
-                  className={`px-2.5 py-0.5 rounded font-mono text-[10px] font-bold border transition ${
-                    riskFilter === fId
-                      ? "bg-sky-600 text-white border-sky-500"
-                      : "border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400"
-                  }`}
-                >
-                  {label}
-                </button>
-              ))}
+              ].map(({ id: fId, label }) => {
+                const active = riskFilter === fId;
+                return (
+                  <button
+                    key={fId}
+                    onClick={() => setRiskFilter(fId)}
+                    className="px-2.5 py-0.5 rounded-full font-mono text-[9px] font-bold border transition-all duration-150"
+                    style={{
+                      background: active ? "var(--primary-glow-sm)" : "transparent",
+                      borderColor: active ? "var(--primary)" : "var(--border-default)",
+                      color: active ? "var(--primary)" : "var(--on-surface-variant)",
+                    }}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
             </div>
           )}
         </div>
@@ -420,33 +441,38 @@ export default function InspectionDetailPage() {
               <div
                 key={r.id}
                 onClick={() => navigate(`${ROUTES.CASE_DETAIL}/${r.caseId}`)}
-                className="lab-card p-4 space-y-3 cursor-pointer hover:border-sky-500/40 transition"
+                className="p-4 space-y-3.5 cursor-pointer hover-backlit"
+                style={cardStyle}
               >
                 <div className="flex justify-between items-start">
                   <div>
-                    <p className="font-mono font-bold text-xs text-slate-900 dark:text-slate-100">{r.caseId}</p>
-                    <p className="text-[10px] text-slate-500 font-mono uppercase">{r.commodity || "N/A"}</p>
+                    <p className="font-mono font-bold text-xs" style={{ color: "var(--on-surface)" }}>{r.caseId}</p>
+                    <p className="text-[9px] font-mono uppercase" style={{ color: "var(--on-surface-muted)" }}>{r.commodity || "N/A"}</p>
                   </div>
                   <Badge status={r.status} size="sm" />
                 </div>
 
-                <div className="flex items-center gap-1.5 text-xs text-slate-700 dark:text-slate-300">
-                  <Hash size={12} className="text-slate-400" />
-                  <span className="font-mono">{r.partNumber}</span>
+                <div className="flex items-center gap-1.5 text-xs font-mono" style={{ color: "var(--on-surface-variant)" }}>
+                  <Hash size={12} style={{ color: "var(--on-surface-muted)" }} />
+                  <span>{r.partNumber}</span>
                 </div>
 
                 <MetricBar label="Risk Score" value={score} max={100} suffix="%" />
 
-                <div className="flex justify-between items-center pt-2 border-t border-slate-200 dark:border-slate-800 text-[10px] text-slate-500">
+                <div className="flex justify-between items-center pt-2.5 border-t text-[9px]"
+                     style={{ borderColor: "var(--border-hairline)", color: "var(--on-surface-muted)" }}>
                   <span className="font-mono"><Clock size={10} className="inline mr-1" />{r.createdAt || "Recent"}</span>
-                  <div className="flex items-center gap-1">
+                  <div className="flex items-center gap-2">
                     <button
                       onClick={(e) => handleDelete(e, r.caseId)}
-                      className="p-1 text-slate-400 hover:text-rose-500 transition"
+                      className="p-1 transition"
+                      style={{ color: "var(--on-surface-muted)" }}
+                      onMouseEnter={(e) => (e.currentTarget.style.color = "var(--urgent)")}
+                      onMouseLeave={(e) => (e.currentTarget.style.color = "var(--on-surface-muted)")}
                     >
                       <Trash2 size={12} />
                     </button>
-                    <span className="text-sky-600 dark:text-sky-400 font-bold uppercase flex items-center">
+                    <span className="font-bold uppercase flex items-center gap-0.5" style={{ color: "var(--primary)" }}>
                       Details <ArrowRight size={10} />
                     </span>
                   </div>
@@ -478,28 +504,13 @@ export default function InspectionDetailPage() {
             </div>
           }
         >
-          <div className="space-y-2 text-xs">
-            <p className="font-bold text-slate-800 dark:text-slate-200">
+          <div className="space-y-2 text-xs" style={{ fontFamily: "var(--font-body)", color: "var(--on-surface)" }}>
+            <p className="font-semibold">
               Are you sure you want to delete inspection report <span className="font-mono text-rose-500">{deleteTargetId}</span>?
             </p>
-            <p className="text-slate-500">This action will remove the case and evidence log permanently.</p>
+            <p style={{ color: "var(--on-surface-muted)" }}>This action will remove the case and evidence log permanently.</p>
           </div>
         </Modal>
-      </Layout>
-    );
-  }
-
-  if (error) {
-    return (
-      <Layout>
-        <div className="p-8 text-center space-y-4">
-          <AlertTriangle size={32} className="mx-auto text-rose-500" />
-          <h2 className="text-sm font-bold text-slate-800 dark:text-slate-200">Report Ingestion Error</h2>
-          <p className="text-xs text-slate-500">{error}</p>
-          <Button variant="outline" size="sm" onClick={() => navigate(ROUTES.CASE_DETAIL)}>
-            Back to Archive
-          </Button>
-        </div>
       </Layout>
     );
   }
@@ -508,20 +519,23 @@ export default function InspectionDetailPage() {
   return (
     <Layout>
       {/* Header Banner */}
-      <div className="lab-card p-4 mb-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
+      <div className="p-4 mb-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-3" style={cardStyle}>
         <div className="space-y-1">
           <div className="flex items-center gap-2">
             <button
               onClick={() => navigate(ROUTES.CASE_DETAIL)}
-              className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-xs font-bold font-mono"
+              className="text-xs font-bold font-mono"
+              style={{ color: "var(--on-surface-muted)" }}
+              onMouseEnter={(e) => (e.currentTarget.style.color = "var(--primary)")}
+              onMouseLeave={(e) => (e.currentTarget.style.color = "var(--on-surface-muted)")}
             >
               ← Reports Archive
             </button>
-            <span className="text-slate-400">/</span>
-            <span className="font-mono font-bold text-xs text-sky-600 dark:text-sky-400">#{merged.id}</span>
+            <span style={{ color: "var(--border-strong)" }}>/</span>
+            <span className="font-mono font-bold text-xs" style={{ color: "var(--primary)" }}>#{merged.id}</span>
             <Badge status={merged.status} size="sm" />
           </div>
-          <h1 className="text-base font-bold text-slate-900 dark:text-slate-100">
+          <h1 className="text-base font-semibold" style={{ fontFamily: "var(--font-headline)", color: "var(--on-surface)" }}>
             Audit Report: <span className="font-mono">{merged.partCode}</span>
           </h1>
         </div>
@@ -540,7 +554,10 @@ export default function InspectionDetailPage() {
           </Button>
           <button
             onClick={() => handleDelete(merged.id)}
-            className="p-1.5 rounded border border-slate-200 dark:border-slate-800 text-slate-400 hover:text-rose-500"
+            className="p-1.5 rounded-xl border text-slate-400 hover:text-rose-500 transition-colors duration-150"
+            style={{ borderColor: "var(--border-default)", background: "rgba(0,0,0,0.15)", color: "var(--on-surface-muted)" }}
+            onMouseEnter={(e) => (e.currentTarget.style.color = "var(--urgent)")}
+            onMouseLeave={(e) => (e.currentTarget.style.color = "var(--on-surface-muted)")}
           >
             <Trash2 size={14} />
           </button>
@@ -597,22 +614,24 @@ export default function InspectionDetailPage() {
               flags={recommendation.flags || []}
             />
           ) : (
-            <div className="lab-card p-4 flex flex-col justify-center gap-2">
-              <p className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
-                <AlertCircle size={14} className="text-amber-500" /> Pipeline Incomplete
+            <div className="p-4 flex flex-col justify-center gap-2" style={cardStyle}>
+              <p className="text-[10px] font-bold uppercase tracking-wider flex items-center gap-2" style={{ fontFamily: "var(--font-body)", color: "var(--warning)" }}>
+                <AlertCircle size={14} /> Pipeline Incomplete
               </p>
-              <p className="text-xs text-slate-500">
+              <p className="text-xs" style={{ fontFamily: "var(--font-body)", color: "var(--on-surface-muted)" }}>
                 The AI pipeline did not complete for this inspection. No verdict has been issued.
                 Submit a new scan or check the backend pipeline logs.
               </p>
             </div>
           )}
         </div>
-        <div className="lg:col-span-4 lab-card p-4 flex flex-col items-center justify-center">
-          <p className="text-[10px] font-bold font-mono text-slate-500 uppercase mb-2">Overall Risk Gauge</p>
+        <div className="lg:col-span-4 p-4 flex flex-col items-center justify-center" style={cardStyle}>
+          <p className="text-[9px] font-bold uppercase tracking-widest mb-3" style={{ fontFamily: "var(--font-body)", color: "var(--on-surface-muted)" }}>
+            Overall Risk Gauge
+          </p>
           <FraudScore score={fraudScore ?? 0} size="md" showLabel={false} />
           {!pipelineComplete && (
-            <p className="text-[10px] text-slate-500 mt-1 font-mono">No result data</p>
+            <p className="text-[9px] font-mono mt-1" style={{ color: "var(--on-surface-muted)" }}>No result data</p>
           )}
         </div>
       </div>
@@ -634,14 +653,21 @@ export default function InspectionDetailPage() {
           label={heatmapUrl ? "SSIM Anomaly Heatmap Overlay" : "AI Region of Interest"}
         />
 
-        <div className="lab-card p-4 space-y-3">
-          <h3 className="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider flex items-center gap-2">
-            <FileText size={16} className="text-sky-500" /> AI Audit Narrative &amp; Justification
+        <div className="p-4 space-y-3.5" style={cardStyle}>
+          <h3 className="text-[11px] font-bold uppercase tracking-wider flex items-center gap-2"
+              style={{ fontFamily: "var(--font-headline)", color: "var(--on-surface)" }}>
+            <FileText size={15} style={{ color: "var(--primary)" }} /> AI Audit Narrative &amp; Justification
           </h3>
-          <div className="p-3 rounded-lg bg-slate-100 dark:bg-slate-900 text-xs text-slate-700 dark:text-slate-300 leading-relaxed font-sans">
+          <div className="p-3.5 rounded-xl text-xs leading-relaxed"
+               style={{
+                 background: "rgba(0,0,0,0.15)",
+                 border: "1px solid var(--border-default)",
+                 fontFamily: "var(--font-body)",
+                 color: "var(--on-surface-variant)",
+               }}>
             {recommendation.reasoning || "Diagnostic complete."}
           </div>
-          <div className="text-[10px] text-slate-500 font-mono">
+          <div className="text-[9px] font-mono" style={{ color: "var(--on-surface-muted)" }}>
             Pipeline method: Multi-agent SSIM alignment + EasyOCR serial verification + Vector Embedding Cosine search.
           </div>
         </div>
@@ -652,27 +678,33 @@ export default function InspectionDetailPage() {
         <div className="lg:col-span-7">
           <OCRResults results={ocrResults} />
         </div>
-        <div className="lg:col-span-5 lab-card p-4 space-y-3">
-          <h3 className="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider flex items-center gap-2">
-            <FileText size={16} className="text-sky-500" /> Pipeline Verdict &amp; Anomaly Category
+        <div className="lg:col-span-5 p-4 space-y-3.5" style={cardStyle}>
+          <h3 className="text-[11px] font-bold uppercase tracking-wider flex items-center gap-2"
+              style={{ fontFamily: "var(--font-headline)", color: "var(--on-surface)" }}>
+            <FileText size={15} style={{ color: "var(--primary)" }} /> Pipeline Verdict &amp; Anomaly Category
           </h3>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 font-mono text-xs">
-            <div className="p-2.5 rounded bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
-              <span className="text-[9px] font-bold text-slate-500 uppercase block">Anomaly Category</span>
-              <span className="font-bold text-sky-600 dark:text-sky-400 font-sans text-[11px] block truncate mt-0.5" title={anomalyCategory || "—"}>
+            <div className="p-2.5 rounded-xl"
+                 style={{ background: "rgba(0,0,0,0.15)", border: "1px solid var(--border-default)" }}>
+              <span className="text-[8px] font-bold uppercase block" style={{ color: "var(--on-surface-muted)" }}>Anomaly Category</span>
+              <span className="font-bold font-sans text-[10px] block truncate mt-0.5 text-ellipsis overflow-hidden"
+                    style={{ color: "var(--primary)" }} title={anomalyCategory || "—"}>
                 {anomalyCategory || "—"}
               </span>
             </div>
-            <div className="p-2.5 rounded bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
-              <span className="text-[9px] font-bold text-slate-500 uppercase block">Verdict</span>
-              <span className={`font-bold uppercase text-[11px] block mt-0.5 ${
-                pipelineComplete ? "text-emerald-600 dark:text-emerald-400" : "text-slate-400"
-              }`}>{aiClassification}</span>
+            <div className="p-2.5 rounded-xl"
+                 style={{ background: "rgba(0,0,0,0.15)", border: "1px solid var(--border-default)" }}>
+              <span className="text-[8px] font-bold uppercase block" style={{ color: "var(--on-surface-muted)" }}>Verdict</span>
+              <span className="font-bold uppercase text-[10px] block mt-0.5"
+                    style={{ color: pipelineComplete ? "var(--success)" : "var(--on-surface-muted)" }}>
+                {aiClassification}
+              </span>
             </div>
-            <div className="p-2.5 rounded bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
-              <span className="text-[9px] font-bold text-slate-500 uppercase block">Action</span>
-              <span className="font-bold text-amber-600 dark:text-amber-400 font-sans text-[11px] block truncate mt-0.5"
-                title={recommendation.decision || "—"}>
+            <div className="p-2.5 rounded-xl"
+                 style={{ background: "rgba(0,0,0,0.15)", border: "1px solid var(--border-default)" }}>
+              <span className="text-[8px] font-bold uppercase block" style={{ color: "var(--on-surface-muted)" }}>Action</span>
+              <span className="font-bold font-sans text-[10px] block truncate mt-0.5 text-ellipsis overflow-hidden"
+                    style={{ color: "var(--warning)" }} title={recommendation.decision || "—"}>
                 {recommendation.decision || "—"}
               </span>
             </div>
@@ -691,13 +723,13 @@ export default function InspectionDetailPage() {
       </div>
 
       {/* Telemetry Log */}
-      <div className="lab-card p-4 space-y-2 mb-4 font-mono text-xs">
-        <div className="flex items-center gap-2 text-slate-700 dark:text-slate-300 font-bold border-b border-slate-200 dark:border-slate-800 pb-2">
-          <Terminal size={14} className="text-sky-500" /> Execution Log
+      <div className="p-4 space-y-3 mb-4 font-mono text-xs" style={cardStyle}>
+        <div className="flex items-center gap-2 font-bold pb-2" style={{ borderBottom: "1px solid var(--border-hairline)", color: "var(--on-surface)" }}>
+          <Terminal size={14} style={{ color: "var(--primary)" }} /> Execution Log
         </div>
-        <div className="bg-slate-950 text-slate-300 p-3 rounded text-[11px] space-y-1 overflow-x-auto">
+        <div className="bg-[#0b0f17] text-slate-300 p-3.5 rounded-xl text-[10px] space-y-1.5 overflow-x-auto border border-hairline"
+             style={{ borderColor: "var(--border-default)" }}>
           <p className="text-slate-500">&gt; Session: {merged.updatedAt || "Active"}</p>
-          {/* Agent log lines are dynamically generated from real pipeline data */}
           {pipelineComplete ? (
             <>
               <p className="text-sky-400">&gt; Agent-1 (Selector): Ingest &amp; aspect ratio check OK | Commodity: {merged.commodity || "N/A"}</p>
@@ -745,8 +777,8 @@ export default function InspectionDetailPage() {
           </div>
         }
       >
-        <div className="space-y-2 text-xs">
-          <p className="font-bold text-slate-800 dark:text-slate-200">
+        <div className="space-y-2 text-xs" style={{ fontFamily: "var(--font-body)", color: "var(--on-surface)" }}>
+          <p className="font-semibold">
             Permanently delete report <span className="font-mono text-rose-500">{deleteTargetId}</span>?
           </p>
         </div>
