@@ -14,7 +14,8 @@ class Settings:
 
     # OpenRouter API Integration
     OPENROUTER_API_KEY: Optional[str] = os.getenv("OPENROUTER_API_KEY", None)
-    OPENROUTER_MODEL: str = os.getenv("OPENROUTER_MODEL", "nvidia/nemotron-3-ultra-550b-a55b:free")
+    OPENROUTER_MODEL: str = os.getenv("OPENROUTER_MODEL", "nvidia/nemotron-nano-12b-v2-vl:free")
+    FALLBACK_VISION_MODELS: list = ["nvidia/nemotron-nano-12b-v2-vl:free", "openrouter/free"]
 
     # Directory Paths
     BASE_DIR: str = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))

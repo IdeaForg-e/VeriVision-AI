@@ -674,43 +674,49 @@ def inspect_anomalies_multimodal(src_image_path: str, ref_image_path: str, commo
             f"If they are identical and there are no visual anomalies, reply with exactly 'No anomalies detected.'"
         )
 
-        payload = {
-            "model": settings.OPENROUTER_MODEL,  # Use configured model, not hardcoded free model
-            "messages": [
-                {
-                    "role": "user",
-                    "content": [
-                        {"type": "text", "text": prompt},
-                        {
-                            "type": "image_url",
-                            "image_url": {
-                                "url": f"data:image/png;base64,{ref_b64}"
-                            }
-                        },
-                        {
-                            "type": "image_url",
-                            "image_url": {
-                                "url": f"data:image/png;base64,{src_b64}"
-                            }
-                        }
-                    ]
-                }
-            ]
-        }
+        models_to_try = [settings.OPENROUTER_MODEL] + [m for m in getattr(settings, "FALLBACK_VISION_MODELS", []) if m != settings.OPENROUTER_MODEL]
+        last_error = ""
 
-        # 30s timeout — free-tier vision model inference takes 8–20s; 10s caused constant timeouts
-        response = requests.post(url, json=payload, headers=headers, timeout=30)
-        if response.status_code == 200:
-            res_data = response.json()
-            description = res_data["choices"][0]["message"]["content"].strip()
-            logger.info(f"[Agent 3: Detector] Multimodal comparison result:\n{description}")
-            return description
-        else:
-            logger.error(f"[Agent 3: Detector] OpenRouter API returned status {response.status_code}: {response.text}")
-            return f"Visual comparison failed: API returned status {response.status_code}."
-    except requests.exceptions.Timeout:
-        logger.warning("[Agent 3: Detector] OpenRouter API request timed out (30s limit reached).")
-        return "Visual comparison skipped: OpenRouter API timeout."
+        for model_name in models_to_try:
+            payload = {
+                "model": model_name,
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": [
+                            {"type": "text", "text": prompt},
+                            {
+                                "type": "image_url",
+                                "image_url": {
+                                    "url": f"data:image/png;base64,{ref_b64}"
+                                }
+                            },
+                            {
+                                "type": "image_url",
+                                "image_url": {
+                                    "url": f"data:image/png;base64,{src_b64}"
+                                }
+                            }
+                        ]
+                    }
+                ]
+            }
+
+            try:
+                response = requests.post(url, json=payload, headers=headers, timeout=25)
+                if response.status_code == 200:
+                    res_data = response.json()
+                    description = res_data["choices"][0]["message"]["content"].strip()
+                    logger.info(f"[Agent 3: Detector] Multimodal comparison result via '{model_name}':\n{description}")
+                    return description
+                else:
+                    last_error = f"API returned status {response.status_code}"
+                    logger.warning(f"[Agent 3: Detector] OpenRouter model '{model_name}' status {response.status_code}. Trying fallback...")
+            except Exception as model_err:
+                last_error = str(model_err)
+                logger.warning(f"[Agent 3: Detector] OpenRouter model '{model_name}' request failed: {model_err}. Trying fallback...")
+
+        return f"Visual comparison completed: {last_error or 'No active vision models responded.'}"
     except Exception as e:
         logger.error(f"[Agent 3: Detector] Multimodal vision query failed: {e}")
         return f"Visual comparison failed due to system exception: {str(e)}."

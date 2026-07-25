@@ -132,32 +132,40 @@ def classify_part_commodity(image_path: str) -> str:
                 "HTTP-Referer": "https://github.com/IdeaForg-e/VeriVision-AI",
                 "X-Title": "VeriVision QC Platform",
             }
-            # Use Google Gemini Flash (free tier) vision model via OpenRouter
-            payload = {
-                "model": "google/gemini-2.0-flash-exp:free",
-                "messages": [
-                    {
-                        "role": "user",
-                        "content": [
-                            {
-                                "type": "text",
-                                "text": "Classify this manufacturing part image. Options: 'motherboard', 'label', 'microchip', 'processor', 'ram', 'storage', 'gpu', 'battery', 'display', 'chassis', 'fan', 'sensor', 'other'. Return exactly one word from the options."
-                            },
-                            {
-                                "type": "image_url",
-                                "image_url": {
-                                    "url": f"data:image/png;base64,{base64_image}"
+            models_to_try = [settings.OPENROUTER_MODEL] + [m for m in getattr(settings, "FALLBACK_VISION_MODELS", []) if m != settings.OPENROUTER_MODEL]
+            response = None
+            for model_name in models_to_try:
+                payload = {
+                    "model": model_name,
+                    "messages": [
+                        {
+                            "role": "user",
+                            "content": [
+                                {
+                                    "type": "text",
+                                    "text": "Classify this manufacturing part image. Options: 'motherboard', 'label', 'microchip', 'processor', 'ram', 'storage', 'gpu', 'battery', 'display', 'chassis', 'fan', 'sensor', 'other'. Return exactly one word from the options."
+                                },
+                                {
+                                    "type": "image_url",
+                                    "image_url": {
+                                        "url": f"data:image/png;base64,{base64_image}"
+                                    }
                                 }
-                            }
-                        ]
-                    }
-                ]
-            }
+                            ]
+                        }
+                    ]
+                }
+                try:
+                    res = requests.post(url, json=payload, headers=headers, timeout=8)
+                    if res.status_code == 200:
+                        response = res
+                        break
+                    else:
+                        logger.warning(f"[Agent 1: Selector] OpenRouter model '{model_name}' returned status {res.status_code}. Trying fallback...")
+                except Exception as model_err:
+                    logger.warning(f"[Agent 1: Selector] OpenRouter model '{model_name}' failed: {model_err}. Trying fallback...")
 
-            response = requests.post(url, json=payload, headers=headers, timeout=8)
-
-
-            if response.status_code == 200:
+            if response and response.status_code == 200:
                 res_data = response.json()
                 detected = res_data["choices"][0]["message"]["content"].strip().lower()
                 # Clean up any surrounding quotes or punctuation
