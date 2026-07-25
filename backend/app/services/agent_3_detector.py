@@ -9,49 +9,81 @@ from app.config import settings
 
 logger = logging.getLogger(__name__)
 
-# Lazy initialize EasyOCR reader to save startup memory/time.
-# _easyocr_reader states: None = not yet attempted, "FAILED" = init tried and
-# failed, Reader instance = ready. We never silently re-cache None on failure —
+# Lazy initialize Google Vision client to save startup time.
+# _vision_client states: None = not yet attempted, "FAILED" = init tried and
+# failed, client instance = ready. We never silently re-cache None on failure —
 # that made every request after the first failure look like a fresh retry log
 # line while actually permanently short-circuiting to the fallback path.
-_easyocr_reader = None
-_easyocr_init_error: Optional[str] = None
+#
+# Switched from EasyOCR to Google Vision document_text_detection: EasyOCR's
+# neural decoder is non-deterministic run-to-run on the same crop (temperature
+# in beam search), which was producing two different reads of the same label
+# ('1' vs '|', 'a8g' vs 'a86') and getting scored as a fraud signal. Google
+# Vision's OCR is deterministic and has materially higher accuracy on small
+# stamped/printed serials.
+_vision_client = None
+_vision_init_error: Optional[str] = None
 
 
 def get_ocr_reader(retry: bool = False):
     """
-    Returns a ready EasyOCR reader, or raises RuntimeError with the original
-    cause if the engine cannot be initialized. Callers that can legitimately
-    run without OCR (e.g. run_anomaly_ensemble's ThreadPoolExecutor tasks)
-    must catch this explicitly and record it in `errors`, not swallow it
-    into a generic "" / False result.
+    Returns a ready Google Vision ImageAnnotatorClient, or raises RuntimeError
+    with the original cause if the client cannot be initialized. Callers that
+    can legitimately run without OCR (e.g. run_anomaly_ensemble's
+    ThreadPoolExecutor tasks) must catch this explicitly and record it in
+    `errors`, not swallow it into a generic "" / False result.
 
     `retry=True` forces a fresh init attempt even after a prior failure —
     use this from an ops/healthcheck endpoint after fixing the environment,
     instead of restarting the whole process.
     """
-    global _easyocr_reader, _easyocr_init_error
+    global _vision_client, _vision_init_error
 
-    if _easyocr_reader == "FAILED" and not retry:
-        raise RuntimeError(f"EasyOCR previously failed to initialize: {_easyocr_init_error}")
+    if _vision_client == "FAILED" and not retry:
+        raise RuntimeError(f"Google Vision client previously failed to initialize: {_vision_init_error}")
 
-    if _easyocr_reader is None or _easyocr_reader == "FAILED":
-        logger.info("Initializing EasyOCR Engine on CPU mode...")
+    if _vision_client is None or _vision_client == "FAILED":
+        logger.info("Initializing Google Vision OCR client...")
         try:
-            import easyocr
-            _easyocr_reader = easyocr.Reader(["en"], gpu=False)
-            _easyocr_init_error = None
-            logger.info("EasyOCR Engine successfully initialized.")
+            from google.cloud import vision
+            _vision_client = vision.ImageAnnotatorClient()
+            _vision_init_error = None
+            logger.info("Google Vision OCR client successfully initialized.")
         except Exception as e:
-            _easyocr_reader = "FAILED"
-            _easyocr_init_error = str(e)
+            _vision_client = "FAILED"
+            _vision_init_error = str(e)
             logger.critical(
-                f"EasyOCR failed to initialize — OCR detection is DOWN for this process. "
-                f"Check 'pip show easyocr torch' in this environment. Cause: {e}"
+                f"Google Vision client failed to initialize — OCR detection is DOWN for this process. "
+                f"Check GOOGLE_APPLICATION_CREDENTIALS / 'pip show google-cloud-vision' in this environment. Cause: {e}"
             )
-            raise RuntimeError(f"EasyOCR initialization failed: {e}") from e
+            raise RuntimeError(f"Google Vision client initialization failed: {e}") from e
 
-    return _easyocr_reader
+    return _vision_client
+
+
+def _vision_readtext(reader, img: np.ndarray) -> list[str]:
+    """
+    Runs Google Vision document_text_detection on an in-memory BGR image.
+    document_text_detection (not label/text_detection) is used because it's
+    tuned for dense printed text blocks like serial/warranty stickers.
+    Returns a list of detected line strings (mirrors EasyOCR's readtext shape
+    closely enough for the calling code's " ".join(texts) pattern).
+    """
+    from google.cloud import vision
+
+    ok, buffer = cv2.imencode(".png", img)
+    if not ok:
+        return []
+    vision_image = vision.Image(content=buffer.tobytes())
+    response = reader.document_text_detection(image=vision_image)
+    if response.error.message:
+        raise RuntimeError(f"Google Vision API error: {response.error.message}")
+    annotation = response.full_text_annotation
+    if not annotation or not annotation.text:
+        return []
+    # Split into lines; downstream code re-joins with spaces, matching the
+    # prior EasyOCR-based " ".join(texts) shape.
+    return [line for line in annotation.text.splitlines() if line.strip()]
 
 
 def _ensure_rgb(img: np.ndarray) -> np.ndarray:
@@ -328,7 +360,7 @@ def extract_ocr_text(img: np.ndarray, roi: dict = None, expected_serial: str = "
     Crops ROI (if coordinates are provided) and reads text using EasyOCR.
     If no text is detected in the cropped ROI, or the match is poor, falls back to full-frame OCR.
     """
-    logger.info("Executing text extraction (EasyOCR)...")
+    logger.info("Executing text extraction (Google Vision OCR)...")
     crop = img
     cropped_used = False
     
@@ -360,23 +392,13 @@ def extract_ocr_text(img: np.ndarray, roi: dict = None, expected_serial: str = "
         return "", False
 
     try:
-        # Only binarize/clean when we actually cropped a small ROI — a full
-        # frame board image put through adaptive threshold + CLAHE tends to
-        # blow out non-label regions and doesn't help text detection there.
-        ocr_input = _preprocess_for_ocr(crop) if cropped_used else crop
-        results = reader.readtext(ocr_input)
-        texts = [res[1] for res in results]
+        # Google Vision does its own internal preprocessing/binarization — feed
+        # it the raw (upscaled-if-needed) crop rather than our local CLAHE/
+        # adaptive-threshold pass, which can strip faint strokes Vision would
+        # otherwise pick up.
+        texts = _vision_readtext(reader, crop)
         detected = " ".join(texts).strip()
 
-        # Cleaned-up crop occasionally reads worse than the raw crop (e.g. if
-        # thresholding erased faint strokes) — try raw crop too and keep
-        # whichever produced more characters.
-        if cropped_used and not detected:
-            raw_results = reader.readtext(crop)
-            raw_detected = " ".join(res[1] for res in raw_results).strip()
-            if raw_detected:
-                detected = raw_detected
-        
         # Check similarity with expected serial
         is_poor_match = False
         if expected_serial and detected:
@@ -389,13 +411,12 @@ def extract_ocr_text(img: np.ndarray, roi: dict = None, expected_serial: str = "
         # Fallback: if crop returned nothing or is a poor match, run full-frame search
         if (not detected or is_poor_match) and cropped_used:
             logger.info(f"Crop ROI returned poor match '{detected}' against expected '{expected_serial}'. Triggering full-frame OCR fallback search...")
-            results = reader.readtext(img)
-            texts = [res[1] for res in results]
-            detected_full = " ".join(texts).strip()
+            full_texts = _vision_readtext(reader, img)
+            detected_full = " ".join(full_texts).strip()
             if detected_full:
                 detected = detected_full
-            
-        logger.info(f"EasyOCR parsing complete. Detected text label string: '{detected}'")
+
+        logger.info(f"Google Vision OCR parsing complete. Detected text label string: '{detected}'")
         return detected, True
     except Exception as e:
         logger.error(f"Error during OCR extraction: {e}")
@@ -621,13 +642,17 @@ def compare_color_histograms(src_img: np.ndarray, ref_img: np.ndarray, roi_confi
 
 def inspect_anomalies_multimodal(src_image_path: str, ref_image_path: str, commodity: str) -> str:
     """
-    Queries OpenRouter multimodal vision model (openrouter/free)
+    Queries NVIDIA NIM (or OpenRouter fallback) multimodal vision model
     to semantically compare the aligned captured image and the golden standard.
     """
-    logger.info(f"[Agent 3: Detector] Running multimodal visual comparison for commodity '{commodity}'...")
-    if not settings.OPENROUTER_API_KEY:
-        logger.warning("[Agent 3: Detector] No OpenRouter API key configured. Skipping multimodal visual comparison.")
-        return "Visual comparison skipped: OpenRouter API key not configured."
+    logger.info(f"[Agent 3D: Vision Sub-Agent] Running multimodal visual comparison for commodity '{commodity}'...")
+    
+    nim_key = getattr(settings, "NVIDIA_NIM_API_KEY", None)
+    openrouter_key = getattr(settings, "OPENROUTER_API_KEY", None)
+
+    if not nim_key and not openrouter_key:
+        logger.warning("[Agent 3D: Vision Sub-Agent] Neither NVIDIA_NIM_API_KEY nor OPENROUTER_API_KEY configured. Skipping multimodal visual comparison.")
+        return "Visual comparison skipped: API key not configured."
 
     import base64
     import requests
@@ -651,14 +676,6 @@ def inspect_anomalies_multimodal(src_image_path: str, ref_image_path: str, commo
         src_b64 = prepare_base64(src)
         ref_b64 = prepare_base64(ref)
 
-        url = "https://openrouter.ai/api/v1/chat/completions"
-        headers = {
-            "Authorization": f"Bearer {settings.OPENROUTER_API_KEY}",
-            "Content-Type": "application/json",
-            "HTTP-Referer": "https://github.com/IdeaForg-e/VeriVision-AI",
-            "X-Title": "VeriVision QC Platform",
-        }
-
         prompt = (
             f"You are an expert QA visual inspection AI. Compare these two images of a {commodity} part:\n"
             f"Image 1 (first) is the OEM Golden Reference Standard (the correct standard layout).\n"
@@ -674,6 +691,7 @@ def inspect_anomalies_multimodal(src_image_path: str, ref_image_path: str, commo
             f"If they are identical and there are no visual anomalies, reply with exactly 'No anomalies detected.'"
         )
 
+<<<<<<< HEAD
         models_to_try = [settings.OPENROUTER_MODEL] + [m for m in getattr(settings, "FALLBACK_VISION_MODELS", []) if m != settings.OPENROUTER_MODEL]
         last_error = ""
 
@@ -717,8 +735,73 @@ def inspect_anomalies_multimodal(src_image_path: str, ref_image_path: str, commo
                 logger.warning(f"[Agent 3: Detector] OpenRouter model '{model_name}' request failed: {model_err}. Trying fallback...")
 
         return f"Visual comparison completed: {last_error or 'No active vision models responded.'}"
+=======
+        if nim_key:
+            # High-throughput low-latency NVIDIA NIM endpoint
+            url = f"{getattr(settings, 'NVIDIA_NIM_BASE_URL', 'https://integrate.api.nvidia.com/v1')}/chat/completions"
+            headers = {
+                "Authorization": f"Bearer {nim_key}",
+                "Content-Type": "application/json",
+            }
+            model_name = getattr(settings, "NVIDIA_VISION_MODEL", "meta/llama-3.2-11b-vision-instruct")
+            logger.info(f"[Agent 3D: Vision Sub-Agent] Querying NVIDIA NIM vision model: {model_name}")
+            payload = {
+                "model": model_name,
+                "temperature": 0.1,
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": [
+                            {"type": "text", "text": prompt},
+                            {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{ref_b64}"}},
+                            {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{src_b64}"}}
+                        ]
+                    }
+                ]
+            }
+            timeout_sec = 15
+        else:
+            # Fallback to OpenRouter
+            url = "https://openrouter.ai/api/v1/chat/completions"
+            headers = {
+                "Authorization": f"Bearer {openrouter_key}",
+                "Content-Type": "application/json",
+                "HTTP-Referer": "https://github.com/IdeaForg-e/VeriVision-AI",
+                "X-Title": "VeriVision QC Platform",
+            }
+            model_name = getattr(settings, "OPENROUTER_VISION_MODEL", None) or "google/gemini-2.5-flash"
+            logger.info(f"[Agent 3D: Vision Sub-Agent] Querying OpenRouter vision model: {model_name}")
+            payload = {
+                "model": model_name,
+                "temperature": 0,
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": [
+                            {"type": "text", "text": prompt},
+                            {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{ref_b64}"}},
+                            {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{src_b64}"}}
+                        ]
+                    }
+                ]
+            }
+            timeout_sec = 30
+
+        response = requests.post(url, json=payload, headers=headers, timeout=timeout_sec)
+        if response.status_code == 200:
+            res_data = response.json()
+            description = res_data["choices"][0]["message"]["content"].strip()
+            logger.info(f"[Agent 3D: Vision Sub-Agent] Visual comparison result:\n{description}")
+            return description
+        else:
+            logger.error(f"[Agent 3D: Vision Sub-Agent] API returned status {response.status_code}: {response.text}")
+            return f"Visual comparison failed: API returned status {response.status_code}."
+    except requests.exceptions.Timeout:
+        logger.warning(f"[Agent 3D: Vision Sub-Agent] API request timed out ({timeout_sec}s limit reached).")
+        return "Visual comparison skipped: API timeout."
+>>>>>>> fae3d01 (changed the architecture)
     except Exception as e:
-        logger.error(f"[Agent 3: Detector] Multimodal vision query failed: {e}")
+        logger.error(f"[Agent 3D: Vision Sub-Agent] Multimodal vision query failed: {e}")
         return f"Visual comparison failed due to system exception: {str(e)}."
 
 
@@ -928,6 +1011,13 @@ def run_anomaly_ensemble(src_img: np.ndarray, ref_img: np.ndarray, roi_config: d
     explicit_expected = expected_serial if _is_plausible_expected_label(expected_serial) else ""
     golden_expected = (golden_text if label_roi and _is_plausible_expected_label(golden_text) else "")
     master_expected_text = explicit_expected or golden_expected
+    # True only when the ground truth came from a fixed catalog value, not
+    # from OCR-ing the golden image. Golden-image OCR is itself a noisy read
+    # (same engine, same failure modes) — using it as "truth" and then
+    # comparing it against another noisy read of the target crop means two
+    # independent noise sources get scored as if one were ground truth.
+    # Agent 4 uses this flag to require a higher bar before escalating.
+    expected_text_is_catalog_verified = bool(explicit_expected)
 
     ocr_diff = {"similarity": 1.0, "mismatches": [], "suspicious_confusions": []}
     if ocr_engine_available and master_expected_text and detected_text:
@@ -961,6 +1051,7 @@ def run_anomaly_ensemble(src_img: np.ndarray, ref_img: np.ndarray, roi_config: d
             "engine_available": ocr_engine_available,
             "detected_text": detected_text,
             "expected_text": expected_text_value,
+            "expected_text_is_catalog_verified": expected_text_is_catalog_verified,
             "similarity": ocr_diff["similarity"],
             "mismatches": ocr_diff["mismatches"],
             "suspicious_confusions": ocr_diff.get("suspicious_confusions", []),
@@ -989,6 +1080,7 @@ def run_anomaly_ensemble(src_img: np.ndarray, ref_img: np.ndarray, roi_config: d
         "ssim_score": ssim_val,
         "detected_text": detected_text,
         "expected_text": expected_text_value,
+        "expected_text_is_catalog_verified": expected_text_is_catalog_verified,
         "ocr_similarity": ocr_diff["similarity"],
         "ocr_mismatches": ocr_diff["mismatches"],
         "ocr_diff": ocr_diff,
@@ -997,6 +1089,7 @@ def run_anomaly_ensemble(src_img: np.ndarray, ref_img: np.ndarray, roi_config: d
         "keypoint_matches": keypoint_results["good_matches"],
         "template_match_score": template_results["template_match_score"],
         "template_match_found": template_results["template_match_found"],
+        "template_match_checked": template_results.get("template_match_checked", False),
         "color_hist_similarity": color_results["color_hist_similarity"],
         "vector_embedding_match": vector_embedding_match,
         "matching_score": matching_score,

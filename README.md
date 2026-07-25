@@ -195,7 +195,7 @@ flowchart TB
 | **Computer Vision Engine** | ![OpenCV](https://img.shields.io/badge/-OpenCV_4-5C3EE8?style=flat-square&logo=opencv&logoColor=white) | `4.7.0+` | Homography image registration, Laplacian blur check, and heatmap overlays |
 | **Structural Metrics** | ![scikit-image](https://img.shields.io/badge/-scikit--image-3776AB?style=flat-square&logo=scikitlearn&logoColor=white) | `0.20.0+` | Structural Similarity Index (SSIM) pixel delta matrix calculation |
 | **Text Extraction (OCR)** | ![EasyOCR](https://img.shields.io/badge/-EasyOCR-00C853?style=flat-square&logo=googlecloud&logoColor=white) | `1.7.0+` | Optical Character Recognition for serial numbers & character diffs |
-| **Multimodal Vision & LLM** | ![OpenRouter](https://img.shields.io/badge/-OpenRouter_Vision_LLM-7C3AED?style=flat-square&logo=openai&logoColor=white) | REST Endpoint | Multimodal visual comparison & audit-ready natural language explanations |
+| **Multimodal Vision & LLM** | ![NVIDIA NIM](https://img.shields.io/badge/-NVIDIA_NIM_Microservices-76B900?style=flat-square&logo=nvidia&logoColor=black) | REST Endpoint (`meta/llama-3.2-11b-vision-instruct` & `meta/llama-3.1-8b-instruct`) | TensorRT-LLM hosted vision inspection (~1.2s) & executive audit explainer (~0.3s) |
 | **PDF Report Generator** | ![ReportLab](https://img.shields.io/badge/-ReportLab_PDF-E11D48?style=flat-square&logo=adobeacrobatreader&logoColor=white) | `4.0.0+` | Generates laboratory compliance PDF certificates with embedded heatmaps |
 | **Database Engine** | ![SQLite](https://img.shields.io/badge/-SQLite_3-003B57?style=flat-square&logo=sqlite&logoColor=white) | SQLite 3 | Embedded relational database storing cases, products, and audit trails |
 | **Database ORM** | ![SQLAlchemy](https://img.shields.io/badge/-SQLAlchemy_2-D71F00?style=flat-square&logo=sqlalchemy&logoColor=white) | `2.0.0+` | Python ORM with 7 relational tables and session management |
@@ -203,51 +203,60 @@ flowchart TB
 
 ---
 
-## 🤖 Detailed Breakdown of the 5 LangGraph Agents
+## 🤖 Detailed Breakdown of the 5 LangGraph Agents & Sub-Agents
 
-VeriVision's core is a **LangGraph StateGraph** — a directed acyclic graph where each node is a specialized AI agent. The graph supports conditional routing: if triage fails, the pipeline short-circuits to request a retake instead of producing a false verdict.
+VeriVision's core is a **LangGraph StateGraph** — a directed acyclic graph where each node is a specialized AI agent microservice. The graph supports conditional routing: if triage fails, the pipeline short-circuits to request a retake instead of producing a false verdict.
 
 #### Agent 1 — Selector & Gatekeeper (`agent_1_selector.py`)
-- **CLIP ViT-B/32 Embedding Engine**: Extracts 512-dimensional visual feature vectors from uploaded images
-- **Cosine Similarity Search**: Matches the upload against the entire Golden Reference library in <10ms
-- **Multimodal Commodity Classifier**: Uses OpenRouter vision models to auto-classify parts (motherboard, RAM, SSD, label, etc.)
-- **Viability Gate**: Validates aspect ratio alignment, resolution scale, and visual layout agreement before proceeding
+- **CLIP ViT-B/32 Embedding Engine**: Extracts 512-dimensional visual feature vectors from uploaded images.
+- **Cosine Similarity Search**: Matches the upload against the entire Golden Reference catalog in <10ms.
+- **Multimodal Commodity Classifier**: Auto-classifies parts (motherboard, RAM, SSD, label, etc.).
+- **Viability Gate**: Validates aspect ratio alignment, resolution scale, and visual layout agreement before proceeding.
 
 #### Agent 2 — Triage & Aligner (`agent_2_triage.py`)
-- **Blur Detection**: Laplacian variance analysis with configurable threshold
-- **Lighting Validation**: Mean pixel intensity range checks (too dark / too bright)
-- **ORB Keypoint Alignment**: 2000-feature ORB descriptor extraction → BFMatcher → RANSAC homography registration
-- **Illumination Normalization**: Adaptive histogram equalization applied only when alignment is geometrically reliable (≥15% RANSAC inlier ratio)
+- **Blur Detection**: Laplacian variance analysis with configurable threshold ($\text{Var}(\nabla^2 I) \ge 100.0$).
+- **Lighting Validation**: Mean pixel intensity range checks ($40 \le \mu \le 220$).
+- **ORB Keypoint Alignment**: 2000-feature ORB descriptor extraction → BFMatcher → RANSAC homography registration.
+- **Illumination Normalization**: Adaptive histogram equalization applied when alignment is geometrically reliable ($\ge 15\%$ RANSAC inlier ratio).
 
 #### Agent 3 — Vision-AI Hybrid Inspector (`agent_3_detector.py`)
-Runs **6 detection methods in parallel** using `ThreadPoolExecutor`:
+Modularized into **5 parallel Sub-Agents** executed concurrently via `ThreadPoolExecutor`:
 
-| # | Method | What It Catches | Key Output |
+| Sub-Agent | Name & Tech Stack | Responsibilities & What It Catches | Output Metrics |
 |:--|:---|:---|:---|
-| 1 | **SSIM Structural Diff** | Missing components, physical damage, PCB layout changes | `ssim_score` (0.0 - 1.0) & JET Heatmap |
-| 2 | **EasyOCR + String Diff** | Altered serial numbers (0→O, I→1, S→5), missing labels | `ocr_similarity` & `ocr_mismatches` array |
-| 3 | **ORB Keypoint Rate** | Component swaps, assembly variations | `keypoint_ratio` score |
-| 4 | **Template/ROI Presence** | Missing QC stickers, warranty seals, logos | `template_match_score` & flag |
-| 5 | **3D Color Histogram** | Non-OEM labels, different paint/material hue | `color_hist_similarity` score |
-| 6 | **Multimodal Vision LLM** | Semantic anomalies (burns, cracks, residue, rotation) | `multimodal_report` narrative text |
+| **Agent 3A** | **Structural SSIM Sub-Agent** (`skimage.metrics`) | Computes structural similarity index, renders JET thermal heatmaps, and draws bright defect overlays on target images. | `ssim_score` ($0.0 - 1.0$) & JET Heatmap |
+| **Agent 3B** | **OCR & Label Sub-Agent** (`Google Vision API` + `difflib`) | Extracts sticker/serial text, compares against OEM catalog master text, and highlights 0↔O, 1↔I character diffs. | `ocr_similarity` & `ocr_mismatches` array |
+| **Agent 3C** | **Feature & Template Sub-Agent** (`cv2.ORB`, `cv2.matchTemplate`, `cv2.calcHist`) | Performs KNN keypoint matching, checks for presence of OEM warranty seals, and measures 3D RGB color histogram correlation. | `keypoint_ratio`, `template_match_score`, `color_hist_similarity` |
+| **Agent 3D** | **Multimodal Vision Sub-Agent** (`NVIDIA NIM` / `OpenRouter`) | Queries `meta/llama-3.2-11b-vision-instruct` (~1.2s latency) to identify semantic defects (scratches, cracks, solder residue, burnt pins). | `multimodal_report` narrative text |
+| **Agent 3E** | **Visual Embedding Sub-Agent** (`Open_CLIP ViT-B/32`) | Calculates 512-dim visual embedding similarity to confirm target scan identity against golden reference. | `vector_embedding_match` (% score) |
 
-Also generates:
-- **SSIM Anomaly Heatmap**: Real image with red bounding box overlays on high-delta regions
-- **Diagnostic Card**: Side-by-side Golden vs Target vs Heatmap composite image
+Generates:
+- **SSIM Anomaly Heatmap**: Real image with neon-red bounding box overlays on high-delta regions.
+- **Side-by-Side Diagnostic Card**: Unified composite card featuring Golden Standard, Target Scan with Defects Marked, and Thermal Heatmap.
 
 #### Agent 4 — Decision Judge (`agent_4_decision.py`)
-- **Weighted Scoring Matrix**: SSIM (35%) + OCR (20%) + Vector Embedding (15%) + Keypoints (15%) + Template (10%) + Color (5%)
-- **Fraud Score**: 0–100 scale with amplification factor
+- **Weighted Scoring Matrix**: SSIM ($35\%$) + OCR ($20\%$) + Vector Embedding ($15\%$) + Keypoints ($15\%$) + Template ($10\%$) + Color ($5\%$).
+- **Fraud Score**: $0-100$ scale with calibrated loss amplification.
 - **5 Verdict Categories**: `Clean` | `Tampered` | `Missing` | `Mismatched` | `Reused`
 - **4 Action Recommendations**: `Accept` | `Quarantine & Escalate` | `Request Vendor Verification` | `Request Additional Angle`
-- **Leet-Speak Detection**: Recognizes minor character substitutions (0↔O, 1↔I, 5↔S) and downgrades severity
-- **Borderline Handling**: Fraud scores 40–70 force confidence to 0.45 to trigger mandatory HITL review
-- **Multimodal Fusion**: Vision LLM findings boost or confirm the mathematical verdict
-- **Multi-Angle Fusion Engine** (Bonus): Noisy-OR probabilistic fusion across 2–3 camera angles
+- **Leet-Speak & Confusable OCR Handling**: Distinguishes OCR visual confusions (0↔O, 1↔I, S↔5) from genuine tampering.
+- **Multi-Angle Fusion Engine**: Noisy-OR probabilistic fusion across 2–3 camera angles with $+5\%$ confidence boost per agreeing view.
 
+<<<<<<< HEAD
 #### Agent 5 — Executive Explainer & Report Engine (`agent_5_explainer.py`)
 - **Primary**: OpenRouter LLM generates fluent, executive-level audit explanations with strict natural language rules (no raw pixel math coordinates, no code variables).
 - **Fallback**: Rich local template generator produces structured bullet summaries and detailed audit paragraphs covering SSIM, OCR character diffs, template presence, color correlation, and verdict rationale.
+=======
+<<<<<<< Updated upstream
+#### Agent 5 — LLM Explainer (`agent_5_explainer.py`)
+- **Primary**: OpenRouter LLM generates fluent, audit-ready explanations grounded in Agent 4's reasoning
+- **Fallback**: Rich rule-based template generator produces structured paragraphs covering SSIM, OCR, template, color, and verdict
+=======
+#### Agent 5 — Executive Explainer & Report Engine (`agent_5_explainer.py`)
+- **NVIDIA NIM Fast Explainer**: Queries `meta/llama-3.1-8b-instruct` (~0.3s latency) to generate audit-ready, executive English reports adhering to strict non-technical natural language rules.
+- **Fallback Engine**: OpenRouter API fallback or local multi-paragraph rule-based template generator.
+>>>>>>> Stashed changes
+>>>>>>> fae3d01 (changed the architecture)
 - **Grounding Constraint**: The explainer cannot contradict the decision agent — it only narrates the pre-determined verdict
 
 ---

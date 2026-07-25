@@ -4,13 +4,7 @@
 import { api } from "./api.js";
 
 export async function getCases() {
-  try {
-    const data = await api.get("/triage/cases");
-    return data;
-  } catch {
-    // Return empty array on error
-    return [];
-  }
+  return await api.get("/triage/cases");
 }
 
 export async function getCaseById(caseId) {

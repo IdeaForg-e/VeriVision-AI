@@ -77,16 +77,28 @@ def generate_explanation(metrics: dict) -> str:
 
     logger.info(f"Generate Explanation called for verdict={verdict.upper()}, fraud_score={fraud_score}")
 
+<<<<<<< Updated upstream
     openrouter_key = settings.OPENROUTER_API_KEY
     models_to_try = [settings.OPENROUTER_MODEL] + [m for m in getattr(settings, "FALLBACK_VISION_MODELS", []) if m != settings.OPENROUTER_MODEL]
 
+<<<<<<< HEAD
+=======
+    # Default to enabled when an API key is present — the env var exists only
+    # as an escape hatch to force the template fallback (e.g. for offline demos).
+=======
+    nim_key = getattr(settings, "NVIDIA_NIM_API_KEY", None)
+    openrouter_key = getattr(settings, "OPENROUTER_API_KEY", None)
+>>>>>>> Stashed changes
+>>>>>>> fae3d01 (changed the architecture)
     use_llm_explainer = os.getenv("ENABLE_LLM_EXPLAINER", "true").lower() == "true"
-    if openrouter_key and use_llm_explainer:
+
+    if (nim_key or openrouter_key) and use_llm_explainer:
         prompt = _build_prompt(
             ssim, verdict, fraud_score, detected_text, expected_text,
             ocr_mismatches, recommended_action, temp_score, temp_found,
             color_sim, decision_reasoning, multimodal_report,
         )
+<<<<<<< HEAD
         url = "https://openrouter.ai/api/v1/chat/completions"
         headers = {
             "Authorization": f"Bearer {openrouter_key}",
@@ -103,16 +115,77 @@ def generate_explanation(metrics: dict) -> str:
             }
             try:
                 response = requests.post(url, json=payload, headers=headers, timeout=12)
+=======
+
+        if nim_key:
+            url = f"{getattr(settings, 'NVIDIA_NIM_BASE_URL', 'https://integrate.api.nvidia.com/v1')}/chat/completions"
+            headers = {
+                "Authorization": f"Bearer {nim_key}",
+                "Content-Type": "application/json",
+            }
+            model_name = getattr(settings, "NVIDIA_TEXT_MODEL", "meta/llama-3.1-8b-instruct")
+            payload = {
+                "model": model_name,
+                "temperature": 0.1,
+                "messages": [{"role": "user", "content": prompt}],
+            }
+            provider_label = "NVIDIA NIM"
+        else:
+            url = "https://openrouter.ai/api/v1/chat/completions"
+            headers = {
+                "Authorization": f"Bearer {openrouter_key}",
+                "Content-Type": "application/json",
+                "HTTP-Referer": "https://github.com/IdeaForg-e/VeriVision-AI",
+                "X-Title": "VeriVision QC Platform",
+            }
+            model_name = getattr(settings, "OPENROUTER_MODEL", "google/gemini-2.5-flash")
+            payload = {
+                "model": model_name,
+                "temperature": 0,
+                "messages": [{"role": "user", "content": prompt}],
+            }
+            provider_label = "OpenRouter"
+
+        for attempt in range(1, MAX_LLM_ATTEMPTS + 1):
+            logger.info(f"Querying {provider_label} Explainer model (attempt {attempt}/{MAX_LLM_ATTEMPTS}): {model_name}")
+            try:
+<<<<<<< Updated upstream
+                response = requests.post(url, json=payload, headers=headers, timeout=30)
+                if response.status_code != 200:
+                    logger.warning(f"Explainer model endpoint returned status {response.status_code}. Details: {response.text}")
+                    continue
+
+                res_data = response.json()
+                explanation = res_data["choices"][0]["message"]["content"].strip()
+                if not explanation:
+                    raise ValueError("Explainer model returned an empty response")
+
+                logger.info("Explainer model returned response successfully.")
+                return explanation
+
+=======
+                response = requests.post(url, json=payload, headers=headers, timeout=10)
+>>>>>>> fae3d01 (changed the architecture)
                 if response.status_code == 200:
                     res_data = response.json()
                     explanation = res_data["choices"][0]["message"]["content"].strip()
                     if explanation:
+<<<<<<< HEAD
                         logger.info(f"Explainer model '{model_name}' returned response successfully.")
                         return explanation
                 else:
                     logger.warning(f"Explainer model '{model_name}' returned status {response.status_code}. Trying fallback...")
             except Exception as e:
                 logger.error(f"Explainer LLM Agent call to '{model_name}' failed: {e}. Trying fallback...")
+=======
+                        logger.info(f"{provider_label} Explainer model returned response successfully.")
+                        return explanation
+                else:
+                    logger.warning(f"{provider_label} Explainer endpoint returned status {response.status_code}: {response.text}")
+>>>>>>> Stashed changes
+            except Exception as e:
+                logger.error(f"{provider_label} Explainer LLM attempt {attempt}/{MAX_LLM_ATTEMPTS} failed: {e}")
+>>>>>>> fae3d01 (changed the architecture)
 
         logger.warning("All Explainer LLM attempts exhausted. Falling back to template explainer...")
 

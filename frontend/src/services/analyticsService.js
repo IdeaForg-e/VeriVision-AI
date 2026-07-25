@@ -4,49 +4,25 @@
 import { api } from "./api.js";
 
 export async function getVendorAnalytics() {
-  try {
-    return await api.get("/analytics/vendors");
-  } catch {
-    return [];
-  }
+  return await api.get("/analytics/vendors");
 }
 
 export async function getVendorDetail(vendorName) {
-  try {
-    return await api.get(`/analytics/vendors/${encodeURIComponent(vendorName)}`);
-  } catch {
-    return null;
-  }
+  return await api.get(`/analytics/vendors/${encodeURIComponent(vendorName)}`);
 }
 
 export async function getSiteAnalytics() {
-  try {
-    return await api.get("/analytics/sites");
-  } catch {
-    return [];
-  }
+  return await api.get("/analytics/sites");
 }
 
 export async function getRepeatOffenders() {
-  try {
-    return await api.get("/analytics/repeat-offenders");
-  } catch {
-    return [];
-  }
+  return await api.get("/analytics/repeat-offenders");
 }
 
 export async function getMonthlyTrend() {
-  try {
-    return await api.get("/analytics/monthly-trend");
-  } catch {
-    return [];
-  }
+  return await api.get("/analytics/monthly-trend");
 }
 
 export async function getMonthlyBreakdown() {
-  try {
-    return await api.get("/analytics/monthly-breakdown");
-  } catch {
-    return [];
-  }
+  return await api.get("/analytics/monthly-breakdown");
 }

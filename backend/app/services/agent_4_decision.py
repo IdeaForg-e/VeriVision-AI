@@ -98,7 +98,9 @@ def make_decision(ensemble_results: dict, thresholds: dict | None = None) -> dic
 
     temp_score = ensemble_results.get("template_match_score", 1.0)
     temp_found = ensemble_results.get("template_match_found", True)
+    temp_checked = ensemble_results.get("template_match_checked", "template_match_found" in ensemble_results)
     color_sim = ensemble_results.get("color_hist_similarity", 1.0)
+    expected_text_is_catalog_verified = bool(ensemble_results.get("expected_text_is_catalog_verified", False))
     raw_vec_match = ensemble_results.get("vector_embedding_match")
     vec_match_available = raw_vec_match is not None
     # If the embedding comparison failed/was skipped, don't pretend it said 85% —
@@ -151,11 +153,40 @@ def make_decision(ensemble_results: dict, thresholds: dict | None = None) -> dic
     localized_structural_issue = alignment_reliable and (ssim < max(ssim_target, 0.85) or bool(anomaly_regions))
     # OCR mismatch severity: count how many characters are different
     ocr_mismatch_count = len(ocr_mismatches)
+    # Bug fix: suspicious_confusions (0/O, 1/I/|, S/5, etc.) are OCR's most
+    # common misreads — they are the LEAST reliable signal of real tampering,
+    # not an automatic escalation trigger. The old condition fired on ANY
+    # confusable-pair diff regardless of overall similarity, which is
+    # backwards. It also used golden-image OCR as "expected_text" ground
+    # truth whenever no catalog serial was configured — comparing one noisy
+    # OCR read against another and calling the delta "fraud".
+    #
+    # New rule:
+    #   - Non-confusable mismatches always count (real character differences
+    #     are real signal regardless of ground-truth source).
+    #   - Confusable-only mismatches only count when expected_text came from
+    #     a fixed catalog value. Against golden-image OCR, a confusable-only
+    #     diff is presumed to be OCR noise on both sides and must not trigger
+    #     escalation — it should route to the low-confidence "needs review"
+    #     path instead.
+    non_confusable_mismatches = [m for m in ocr_mismatches if not m.get("confusable", False)]
+    has_real_char_mismatch = len(non_confusable_mismatches) > 0
+    has_confusable_only_mismatch = (
+        ocr_mismatch_count > 0 and not has_real_char_mismatch and bool(suspicious_confusions)
+    )
+
     has_ocr_mismatch = (
         expected_text
         and detected_text
         and ocr_mismatch_count > 0
-        and ((ocr_sim * 100) < ocr_fuzzy or bool(suspicious_confusions))
+        and (ocr_sim * 100) < ocr_fuzzy
+        and (has_real_char_mismatch or expected_text_is_catalog_verified)
+    )
+    has_low_confidence_ocr_noise = (
+        expected_text
+        and detected_text
+        and has_confusable_only_mismatch
+        and not expected_text_is_catalog_verified
     )
 
     # --- DETERMINE VERDICT (Priority order: Most Severe → Least Severe) ---
@@ -168,7 +199,12 @@ def make_decision(ensemble_results: dict, thresholds: dict | None = None) -> dic
     reason_note = "All measured optical and character features fall within OEM tolerance."
 
     # 1. MISSING QC LABEL → Template match failed
-    if not temp_found:
+    # Bug fix: match_template_roi() returns template_match_found=True when no
+    # template_roi is configured (template_match_checked=False) — that's a
+    # "not checked" default, not a verified pass, and must never be read as
+    # "not found" either. Gate this branch on temp_checked so an unconfigured
+    # ROI can't silently masquerade as either a pass or a fail.
+    if temp_checked and not temp_found:
         category = "Missing QC label"
         verdict = "missing"
         recommended_action = "Quarantine & Escalate"
@@ -227,6 +263,20 @@ def make_decision(ensemble_results: dict, thresholds: dict | None = None) -> dic
             f"Keypoint agreement is {kp_ratio:.1%}, which is treated as alignment/local difference evidence, not standalone swap proof."
         )
         logger.info(f"[Agent 4] Decision: LOCALIZED MISSING COMPONENT -> Quarantine. Fraud Score: {fraud_score}")
+
+    elif has_low_confidence_ocr_noise:
+        category = "OCR noise on label (needs review)"
+        verdict = "missing"
+        recommended_action = "Request Additional Angle"
+        confidence = 0.30
+        fraud_score = 15
+        reason_note = (
+            f"OCR NOISE (LOW CONFIDENCE): Detected '{detected_text}' vs. golden-image read '{expected_text}' "
+            f"differ only in visually confusable characters (e.g. 0/O, 1/I/|), and the expected text was not "
+            f"sourced from a catalog value. This pattern matches OCR misread noise, not confirmed tampering. "
+            f"Recommending a cleaner-angle retake before ruling on the serial field."
+        )
+        logger.info(f"[Agent 4] Decision: OCR NOISE (confusable-only, non-catalog) → Request Additional Angle. Fraud Score: {fraud_score}")
 
     elif has_ocr_mismatch:
         category = "Altered serial number"

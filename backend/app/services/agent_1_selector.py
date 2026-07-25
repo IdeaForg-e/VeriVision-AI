@@ -1,25 +1,89 @@
 import logging
+import base64
 import cv2
 import os
+import requests
 from app.config import settings
 
 logger = logging.getLogger(__name__)
 
+VALID_COMMODITIES = {
+    "motherboard", "label", "microchip", "processor", "ram",
+    "storage", "gpu", "battery", "display", "chassis", "fan", "sensor", "other"
+}
+
+OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
+# Fixed: gemini-2.0-flash-exp:free returned 404 (no image input support on
+# that endpoint). Use the paid Gemini 2.5 Flash multimodal endpoint.
+VISION_MODEL = "google/gemini-2.5-flash"
+
+
+def _call_gemini_vision(base64_image: str, prompt_text: str, max_tokens: int = 20) -> str | None:
+    """
+    Single shared client for all OpenRouter/Gemini vision calls in this module.
+    temperature=0 for deterministic classification output.
+    Returns raw text content, or None on any failure.
+    """
+    if not settings.OPENROUTER_API_KEY:
+        return None
+
+    headers = {
+        "Authorization": f"Bearer {settings.OPENROUTER_API_KEY}",
+        "Content-Type": "application/json",
+        "HTTP-Referer": "https://github.com/IdeaForg-e/VeriVision-AI",
+        "X-Title": "VeriVision QC Platform",
+    }
+    payload = {
+        "model": VISION_MODEL,
+        "temperature": 0,
+        "max_tokens": max_tokens,
+        "messages": [
+            {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": prompt_text},
+                    {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{base64_image}"}},
+                ],
+            }
+        ],
+    }
+
+    try:
+        response = requests.post(OPENROUTER_URL, json=payload, headers=headers, timeout=8)
+    except Exception as e:
+        logger.error(f"[Agent 1: Selector] Gemini vision request raised an exception: {e}")
+        return None
+
+    if response.status_code != 200:
+        logger.warning(f"[Agent 1: Selector] Gemini vision API returned status {response.status_code}: {response.text}")
+        return None
+
+    try:
+        return response.json()["choices"][0]["message"]["content"].strip()
+    except (KeyError, IndexError, ValueError) as e:
+        logger.error(f"[Agent 1: Selector] Malformed Gemini vision response: {e}")
+        return None
+
+
+def _encode_image_b64(image_path: str, max_dim: int = 300) -> str | None:
+    img = cv2.imread(image_path)
+    if img is None:
+        return None
+    h, w = img.shape[:2]
+    if max(h, w) > max_dim:
+        scale = max_dim / max(h, w)
+        img = cv2.resize(img, (int(w * scale), int(h * scale)), interpolation=cv2.INTER_AREA)
+    _, buffer = cv2.imencode(".png", img)
+    return base64.b64encode(buffer).decode("utf-8")
+
+
 def verify_comparison_viability(src_image_path: str, ref_image_path: str) -> dict:
     """
     Agent 1: Gatekeeper.
-    Verifies if the dynamically uploaded Golden Reference and Captured Scan
-    are viable for a side-by-side computer vision comparison.
-    
-    Checks:
-    1. Decodability and file integrity on disk.
-    2. Aspect ratio orientation alignment (prevents mixing portrait and landscape).
-    3. Resolution scale variations (prevents comparing a tiny thumbnail with a 4K image).
-    4. Visual layout agreement (prevents matching completely different objects).
+    Checks: file integrity, aspect ratio, resolution scale, keypoint layout agreement.
     """
     logger.info(f"[Agent 1: Selector] Verifying comparison viability between: {src_image_path} and {ref_image_path}")
 
-    # 1. Read files
     if not os.path.exists(src_image_path):
         return {"viable": False, "detail": "Target captured scan image file is missing on disk."}
     if not os.path.exists(ref_image_path):
@@ -33,13 +97,13 @@ def verify_comparison_viability(src_image_path: str, ref_image_path: str) -> dic
     if ref is None:
         return {"viable": False, "detail": "Unable to read golden reference standard image."}
 
-    # 2. Visual Layout Matching Check (ORB keypoints agreement — informative logging)
     gray_src = cv2.cvtColor(src, cv2.COLOR_BGR2GRAY)
     gray_ref = cv2.cvtColor(ref, cv2.COLOR_BGR2GRAY)
     orb = cv2.ORB_create(nfeatures=500)
     kp_src, des_src = orb.detectAndCompute(gray_src, None)
     kp_ref, des_ref = orb.detectAndCompute(gray_ref, None)
-    
+
+    layout_warning = ""
     if des_src is not None and des_ref is not None:
         bf = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
         try:
@@ -48,18 +112,14 @@ def verify_comparison_viability(src_image_path: str, ref_image_path: str) -> dic
             if len(good_matches) < 3:
                 logger.info("[Agent 1: Selector] Low ORB keypoint match agreement (likely severe structural defect/burn). Proceeding with AI anomaly ensemble.")
                 layout_warning = "Low visual keypoint agreement; this may indicate a wrong reference or severe structural anomaly."
-            else:
-                layout_warning = ""
         except Exception as match_err:
             logger.error(f"[Agent 1: Selector] Keypoint matching failed during viability check: {match_err}")
             layout_warning = "Unable to complete layout keypoint agreement check."
     else:
         layout_warning = "Unable to extract enough visual keypoints for reference agreement check."
 
-    # 3. Aspect Ratio Check
     h_ref, w_ref = ref.shape[:2]
     h_src, w_src = src.shape[:2]
-
     ar_ref = w_ref / max(h_ref, 1)
     ar_src = w_src / max(h_src, 1)
 
@@ -72,7 +132,6 @@ def verify_comparison_viability(src_image_path: str, ref_image_path: str) -> dic
             "detail": f"Aspect ratio mismatch detected (Golden: {ar_ref:.2f}, Captured: {ar_src:.2f}). Bypassing pixel alignment for semantic AI comparison."
         }
 
-    # 4. Resolution / Scale Check
     w_ratio = w_src / max(w_ref, 1)
     h_ratio = h_src / max(h_ref, 1)
 
@@ -91,18 +150,29 @@ def verify_comparison_viability(src_image_path: str, ref_image_path: str) -> dic
 
 def classify_part_commodity(image_path: str) -> str:
     """
-    Agent 1: Classifier.
-    Classifies the manufacturing part commodity type based on the golden image.
-    Uses OpenRouter multimodal Gemini model if API key is present.
-    Otherwise, falls back to local OCR-based rule checks.
+    Agent 1: Classifier. Uses Gemini 2.5 Flash multimodal via OpenRouter.
+    Falls back to local OCR-based heuristics if API key missing or call fails.
     """
     logger.info(f"[Agent 1: Selector] Classifying commodity for golden reference image: {image_path}")
 
-    VALID_COMMODITIES = {
-        "motherboard", "label", "microchip", "processor", "ram",
-        "storage", "gpu", "battery", "display", "chassis", "fan", "sensor", "other"
-    }
+    base64_image = _encode_image_b64(image_path)
+    if base64_image is None:
+        logger.error("[Agent 1: Selector] Could not read/encode image for classification. Skipping vision call.")
+    else:
+        prompt = (
+            "Classify this manufacturing part image. Options: 'motherboard', 'label', 'microchip', "
+            "'processor', 'ram', 'storage', 'gpu', 'battery', 'display', 'chassis', 'fan', 'sensor', 'other'. "
+            "Return exactly one word from the options."
+        )
+        raw = _call_gemini_vision(base64_image, prompt)
+        if raw:
+            detected = "".join(c for c in raw.strip().lower() if c.isalnum() or c == "-")
+            logger.info(f"[Agent 1: Selector] Gemini classification returned: '{detected}'")
+            if detected in VALID_COMMODITIES:
+                return detected
+            logger.warning(f"[Agent 1: Selector] Gemini returned invalid commodity type: '{detected}'")
 
+<<<<<<< HEAD
     # 1. Try OpenRouter Multimodal Vision classification
     if settings.OPENROUTER_API_KEY:
         import base64
@@ -181,31 +251,29 @@ def classify_part_commodity(image_path: str) -> str:
             logger.error(f"[Agent 1: Selector] OpenRouter multimodal classifier raised an exception: {e}")
 
     # 2. Local Fallback Heuristics (using OCR and keyword detection)
+=======
+    # Local fallback heuristics (OCR + keyword match)
+>>>>>>> fae3d01 (changed the architecture)
     logger.info("[Agent 1: Selector] Running local fallback classifier heuristics...")
     try:
-        import cv2
         img = cv2.imread(image_path)
         if img is not None:
             from app.services.agent_3_detector import extract_ocr_text
             text, _ = extract_ocr_text(img)
             text = text.lower()
             logger.info(f"[Agent 1: Selector] Local fallback classifier extracted text snippet: '{text[:80]}'")
-            
-            if any(k in text for k in ["serial", "warranty", "void", "sticker", "seal"]):
-                logger.info("[Agent 1: Selector] Local heuristic matched: label")
-                return "label"
-            if any(k in text for k in ["intel", "amd", "core", "ryzen", "cpu"]):
-                logger.info("[Agent 1: Selector] Local heuristic matched: processor")
-                return "processor"
-            if any(k in text for k in ["ddr", "ram", "memory", "dimm"]):
-                logger.info("[Agent 1: Selector] Local heuristic matched: ram")
-                return "ram"
-            if any(k in text for k in ["ssd", "nvme", "sata", "hdd"]):
-                logger.info("[Agent 1: Selector] Local heuristic matched: storage")
-                return "storage"
-            if any(k in text for k in ["chip", "ic", "microchip", "controller"]):
-                logger.info("[Agent 1: Selector] Local heuristic matched: microchip")
-                return "microchip"
+
+            keyword_map = {
+                "label": ["serial", "warranty", "void", "sticker", "seal"],
+                "processor": ["intel", "amd", "core", "ryzen", "cpu"],
+                "ram": ["ddr", "ram", "memory", "dimm"],
+                "storage": ["ssd", "nvme", "sata", "hdd"],
+                "microchip": ["chip", "ic", "microchip", "controller"],
+            }
+            for commodity, keywords in keyword_map.items():
+                if any(k in text for k in keywords):
+                    logger.info(f"[Agent 1: Selector] Local heuristic matched: {commodity}")
+                    return commodity
     except Exception as e:
         logger.error(f"[Agent 1: Selector] Local fallback classifier failed: {e}")
 

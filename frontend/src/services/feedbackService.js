@@ -5,16 +5,7 @@
 import { api } from "./api.js";
 
 export async function fetchPipelineConfig() {
-  try {
-    return await api.get("/triage/pipeline/config");
-  } catch {
-    // Fallback default config
-    return {
-      thresholds: { ssim: 0.85, keypointDeltaPct: 15, ocrFuzzyPct: 100 },
-      routingRules: [],
-      privacy: { storeImageHashOnly: true, redactPersonalMarkings: true, verdictChangeAuditLog: true },
-    };
-  }
+  return await api.get("/triage/pipeline/config");
 }
 
 export async function savePipelineConfig(config) {
@@ -26,9 +17,5 @@ export async function savePipelineConfig(config) {
 }
 
 export async function fetchAdjustmentHistory() {
-  try {
-    return await api.get("/triage/pipeline/history");
-  } catch {
-    return [];
-  }
+  return await api.get("/triage/pipeline/history");
 }

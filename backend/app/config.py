@@ -17,6 +17,12 @@ class Settings:
     OPENROUTER_MODEL: str = os.getenv("OPENROUTER_MODEL", "nvidia/nemotron-nano-12b-v2-vl:free")
     FALLBACK_VISION_MODELS: list = ["nvidia/nemotron-nano-12b-v2-vl:free", "openrouter/free"]
 
+    # NVIDIA NIM API Integration (Ultra Low Latency TensorRT-LLM Microservices)
+    NVIDIA_NIM_API_KEY: Optional[str] = os.getenv("NVIDIA_NIM_API_KEY", None)
+    NVIDIA_NIM_BASE_URL: str = os.getenv("NVIDIA_NIM_BASE_URL", "https://integrate.api.nvidia.com/v1")
+    NVIDIA_VISION_MODEL: str = os.getenv("NVIDIA_VISION_MODEL", "meta/llama-3.2-11b-vision-instruct")
+    NVIDIA_TEXT_MODEL: str = os.getenv("NVIDIA_TEXT_MODEL", "meta/llama-3.1-8b-instruct")
+
     # Directory Paths
     BASE_DIR: str = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     UPLOAD_DIR: str = os.path.join(BASE_DIR, "data", "cases")
