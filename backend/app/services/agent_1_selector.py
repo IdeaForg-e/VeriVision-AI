@@ -12,60 +12,9 @@ VALID_COMMODITIES = {
     "storage", "gpu", "battery", "display", "chassis", "fan", "sensor", "other"
 }
 
-OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
-# Fixed: gemini-2.0-flash-exp:free returned 404 (no image input support on
-# that endpoint). Use the paid Gemini 2.5 Flash multimodal endpoint.
-VISION_MODEL = "google/gemini-2.5-flash"
 
-
-def _call_gemini_vision(base64_image: str, prompt_text: str, max_tokens: int = 20) -> str | None:
-    """
-    Single shared client for all OpenRouter/Gemini vision calls in this module.
-    temperature=0 for deterministic classification output.
-    Returns raw text content, or None on any failure.
-    """
-    if not settings.OPENROUTER_API_KEY:
-        return None
-
-    headers = {
-        "Authorization": f"Bearer {settings.OPENROUTER_API_KEY}",
-        "Content-Type": "application/json",
-        "HTTP-Referer": "https://github.com/IdeaForg-e/VeriVision-AI",
-        "X-Title": "VeriVision QC Platform",
-    }
-    payload = {
-        "model": VISION_MODEL,
-        "temperature": 0,
-        "max_tokens": max_tokens,
-        "messages": [
-            {
-                "role": "user",
-                "content": [
-                    {"type": "text", "text": prompt_text},
-                    {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{base64_image}"}},
-                ],
-            }
-        ],
-    }
-
-    try:
-        response = requests.post(OPENROUTER_URL, json=payload, headers=headers, timeout=8)
-    except Exception as e:
-        logger.error(f"[Agent 1: Selector] Gemini vision request raised an exception: {e}")
-        return None
-
-    if response.status_code != 200:
-        logger.warning(f"[Agent 1: Selector] Gemini vision API returned status {response.status_code}: {response.text}")
-        return None
-
-    try:
-        return response.json()["choices"][0]["message"]["content"].strip()
-    except (KeyError, IndexError, ValueError) as e:
-        logger.error(f"[Agent 1: Selector] Malformed Gemini vision response: {e}")
-        return None
-
-
-def _encode_image_b64(image_path: str, max_dim: int = 300) -> str | None:
+def _encode_image_b64(image_path: str, max_dim: int = 300) -> str:
+    """Encode image to base64 string."""
     img = cv2.imread(image_path)
     if img is None:
         return None
@@ -110,10 +59,10 @@ def verify_comparison_viability(src_image_path: str, ref_image_path: str) -> dic
             matches = bf.match(des_src, des_ref)
             good_matches = [m for m in matches if m.distance < 50]
             if len(good_matches) < 3:
-                logger.info("[Agent 1: Selector] Low ORB keypoint match agreement (likely severe structural defect/burn). Proceeding with AI anomaly ensemble.")
+                logger.info("[Agent 1: Selector] Low ORB keypoint match agreement. Proceeding with AI anomaly ensemble.")
                 layout_warning = "Low visual keypoint agreement; this may indicate a wrong reference or severe structural anomaly."
         except Exception as match_err:
-            logger.error(f"[Agent 1: Selector] Keypoint matching failed during viability check: {match_err}")
+            logger.error(f"[Agent 1: Selector] Keypoint matching failed: {match_err}")
             layout_warning = "Unable to complete layout keypoint agreement check."
     else:
         layout_warning = "Unable to extract enough visual keypoints for reference agreement check."
@@ -125,7 +74,6 @@ def verify_comparison_viability(src_image_path: str, ref_image_path: str) -> dic
 
     logger.info(f"[Agent 1: Selector] Aspect Ratios - Golden: {ar_ref:.2f}, Captured: {ar_src:.2f}")
     if abs(ar_ref - ar_src) > 0.4:
-        logger.info("[Agent 1: Selector] Aspect ratio mismatch detected. Bypassing pixel alignment.")
         return {
             "viable": True,
             "warning": True,
@@ -137,7 +85,6 @@ def verify_comparison_viability(src_image_path: str, ref_image_path: str) -> dic
 
     logger.info(f"[Agent 1: Selector] Dimension Ratios - Width: {w_ratio:.2f}, Height: {h_ratio:.2f}")
     if w_ratio < 0.25 or w_ratio > 4.0 or h_ratio < 0.25 or h_ratio > 4.0:
-        logger.info("[Agent 1: Selector] Resolution scale mismatch detected. Bypassing pixel alignment.")
         return {
             "viable": True,
             "warning": True,
@@ -150,110 +97,12 @@ def verify_comparison_viability(src_image_path: str, ref_image_path: str) -> dic
 
 def classify_part_commodity(image_path: str) -> str:
     """
-    Agent 1: Classifier. Uses Gemini 2.5 Flash multimodal via OpenRouter.
-    Falls back to local OCR-based heuristics if API key missing or call fails.
+    Agent 1: Classifier.
+    Uses local OCR-based heuristics for commodity classification.
     """
     logger.info(f"[Agent 1: Selector] Classifying commodity for golden reference image: {image_path}")
 
-    base64_image = _encode_image_b64(image_path)
-    if base64_image is None:
-        logger.error("[Agent 1: Selector] Could not read/encode image for classification. Skipping vision call.")
-    else:
-        prompt = (
-            "Classify this manufacturing part image. Options: 'motherboard', 'label', 'microchip', "
-            "'processor', 'ram', 'storage', 'gpu', 'battery', 'display', 'chassis', 'fan', 'sensor', 'other'. "
-            "Return exactly one word from the options."
-        )
-        raw = _call_gemini_vision(base64_image, prompt)
-        if raw:
-            detected = "".join(c for c in raw.strip().lower() if c.isalnum() or c == "-")
-            logger.info(f"[Agent 1: Selector] Gemini classification returned: '{detected}'")
-            if detected in VALID_COMMODITIES:
-                return detected
-            logger.warning(f"[Agent 1: Selector] Gemini returned invalid commodity type: '{detected}'")
-
-<<<<<<< HEAD
-    # 1. Try OpenRouter Multimodal Vision classification
-    if settings.OPENROUTER_API_KEY:
-        import base64
-        import requests
-        import cv2
-        try:
-            # Read and downscale image to max 300px to ensure tiny payload size and super fast upload/inference latency
-            img = cv2.imread(image_path)
-            if img is None:
-                raise ValueError("Could not read image for base64 encoding")
-            
-            h, w = img.shape[:2]
-            max_dim = 300
-            if max(h, w) > max_dim:
-                scale = max_dim / max(h, w)
-                img_resized = cv2.resize(img, (int(w * scale), int(h * scale)), interpolation=cv2.INTER_AREA)
-            else:
-                img_resized = img
-                
-            _, buffer = cv2.imencode('.png', img_resized)
-            base64_image = base64.b64encode(buffer).decode("utf-8")
-
-            url = "https://openrouter.ai/api/v1/chat/completions"
-            headers = {
-                "Authorization": f"Bearer {settings.OPENROUTER_API_KEY}",
-                "Content-Type": "application/json",
-                "HTTP-Referer": "https://github.com/IdeaForg-e/VeriVision-AI",
-                "X-Title": "VeriVision QC Platform",
-            }
-            models_to_try = [settings.OPENROUTER_MODEL] + [m for m in getattr(settings, "FALLBACK_VISION_MODELS", []) if m != settings.OPENROUTER_MODEL]
-            response = None
-            for model_name in models_to_try:
-                payload = {
-                    "model": model_name,
-                    "messages": [
-                        {
-                            "role": "user",
-                            "content": [
-                                {
-                                    "type": "text",
-                                    "text": "Classify this manufacturing part image. Options: 'motherboard', 'label', 'microchip', 'processor', 'ram', 'storage', 'gpu', 'battery', 'display', 'chassis', 'fan', 'sensor', 'other'. Return exactly one word from the options."
-                                },
-                                {
-                                    "type": "image_url",
-                                    "image_url": {
-                                        "url": f"data:image/png;base64,{base64_image}"
-                                    }
-                                }
-                            ]
-                        }
-                    ]
-                }
-                try:
-                    res = requests.post(url, json=payload, headers=headers, timeout=8)
-                    if res.status_code == 200:
-                        response = res
-                        break
-                    else:
-                        logger.warning(f"[Agent 1: Selector] OpenRouter model '{model_name}' returned status {res.status_code}. Trying fallback...")
-                except Exception as model_err:
-                    logger.warning(f"[Agent 1: Selector] OpenRouter model '{model_name}' failed: {model_err}. Trying fallback...")
-
-            if response and response.status_code == 200:
-                res_data = response.json()
-                detected = res_data["choices"][0]["message"]["content"].strip().lower()
-                # Clean up any surrounding quotes or punctuation
-                detected = "".join([c for c in detected if c.isalnum() or c == "-"])
-                logger.info(f"[Agent 1: Selector] OpenRouter multimodal classification returned: '{detected}'")
-                if detected in VALID_COMMODITIES:
-                    return detected
-                else:
-                    logger.warning(f"[Agent 1: Selector] OpenRouter returned invalid commodity type: '{detected}'")
-            else:
-                logger.warning(f"[Agent 1: Selector] OpenRouter classifier API returned status {response.status_code}: {response.text}")
-        except Exception as e:
-            logger.error(f"[Agent 1: Selector] OpenRouter multimodal classifier raised an exception: {e}")
-
-    # 2. Local Fallback Heuristics (using OCR and keyword detection)
-=======
     # Local fallback heuristics (OCR + keyword match)
->>>>>>> fae3d01 (changed the architecture)
     logger.info("[Agent 1: Selector] Running local fallback classifier heuristics...")
     try:
         img = cv2.imread(image_path)

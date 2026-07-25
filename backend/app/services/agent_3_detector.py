@@ -6,84 +6,50 @@ import difflib
 from typing import Optional
 from skimage.metrics import structural_similarity as ssim
 from app.config import settings
+from app.services.agent_3_multimodal import inspect_anomalies_multimodal, generate_diagnostic_card
 
 logger = logging.getLogger(__name__)
 
-# Lazy initialize Google Vision client to save startup time.
-# _vision_client states: None = not yet attempted, "FAILED" = init tried and
-# failed, client instance = ready. We never silently re-cache None on failure —
-# that made every request after the first failure look like a fresh retry log
-# line while actually permanently short-circuiting to the fallback path.
-#
-# Switched from EasyOCR to Google Vision document_text_detection: EasyOCR's
-# neural decoder is non-deterministic run-to-run on the same crop (temperature
-# in beam search), which was producing two different reads of the same label
-# ('1' vs '|', 'a8g' vs 'a86') and getting scored as a fraud signal. Google
-# Vision's OCR is deterministic and has materially higher accuracy on small
-# stamped/printed serials.
-_vision_client = None
-_vision_init_error: Optional[str] = None
+# EasyOCR Reader (lazy initialized)
+_ocr_reader = None
 
 
 def get_ocr_reader(retry: bool = False):
     """
-    Returns a ready Google Vision ImageAnnotatorClient, or raises RuntimeError
-    with the original cause if the client cannot be initialized. Callers that
-    can legitimately run without OCR (e.g. run_anomaly_ensemble's
-    ThreadPoolExecutor tasks) must catch this explicitly and record it in
-    `errors`, not swallow it into a generic "" / False result.
-
-    `retry=True` forces a fresh init attempt even after a prior failure —
-    use this from an ops/healthcheck endpoint after fixing the environment,
-    instead of restarting the whole process.
+    Returns a ready EasyOCR reader.
+    EasyOCR is a free, open-source OCR engine that runs locally on your machine.
+    It uses deep learning (PyTorch) to detect and recognize text from images.
+    No API keys or internet connection required.
     """
-    global _vision_client, _vision_init_error
+    global _ocr_reader
 
-    if _vision_client == "FAILED" and not retry:
-        raise RuntimeError(f"Google Vision client previously failed to initialize: {_vision_init_error}")
-
-    if _vision_client is None or _vision_client == "FAILED":
-        logger.info("Initializing Google Vision OCR client...")
+    if _ocr_reader is None or retry:
+        logger.info("Initializing EasyOCR reader (free, offline OCR engine)...")
         try:
-            from google.cloud import vision
-            _vision_client = vision.ImageAnnotatorClient()
-            _vision_init_error = None
-            logger.info("Google Vision OCR client successfully initialized.")
+            import easyocr
+            _ocr_reader = easyocr.Reader(['en'], gpu=False)
+            logger.info("EasyOCR reader initialized successfully.")
         except Exception as e:
-            _vision_client = "FAILED"
-            _vision_init_error = str(e)
-            logger.critical(
-                f"Google Vision client failed to initialize — OCR detection is DOWN for this process. "
-                f"Check GOOGLE_APPLICATION_CREDENTIALS / 'pip show google-cloud-vision' in this environment. Cause: {e}"
-            )
-            raise RuntimeError(f"Google Vision client initialization failed: {e}") from e
+            logger.error(f"EasyOCR initialization failed: {e}")
+            raise RuntimeError(f"EasyOCR initialization failed: {e}")
 
-    return _vision_client
+    return _ocr_reader
 
 
-def _vision_readtext(reader, img: np.ndarray) -> list[str]:
+def _readtext(reader, img: np.ndarray) -> list[str]:
     """
-    Runs Google Vision document_text_detection on an in-memory BGR image.
-    document_text_detection (not label/text_detection) is used because it's
-    tuned for dense printed text blocks like serial/warranty stickers.
-    Returns a list of detected line strings (mirrors EasyOCR's readtext shape
-    closely enough for the calling code's " ".join(texts) pattern).
+    Reads text from image using EasyOCR.
+    EasyOCR works by:
+    1. Detecting text regions in the image using CRAFT algorithm
+    2. Recognizing characters using a CRNN neural network
+    3. Returns list of detected text strings
     """
-    from google.cloud import vision
-
-    ok, buffer = cv2.imencode(".png", img)
-    if not ok:
+    try:
+        results = reader.readtext(img)
+        return [text for (_, text, _) in results]
+    except Exception as e:
+        logger.error(f"EasyOCR readtext failed: {e}")
         return []
-    vision_image = vision.Image(content=buffer.tobytes())
-    response = reader.document_text_detection(image=vision_image)
-    if response.error.message:
-        raise RuntimeError(f"Google Vision API error: {response.error.message}")
-    annotation = response.full_text_annotation
-    if not annotation or not annotation.text:
-        return []
-    # Split into lines; downstream code re-joins with spaces, matching the
-    # prior EasyOCR-based " ".join(texts) shape.
-    return [line for line in annotation.text.splitlines() if line.strip()]
 
 
 def _ensure_rgb(img: np.ndarray) -> np.ndarray:
@@ -141,17 +107,8 @@ def compute_ssim_diff(src_img: np.ndarray, ref_img: np.ndarray) -> tuple[float, 
     """
     Computes SSIM between source and reference.
     Returns: (ssim_score, realistic_thermal_heatmap_image, annotated_defective_image, anomaly_regions)
-    
-    The realistic_thermal_heatmap_image shows a thermal camera-like overlay where:
-      - Blue / Dark areas = identical / no defect
-      - Green / Cyan areas = minor surface variation
-      - Yellow / Orange areas = moderate anomaly 
-      - Bright Red / Magenta areas = critical defect
-    
-    The annotated_defective_image clearly marks all defective regions on the target
-    image with bright bounding boxes, semi-transparent red overlays, and numbered labels.
     """
-    logger.info("Executing SSIM structural anomaly detector with realistic thermal colormap & defect target bounding boxes...")
+    logger.info("Executing SSIM structural anomaly detector...")
     gray_src = _ensure_gray(src_img)
     gray_ref = _ensure_gray(ref_img)
 
@@ -160,60 +117,35 @@ def compute_ssim_diff(src_img: np.ndarray, ref_img: np.ndarray) -> tuple[float, 
         gray_src = cv2.resize(gray_src, (gray_ref.shape[1], gray_ref.shape[0]))
         src_img = cv2.resize(src_img, (ref_img.shape[1], ref_img.shape[0]))
 
-    # Compute SSIM structural difference map
     score, diff = ssim(gray_ref, gray_src, full=True)
-
-    # Convert difference to 0-255 range: 0 = identical, 255 = maximum discrepancy
     diff_u8 = ((1.0 - diff) * 127.5).clip(0, 255).astype("uint8")
 
-    # === STEP 1: Generate realistic thermal heatmap ===
-    # Apply Gaussian blur to smooth out noise and create continuous thermal gradients
+    # Generate thermal heatmap
     blurred_diff = cv2.GaussianBlur(diff_u8, (21, 21), 0)
-    
-    # Apply additional bilateral filter to preserve edges while smoothing - looks more realistic
     blurred_diff = cv2.bilateralFilter(blurred_diff, 9, 50, 50)
-
-    # Generate INFRARED-like thermal colormap (JET: blue→cyan→green→yellow→red)
     thermal_colormap = cv2.applyColorMap(blurred_diff, cv2.COLORMAP_JET)
 
-    # Create smooth alpha mask based on anomaly intensity (not binary)
-    # This creates a gradual transition from transparent to fully colored
     alpha_mask = blurred_diff.astype(np.float32) / 180.0
     alpha_mask = np.clip(alpha_mask, 0.0, 1.0)
     alpha_mask_3ch = cv2.merge([alpha_mask, alpha_mask, alpha_mask])
 
-    # Blend thermal overlay onto source image with intensity-based transparency
-    # Real thermal cameras show the actual object + heat signature on top
     realistic_heatmap = (src_img.astype(np.float32) * (1.0 - alpha_mask_3ch * 0.55) + 
                          thermal_colormap.astype(np.float32) * (alpha_mask_3ch * 0.55)).astype("uint8")
 
-    # Apply subtle sharpening to make defect boundaries visible
-    sharpen_kernel = np.array([[-1, -1, -1],
-                               [-1,  9, -1],
-                               [-1, -1, -1]]) / 3.0
+    sharpen_kernel = np.array([[-1, -1, -1], [-1, 9, -1], [-1, -1, -1]]) / 3.0
     realistic_heatmap = cv2.filter2D(realistic_heatmap, -1, sharpen_kernel)
 
-    # === STEP 2: Detect anomaly regions using adaptive thresholding ===
-    # Lower threshold to catch subtle text/label changes
+    # Detect anomaly regions
     _, anomaly_mask = cv2.threshold(blurred_diff, 25, 255, cv2.THRESH_BINARY)
-
-    # Morphological operations to clean up noise
     kernel_clean = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
     anomaly_mask = cv2.morphologyEx(anomaly_mask, cv2.MORPH_OPEN, kernel_clean)
-    
-    # Dilate to merge nearby defect regions
     kernel_dilate = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (7, 7))
     dilated_mask = cv2.dilate(anomaly_mask, kernel_dilate, iterations=1)
-
-    # Find contours of defect regions
     contours, _ = cv2.findContours(dilated_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
-    # === STEP 3: Create annotated defective image with clear defect markings ===
     annotated_target = src_img.copy()
-    
-    # Create a semi-transparent red overlay for defect regions
     defect_overlay = np.zeros_like(src_img)
-    defect_overlay[:, :] = (0, 0, 200)  # Red overlay
+    defect_overlay[:, :] = (0, 0, 200)
 
     contour_count = 0
     all_defect_regions = []
@@ -221,88 +153,34 @@ def compute_ssim_diff(src_img: np.ndarray, ref_img: np.ndarray) -> tuple[float, 
 
     for c in contours:
         area = cv2.contourArea(c)
-        if area > 50:  # Lower noise threshold to catch smaller text/label defects
+        if area > 50:
             contour_count += 1
             x, y, w, h = cv2.boundingRect(c)
             all_defect_regions.append((x, y, w, h))
             severity = "critical" if area > 1000 else "moderate"
             anomaly_regions.append({
                 "detector": "ssim",
-                "x": int(x),
-                "y": int(y),
-                "w": int(w),
-                "h": int(h),
+                "x": int(x), "y": int(y), "w": int(w), "h": int(h),
                 "area": float(round(area, 2)),
                 "severity": severity,
                 "location": _region_label(x, y, w, h, src_img.shape),
             })
 
-            # --- Draw on realistic_heatmap ---
-            # Draw a prominent bright border around defect on heatmap
             cv2.rectangle(realistic_heatmap, (x, y), (x + w, y + h), (255, 255, 255), 3, cv2.LINE_AA)
-
-            # --- Draw on annotated_target (defective image) ---
-            # 1. Fill the defect region with semi-transparent red overlay
             cv2.rectangle(defect_overlay, (x, y), (x + w, y + h), (0, 0, 255), -1)
-            
-            # 2. Draw BRIGHT outer glow box (yellow outer + red inner) — THICK
             cv2.rectangle(annotated_target, (x - 4, y - 4), (x + w + 4, y + h + 4), (0, 255, 255), 4, cv2.LINE_AA)
             cv2.rectangle(annotated_target, (x, y), (x + w, y + h), (0, 0, 255), 4, cv2.LINE_AA)
 
-            # 3. Draw LARGE crosshair markers at corners
-            marker_len = min(30, w // 3, h // 3)
-            cv2.line(annotated_target, (x, y + marker_len), (x, y), (0, 255, 255), 3)
-            cv2.line(annotated_target, (x, y), (x + marker_len, y), (0, 255, 255), 3)
-            cv2.line(annotated_target, (x + w - marker_len, y), (x + w, y), (0, 255, 255), 3)
-            cv2.line(annotated_target, (x + w, y), (x + w, y + marker_len), (0, 255, 255), 3)
-            cv2.line(annotated_target, (x, y + h - marker_len), (x, y + h), (0, 255, 255), 3)
-            cv2.line(annotated_target, (x, y + h), (x + marker_len, y + h), (0, 255, 255), 3)
-            cv2.line(annotated_target, (x + w - marker_len, y + h), (x + w, y + h), (0, 255, 255), 3)
-            cv2.line(annotated_target, (x + w, y + h), (x + w, y + h - marker_len), (0, 255, 255), 3)
-
-            # 4. Draw filled contour outline for organic-shaped defects
-            cv2.drawContours(annotated_target, [c], -1, (0, 0, 255), 2, cv2.LINE_AA)
-            cv2.drawContours(annotated_target, [c], -1, (0, 255, 255), 2, cv2.LINE_AA)
-
-            # 5. Draw LARGE DEFECT badge label with severity indicator
-            if area > 1000:
-                badge_label = f"!! DEFECT #{contour_count} !!"
-                badge_color = (0, 0, 220)
-                text_color = (255, 255, 255)
-            else:
-                badge_label = f"DEFECT #{contour_count}"
-                badge_color = (0, 0, 180)
-                text_color = (255, 255, 200)
-
-            font_scale = 0.7
-            thickness = 2
-            (tw, th), _ = cv2.getTextSize(badge_label, cv2.FONT_HERSHEY_SIMPLEX, font_scale, thickness)
-            label_y = max(0, y - th - 16)
-            
-            # Draw badge background
-            cv2.rectangle(annotated_target, (x, label_y), (x + tw + 20, y), badge_color, -1)
-            cv2.rectangle(annotated_target, (x, label_y), (x + tw + 20, y), (255, 255, 255), 2)
-            
-            # Draw label text
-            cv2.putText(annotated_target, badge_label, (x + 10, label_y + th + 6), 
-                       cv2.FONT_HERSHEY_SIMPLEX, font_scale, text_color, thickness, cv2.LINE_AA)
-
-    # Apply the semi-transparent red overlay to annotated_target
     if contour_count > 0:
-        # Blend the red overlay with alpha=0.45 for stronger defect highlighting
         mask_3ch = np.zeros_like(src_img)
         for (x, y, w, h) in all_defect_regions:
             mask_3ch[y:y+h, x:x+w] = 1.0
-        
         annotated_target = (annotated_target.astype(np.float32) * (1.0 - mask_3ch * 0.45) + 
                            defect_overlay.astype(np.float32) * (mask_3ch * 0.45)).astype("uint8")
 
-    # If no defects found, show "NO DEFECTS DETECTED" badge
     if contour_count == 0:
-        cv2.putText(annotated_target, "NO DEFECTS DETECTED ✓", (20, 40),
-                   cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 200, 0), 2, cv2.LINE_AA)
-        cv2.putText(realistic_heatmap, "CLEAN - No Anomalies", (20, 40),
-                   cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 200, 0), 2, cv2.LINE_AA)
+        cv2.putText(annotated_target, "NO DEFECTS DETECTED", (20, 40), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 200, 0), 2, cv2.LINE_AA)
+        cv2.putText(realistic_heatmap, "CLEAN - No Anomalies", (20, 40), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 200, 0), 2, cv2.LINE_AA)
 
     anomaly_regions.sort(key=lambda r: r["area"], reverse=True)
     logger.info(f"SSIM structural check complete. Score: {score:.4f}, Defect hotspots detected: {contour_count}")
@@ -310,18 +188,7 @@ def compute_ssim_diff(src_img: np.ndarray, ref_img: np.ndarray) -> tuple[float, 
 
 
 def _preprocess_for_ocr(crop: np.ndarray) -> np.ndarray:
-    """
-    Cleans up a label crop before handing it to EasyOCR:
-      1. Upscale small crops (EasyOCR reads tiny/low-res text poorly).
-      2. Convert to grayscale.
-      3. Denoise while keeping edges sharp (bilateral filter).
-      4. Boost local contrast (CLAHE) so faint/worn print stands out.
-      5. Adaptive-threshold binarize (black text on white background),
-         then hand back a 3-channel image since EasyOCR expects BGR/RGB input.
-
-    Any failure here just returns the original crop untouched instead of
-    raising, so OCR quality is best-effort, never a hard failure point.
-    """
+    """Cleans up a label crop before handing it to EasyOCR for better accuracy."""
     try:
         crop_h, crop_w = crop.shape[:2]
         min_dim = 300
@@ -330,37 +197,21 @@ def _preprocess_for_ocr(crop: np.ndarray) -> np.ndarray:
             crop = cv2.resize(crop, (int(crop_w * scale), int(crop_h * scale)), interpolation=cv2.INTER_CUBIC)
 
         gray = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY) if crop.ndim == 3 else crop
-
-        # Denoise but keep character edges crisp
         denoised = cv2.bilateralFilter(gray, 7, 50, 50)
-
-        # Local contrast boost — helps faded/worn labels
         clahe = cv2.createCLAHE(clipLimit=2.5, tileGridSize=(8, 8))
         contrast_boosted = clahe.apply(denoised)
-
-        # Adaptive threshold to get clean black-on-white text
-        binarized = cv2.adaptiveThreshold(
-            contrast_boosted, 255,
-            cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY,
-            blockSize=25, C=10
-        )
-
-        # Light morphological cleanup to remove speckle noise from thresholding
+        binarized = cv2.adaptiveThreshold(contrast_boosted, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, blockSize=25, C=10)
         kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2, 2))
         cleaned = cv2.morphologyEx(binarized, cv2.MORPH_OPEN, kernel)
-
         return cv2.cvtColor(cleaned, cv2.COLOR_GRAY2BGR)
     except Exception as e:
-        logger.warning(f"OCR preprocessing/binarization failed, using raw crop instead: {e}")
+        logger.warning(f"OCR preprocessing failed: {e}")
         return crop
 
 
 def extract_ocr_text(img: np.ndarray, roi: dict = None, expected_serial: str = "") -> tuple[str, bool]:
-    """
-    Crops ROI (if coordinates are provided) and reads text using EasyOCR.
-    If no text is detected in the cropped ROI, or the match is poor, falls back to full-frame OCR.
-    """
-    logger.info("Executing text extraction (Google Vision OCR)...")
+    """Crops ROI and reads text using EasyOCR (free, offline OCR engine)."""
+    logger.info("Executing text extraction (EasyOCR)...")
     crop = img
     cropped_used = False
     
@@ -369,37 +220,27 @@ def extract_ocr_text(img: np.ndarray, roi: dict = None, expected_serial: str = "
         y = roi.get("y", 0)
         w = roi.get("width") if "width" in roi else roi.get("w", 0)
         h = roi.get("height") if "height" in roi else roi.get("h", 0)
-        logger.info(f"Cropping target image to ROI bounding boxes: x={x}, y={y}, w={w}, h={h}")
         if y + h <= img.shape[0] and x + w <= img.shape[1] and w > 0 and h > 0:
             crop = img[y:y + h, x:x + w]
             cropped_used = True
-            # EasyOCR frequently returns nothing on small/tight crops (common when a
-            # label_roi is configured too small). Upscale small crops before reading
-            # so we get a real "no text present" result instead of a false empty read.
             crop_h, crop_w = crop.shape[:2]
             min_dim = 300
             if 0 < crop_h < min_dim or 0 < crop_w < min_dim:
                 scale = min_dim / max(crop_h, crop_w, 1)
                 crop = cv2.resize(crop, (int(crop_w * scale), int(crop_h * scale)), interpolation=cv2.INTER_CUBIC)
-                logger.info(f"Upscaled small OCR crop ({crop_w}x{crop_h}) by {scale:.2f}x for more reliable text detection.")
         else:
-            logger.warning("Configured text label ROI exceeds image boundary dimensions or is empty. Defaulting to full image.")
+            logger.warning("Configured ROI exceeds image boundaries. Defaulting to full image.")
 
     try:
         reader = get_ocr_reader()
     except RuntimeError as e:
-        logger.error(f"OCR Reader offline: {e}. Returning empty detected text and flagging engine as unavailable.")
+        logger.error(f"OCR Reader offline: {e}")
         return "", False
 
     try:
-        # Google Vision does its own internal preprocessing/binarization — feed
-        # it the raw (upscaled-if-needed) crop rather than our local CLAHE/
-        # adaptive-threshold pass, which can strip faint strokes Vision would
-        # otherwise pick up.
-        texts = _vision_readtext(reader, crop)
+        texts = _readtext(reader, crop)
         detected = " ".join(texts).strip()
 
-        # Check similarity with expected serial
         is_poor_match = False
         if expected_serial and detected:
             s_detected = detected.upper().replace(" ", "")
@@ -408,25 +249,22 @@ def extract_ocr_text(img: np.ndarray, roi: dict = None, expected_serial: str = "
             match_ratio = common / max(len(s_expected), 1)
             is_poor_match = match_ratio < 0.25
 
-        # Fallback: if crop returned nothing or is a poor match, run full-frame search
         if (not detected or is_poor_match) and cropped_used:
-            logger.info(f"Crop ROI returned poor match '{detected}' against expected '{expected_serial}'. Triggering full-frame OCR fallback search...")
-            full_texts = _vision_readtext(reader, img)
+            logger.info("Crop ROI returned poor match. Triggering full-frame OCR fallback...")
+            full_texts = _readtext(reader, img)
             detected_full = " ".join(full_texts).strip()
             if detected_full:
                 detected = detected_full
 
-        logger.info(f"Google Vision OCR parsing complete. Detected text label string: '{detected}'")
+        logger.info(f"EasyOCR parsing complete. Detected text: '{detected}'")
         return detected, True
     except Exception as e:
         logger.error(f"Error during OCR extraction: {e}")
         return "", False
 
 
-
 import difflib
 
-# Common OCR visual confusion pairs (e.g. 'G' vs '6', '0' vs 'O', 'I' vs '1', 'S' vs '5', 'B' vs '8')
 _CONFUSION_PAIRS = {
     ('O', '0'), ('0', 'O'),
     ('I', '1'), ('1', 'I'), ('|', 'I'), ('I', '|'), ('|', '1'), ('1', '|'),
@@ -440,19 +278,12 @@ _CONFUSION_PAIRS = {
 
 def calculate_string_diff(str1: str, str2: str) -> dict:
     """
-    same length and perfectly lined up. If OCR drops or inserts even a single
-    character (very common — e.g. missing a hyphen, or reading "AOO-001" as
-    "A0O01"), every character *after* that point shifts by one position and
-    gets flagged as a mismatch, even though the label is actually correct.
-    Sequence alignment finds the actual matching/inserted/deleted/replaced
-    spans, so a single dropped character produces exactly one mismatch entry,
-    not a cascade of false ones.
-
+    Compare two strings using sequence matching to handle OCR errors gracefully.
     Returns: {"similarity": float, "mismatches": list, "suspicious_confusions": list}
     """
     logger.info(f"Comparing OCR detected string '{str1}' against master catalog reference '{str2}'")
-    s1 = str1.upper().replace(" ", "")  # detected
-    s2 = str2.upper().replace(" ", "")  # expected
+    s1 = str1.upper().replace(" ", "")
+    s2 = str2.upper().replace(" ", "")
 
     matcher = difflib.SequenceMatcher(None, s1, s2, autojunk=False)
     similarity = matcher.ratio()
@@ -467,10 +298,6 @@ def calculate_string_diff(str1: str, str2: str) -> dict:
         detected_span = s1[i1:i2]
         expected_span = s2[j1:j2]
 
-        # For 'replace' spans of equal length, report per-character mismatches
-        # (keeps parity with prior granular position-level reporting).
-        # For 'insert'/'delete'/uneven 'replace' spans, report the whole span
-        # as one mismatch instead of forcing a bogus 1:1 char alignment.
         if tag == "replace" and len(detected_span) == len(expected_span):
             for offset, (c1, c2) in enumerate(zip(detected_span, expected_span)):
                 mismatch = {
@@ -488,15 +315,12 @@ def calculate_string_diff(str1: str, str2: str) -> dict:
                 "position": j1,
                 "expected": expected_span,
                 "detected": detected_span,
-                "tag": tag,  # 'insert' (extra chars detected) or 'delete' (missing chars) or uneven 'replace'
+                "tag": tag,
                 "confusable": False,
             }
             mismatches.append(mismatch)
 
-    logger.info(
-        f"Fuzzy character validation complete. String similarity rate: {similarity:.2f}, "
-        f"mismatches count: {len(mismatches)}"
-    )
+    logger.info(f"Fuzzy character validation complete. String similarity rate: {similarity:.2f}, mismatches count: {len(mismatches)}")
     return {
         "similarity": similarity,
         "mismatches": mismatches,
@@ -515,7 +339,7 @@ def match_keypoints(src_img: np.ndarray, ref_img: np.ndarray) -> dict:
     kp2, desc2 = orb.detectAndCompute(gray_ref, None)
 
     if desc1 is None or desc2 is None or len(desc1) < 2 or len(desc2) < 2:
-        logger.warning("Insufficient descriptor points extracted from images to compile matching pairs.")
+        logger.warning("Insufficient descriptor points extracted from images.")
         return {"keypoint_match_score": 0.0, "good_matches": 0, "total_matches": 0}
 
     bf = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=False)
@@ -548,12 +372,10 @@ def match_template_roi(src_img: np.ndarray, ref_img: np.ndarray, roi_config: dic
     logger.info("Executing Template ROI sticker presence checks...")
     roi_config = _normalize_roi_config(roi_config)
     if not roi_config:
-        logger.info("Skipping template match: roi_config is empty.")
         return {"template_match_score": 1.0, "template_match_found": True, "template_match_checked": False}
 
     template_roi = roi_config.get("template_roi")
     if not template_roi:
-        logger.info("Skipping template match: no template_roi coordinates configured.")
         return {"template_match_score": 1.0, "template_match_found": True, "template_match_checked": False}
 
     x = template_roi.get("x", 0)
@@ -561,7 +383,6 @@ def match_template_roi(src_img: np.ndarray, ref_img: np.ndarray, roi_config: dic
     w = template_roi.get("width") if "width" in template_roi else template_roi.get("w", 0)
     h = template_roi.get("height") if "height" in template_roi else template_roi.get("h", 0)
     if w <= 0 or h <= 0:
-        logger.info("Skipping template match: width/height configured as 0.")
         return {"template_match_score": 1.0, "template_match_found": True, "template_match_checked": False}
 
     logger.info(f"Cropping template ROI window: x={x}, y={y}, w={w}, h={h}")
@@ -569,21 +390,17 @@ def match_template_roi(src_img: np.ndarray, ref_img: np.ndarray, roi_config: dic
     gray_ref = _ensure_gray(ref_img)
 
     if y + h > gray_ref.shape[0] or x + w > gray_ref.shape[1]:
-        logger.warning("Template ROI parameters exceed reference image coordinate layout shapes.")
         return {"template_match_score": 0.0, "template_match_found": False, "template_match_checked": True}
 
     template = gray_ref[y:y + h, x:x + w]
     if template.size == 0:
-        logger.warning("Cropped template array size is empty.")
         return {"template_match_score": 0.0, "template_match_found": False, "template_match_checked": True}
 
     if y + h > gray_src.shape[0] or x + w > gray_src.shape[1]:
-        logger.warning("Template ROI parameters exceed target image coordinate layout shapes.")
         return {"template_match_score": 0.0, "template_match_found": False, "template_match_checked": True}
 
     src_roi = gray_src[y:y + h, x:x + w]
     if src_roi.size == 0:
-        logger.warning("Cropped source ROI array size is empty.")
         return {"template_match_score": 0.0, "template_match_found": False, "template_match_checked": True}
 
     result = cv2.matchTemplate(gray_src, template, cv2.TM_CCOEFF_NORMED)
@@ -617,18 +434,13 @@ def compare_color_histograms(src_img: np.ndarray, ref_img: np.ndarray, roi_confi
         y = color_roi.get("y", 0)
         w = color_roi.get("width") if "width" in color_roi else color_roi.get("w", 0)
         h = color_roi.get("height") if "height" in color_roi else color_roi.get("h", 0)
-        logger.info(f"Cropping color histogram ROI: x={x}, y={y}, w={w}, h={h}")
         if y + h <= src.shape[0] and x + w <= src.shape[1] and y + h <= ref.shape[0] and x + w <= ref.shape[1]:
             src = src[y:y + h, x:x + w]
             ref = ref[y:y + h, x:x + w]
-        else:
-            logger.warning("Color histogram ROI exceeds target image size. Using full images.")
 
     if src.shape != ref.shape:
-        logger.info(f"Histogram source shape {src.shape} != reference {ref.shape}. Resizing reference to compute histogram comparison.")
         ref = cv2.resize(ref, (src.shape[1], src.shape[0]))
 
-    # Compute 3D Color Histograms in RGB
     hist1 = cv2.calcHist([src], [0, 1, 2], None, [16, 16, 16], [0, 256, 0, 256, 0, 256])
     hist2 = cv2.calcHist([ref], [0, 1, 2], None, [16, 16, 16], [0, 256, 0, 256, 0, 256])
     cv2.normalize(hist1, hist1)
@@ -640,224 +452,8 @@ def compare_color_histograms(src_img: np.ndarray, ref_img: np.ndarray, roi_confi
     return {"color_hist_similarity": similarity, "color_hist_checked": True}
 
 
-def inspect_anomalies_multimodal(src_image_path: str, ref_image_path: str, commodity: str) -> str:
-    """
-    Queries NVIDIA NIM (or OpenRouter fallback) multimodal vision model
-    to semantically compare the aligned captured image and the golden standard.
-    """
-    logger.info(f"[Agent 3D: Vision Sub-Agent] Running multimodal visual comparison for commodity '{commodity}'...")
-    
-    nim_key = getattr(settings, "NVIDIA_NIM_API_KEY", None)
-    openrouter_key = getattr(settings, "OPENROUTER_API_KEY", None)
-
-    if not nim_key and not openrouter_key:
-        logger.warning("[Agent 3D: Vision Sub-Agent] Neither NVIDIA_NIM_API_KEY nor OPENROUTER_API_KEY configured. Skipping multimodal visual comparison.")
-        return "Visual comparison skipped: API key not configured."
-
-    import base64
-    import requests
-
-    try:
-        # Load and resize images to max 512px to keep upload tiny & fast
-        src = cv2.imread(src_image_path)
-        ref = cv2.imread(ref_image_path)
-        if src is None or ref is None:
-            return "Visual comparison failed: Unable to load target or reference images."
-
-        def prepare_base64(img):
-            h, w = img.shape[:2]
-            max_dim = 512
-            if max(h, w) > max_dim:
-                scale = max_dim / max(h, w)
-                img = cv2.resize(img, (int(w * scale), int(h * scale)), interpolation=cv2.INTER_AREA)
-            _, buffer = cv2.imencode('.png', img)
-            return base64.b64encode(buffer).decode("utf-8")
-
-        src_b64 = prepare_base64(src)
-        ref_b64 = prepare_base64(ref)
-
-        prompt = (
-            f"You are an expert QA visual inspection AI. Compare these two images of a {commodity} part:\n"
-            f"Image 1 (first) is the OEM Golden Reference Standard (the correct standard layout).\n"
-            f"Image 2 (second) is the Aligned Target Scan (the actual part under inspection).\n\n"
-            f"Identify any semantic visual differences, anomalies, or defects in the Target Scan (Image 2) compared to the Golden Reference (Image 1).\n"
-            f"Look for:\n"
-            f"1. Missing components (chips, resistors, labels, connectors, etc.).\n"
-            f"2. Physical damages (cracks, scratches, burns, solder residue).\n"
-            f"3. Alignment or rotation mismatches.\n"
-            f"4. Label differences (mismatched texts, logos, styles).\n\n"
-            f"Write a concise, bulleted description of what is physically wrong with the target scan. "
-            f"Be precise about locations (e.g., 'top-left of chip', 'near central barcode'). "
-            f"If they are identical and there are no visual anomalies, reply with exactly 'No anomalies detected.'"
-        )
-
-<<<<<<< HEAD
-        models_to_try = [settings.OPENROUTER_MODEL] + [m for m in getattr(settings, "FALLBACK_VISION_MODELS", []) if m != settings.OPENROUTER_MODEL]
-        last_error = ""
-
-        for model_name in models_to_try:
-            payload = {
-                "model": model_name,
-                "messages": [
-                    {
-                        "role": "user",
-                        "content": [
-                            {"type": "text", "text": prompt},
-                            {
-                                "type": "image_url",
-                                "image_url": {
-                                    "url": f"data:image/png;base64,{ref_b64}"
-                                }
-                            },
-                            {
-                                "type": "image_url",
-                                "image_url": {
-                                    "url": f"data:image/png;base64,{src_b64}"
-                                }
-                            }
-                        ]
-                    }
-                ]
-            }
-
-            try:
-                response = requests.post(url, json=payload, headers=headers, timeout=25)
-                if response.status_code == 200:
-                    res_data = response.json()
-                    description = res_data["choices"][0]["message"]["content"].strip()
-                    logger.info(f"[Agent 3: Detector] Multimodal comparison result via '{model_name}':\n{description}")
-                    return description
-                else:
-                    last_error = f"API returned status {response.status_code}"
-                    logger.warning(f"[Agent 3: Detector] OpenRouter model '{model_name}' status {response.status_code}. Trying fallback...")
-            except Exception as model_err:
-                last_error = str(model_err)
-                logger.warning(f"[Agent 3: Detector] OpenRouter model '{model_name}' request failed: {model_err}. Trying fallback...")
-
-        return f"Visual comparison completed: {last_error or 'No active vision models responded.'}"
-=======
-        if nim_key:
-            # High-throughput low-latency NVIDIA NIM endpoint
-            url = f"{getattr(settings, 'NVIDIA_NIM_BASE_URL', 'https://integrate.api.nvidia.com/v1')}/chat/completions"
-            headers = {
-                "Authorization": f"Bearer {nim_key}",
-                "Content-Type": "application/json",
-            }
-            model_name = getattr(settings, "NVIDIA_VISION_MODEL", "meta/llama-3.2-11b-vision-instruct")
-            logger.info(f"[Agent 3D: Vision Sub-Agent] Querying NVIDIA NIM vision model: {model_name}")
-            payload = {
-                "model": model_name,
-                "temperature": 0.1,
-                "messages": [
-                    {
-                        "role": "user",
-                        "content": [
-                            {"type": "text", "text": prompt},
-                            {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{ref_b64}"}},
-                            {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{src_b64}"}}
-                        ]
-                    }
-                ]
-            }
-            timeout_sec = 15
-        else:
-            # Fallback to OpenRouter
-            url = "https://openrouter.ai/api/v1/chat/completions"
-            headers = {
-                "Authorization": f"Bearer {openrouter_key}",
-                "Content-Type": "application/json",
-                "HTTP-Referer": "https://github.com/IdeaForg-e/VeriVision-AI",
-                "X-Title": "VeriVision QC Platform",
-            }
-            model_name = getattr(settings, "OPENROUTER_VISION_MODEL", None) or "google/gemini-2.5-flash"
-            logger.info(f"[Agent 3D: Vision Sub-Agent] Querying OpenRouter vision model: {model_name}")
-            payload = {
-                "model": model_name,
-                "temperature": 0,
-                "messages": [
-                    {
-                        "role": "user",
-                        "content": [
-                            {"type": "text", "text": prompt},
-                            {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{ref_b64}"}},
-                            {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{src_b64}"}}
-                        ]
-                    }
-                ]
-            }
-            timeout_sec = 30
-
-        response = requests.post(url, json=payload, headers=headers, timeout=timeout_sec)
-        if response.status_code == 200:
-            res_data = response.json()
-            description = res_data["choices"][0]["message"]["content"].strip()
-            logger.info(f"[Agent 3D: Vision Sub-Agent] Visual comparison result:\n{description}")
-            return description
-        else:
-            logger.error(f"[Agent 3D: Vision Sub-Agent] API returned status {response.status_code}: {response.text}")
-            return f"Visual comparison failed: API returned status {response.status_code}."
-    except requests.exceptions.Timeout:
-        logger.warning(f"[Agent 3D: Vision Sub-Agent] API request timed out ({timeout_sec}s limit reached).")
-        return "Visual comparison skipped: API timeout."
->>>>>>> fae3d01 (changed the architecture)
-    except Exception as e:
-        logger.error(f"[Agent 3D: Vision Sub-Agent] Multimodal vision query failed: {e}")
-        return f"Visual comparison failed due to system exception: {str(e)}."
-
-
-def generate_diagnostic_card(src_img: np.ndarray, ref_img: np.ndarray, heatmap_overlay: np.ndarray, annotated_img: np.ndarray = None) -> np.ndarray:
-    """
-    Combines the Golden Reference, Defect-Annotated Target Scan, and SSIM Thermal Heatmap
-    side-by-side into a single diagnostic image.
-    
-    The TARGET SCAN panel shows the annotated image with defect markings directly on it,
-    so users can immediately see which parts are defective.
-    """
-    logger.info("Generating unified visual diagnostic card with defect annotations on target scan...")
-    ref = _ensure_rgb(ref_img)
-    heat = _ensure_rgb(heatmap_overlay)
-    
-    # Use annotated image as the TARGET SCAN panel (with defect marks on it)
-    if annotated_img is not None:
-        target_display = _ensure_rgb(annotated_img)
-    else:
-        target_display = _ensure_rgb(src_img)
-
-    # Resize all to match ref height/width for clean side-by-side combination
-    h, w = ref.shape[:2]
-    # Standardize size for display cards: e.g., 360px height
-    card_h = 360
-    card_w = int(w * (card_h / h))
-
-    ref_resized = cv2.resize(ref, (card_w, card_h))
-    target_resized = cv2.resize(target_display, (card_w, card_h))
-    heat_resized = cv2.resize(heat, (card_w, card_h))
-
-    # Add header bars above each image
-    header_h = 40
-    def add_header(img, text, color):
-        header = np.ones((header_h, card_w, 3), dtype=np.uint8) * 15  # dark gray header background
-        # Add thin bottom border to header
-        cv2.line(header, (0, header_h - 1), (card_w, header_h - 1), color, 2)
-        # Put Text
-        cv2.putText(header, text, (15, 25), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (220, 220, 220), 2, cv2.LINE_AA)
-        return np.vstack([header, img])
-
-    ref_card = add_header(ref_resized, "GOLDEN STANDARD", (6, 182, 212))               # Cyan border
-    target_card = add_header(target_resized, "TARGET SCAN (DEFECTS MARKED)", (239, 68, 68))  # Red border
-    heat_card = add_header(heat_resized, "THERMAL HEATMAP", (255, 165, 0))             # Orange border
-
-    # Stack them side-by-side with separator borders
-    separator = np.ones((card_h + header_h, 4, 3), dtype=np.uint8) * 15 # dark divider line
-    diagnostic_card = np.hstack([ref_card, separator, target_card, separator, heat_card])
-    return diagnostic_card
-
-
 def run_anomaly_ensemble(src_img: np.ndarray, ref_img: np.ndarray, roi_config: dict = None, src_image_path: str = None, ref_image_path: str = None, commodity: str = "motherboard") -> dict:
-    """
-    Runs the hybrid CV + Vision LLM ensemble comparison logic in PARALLEL.
-    Uses ThreadPoolExecutor to run SSIM, EasyOCR, Vision LLM, and Feature Matching concurrently.
-    """
+    """Runs the hybrid CV + Vision LLM ensemble comparison logic in PARALLEL."""
     import time
     from concurrent.futures import ThreadPoolExecutor
 
@@ -866,24 +462,18 @@ def run_anomaly_ensemble(src_img: np.ndarray, ref_img: np.ndarray, roi_config: d
     errors = []
     roi_config = _normalize_roi_config(roi_config)
 
-    # ── Pre-warm PyTorch-backed models on the MAIN THREAD ─────────────────────
-    # EasyOCR and open_clip both import torchvision internally. Python's module
-    # import system uses _ModuleLock, which causes a deadlock when these models
-    # are lazy-initialized for the first time inside a ThreadPoolExecutor worker.
-    # Calling get_ocr_reader() here ensures all torch/torchvision modules are
-    # fully loaded before any background threads start.
+    # Pre-warm OCR client on main thread
     try:
         get_ocr_reader()
     except RuntimeError as e:
-        logger.critical(f"[Agent 3: Detector] OCR unavailable for this entire case — all OCR results will be empty. {e}")
+        logger.critical(f"[Agent 3: Detector] OCR unavailable for this entire case: {e}")
 
-    # Also pre-warm CLIP embedding model on the main thread for the same reason.
+    # Pre-warm CLIP embedding model
     try:
         from app.services.embedding_service import _load_clip
         _load_clip()
     except Exception as _clip_prewarm_err:
-        logger.warning(f"[Agent 3: Detector] CLIP pre-warm failed (will use OpenCV fallback): {_clip_prewarm_err}")
-    # ──────────────────────────────────────────────────────────────────────────
+        logger.warning(f"[Agent 3: Detector] CLIP pre-warm failed: {_clip_prewarm_err}")
 
     label_roi = None
     expected_serial = ""
@@ -891,7 +481,6 @@ def run_anomaly_ensemble(src_img: np.ndarray, ref_img: np.ndarray, roi_config: d
         label_roi = roi_config.get("label_roi")
         expected_serial = roi_config.get("expected_serial", "")
 
-    # Helper sub-tasks for thread pool
     def task_ssim():
         try:
             return compute_ssim_diff(src_img, ref_img)
@@ -996,7 +585,7 @@ def run_anomaly_ensemble(src_img: np.ndarray, ref_img: np.ndarray, roi_config: d
             errors.append("embedding_timeout_or_failed")
             vector_embedding_match = None
 
-    # Generate visual side-by-side diagnostic card (4 panels: Golden, Target, Defect Marked, Thermal Heatmap)
+    # Generate visual diagnostic card
     diagnostic_card = None
     try:
         diagnostic_card = generate_diagnostic_card(src_img, ref_img, heatmap_img, annotated_target)
@@ -1004,19 +593,10 @@ def run_anomaly_ensemble(src_img: np.ndarray, ref_img: np.ndarray, roi_config: d
         logger.error(f"Failed to generate side-by-side diagnostic card: {e}")
         errors.append("card_generation_failed")
 
-    # Dynamic Ground-Truth OCR Determination:
-    # Prefer explicit catalog serial text. Use golden OCR ONLY when a focused label_roi
-    # is configured — full-frame golden OCR reads silkscreen markings (R102, C15, etc.)
-    # which are NOT serial numbers and cause false mismatches on every clean scan.
+    # Dynamic Ground-Truth OCR Determination
     explicit_expected = expected_serial if _is_plausible_expected_label(expected_serial) else ""
     golden_expected = (golden_text if label_roi and _is_plausible_expected_label(golden_text) else "")
     master_expected_text = explicit_expected or golden_expected
-    # True only when the ground truth came from a fixed catalog value, not
-    # from OCR-ing the golden image. Golden-image OCR is itself a noisy read
-    # (same engine, same failure modes) — using it as "truth" and then
-    # comparing it against another noisy read of the target crop means two
-    # independent noise sources get scored as if one were ground truth.
-    # Agent 4 uses this flag to require a higher bar before escalating.
     expected_text_is_catalog_verified = bool(explicit_expected)
 
     ocr_diff = {"similarity": 1.0, "mismatches": [], "suspicious_confusions": []}
@@ -1035,18 +615,11 @@ def run_anomaly_ensemble(src_img: np.ndarray, ref_img: np.ndarray, roi_config: d
     matching_score = float(np.clip(sum(score_components) / max(len(score_components), 1), 0.0, 1.0))
 
     elapsed = time.time() - t0
-    logger.info(
-        f"⚡ [Agent 3: Detector] Parallel execution finished in {elapsed:.3f}s. "
-        f"SSIM: {ssim_val:.3f}, Keypoint: {keypoint_results['keypoint_match_score']:.3f}, Matching Score: {matching_score:.3f}"
-    )
+    logger.info(f"⚡ [Agent 3: Detector] Parallel execution finished in {elapsed:.3f}s. SSIM: {ssim_val:.3f}, Matching Score: {matching_score:.3f}")
 
     expected_text_value = master_expected_text
     detector_results = {
-        "ssim": {
-            "score": ssim_val,
-            "threshold": float(getattr(settings, "SSIM_THRESHOLD", 0.80)),
-            "regions": anomaly_regions,
-        },
+        "ssim": {"score": ssim_val, "threshold": float(getattr(settings, "SSIM_THRESHOLD", 0.80)), "regions": anomaly_regions},
         "ocr": {
             "engine_available": ocr_engine_available,
             "detected_text": detected_text,
@@ -1056,16 +629,10 @@ def run_anomaly_ensemble(src_img: np.ndarray, ref_img: np.ndarray, roi_config: d
             "mismatches": ocr_diff["mismatches"],
             "suspicious_confusions": ocr_diff.get("suspicious_confusions", []),
         },
-        "keypoints": {
-            "score": keypoint_results["keypoint_match_score"],
-            "good_matches": keypoint_results["good_matches"],
-            "total_matches": keypoint_results["total_matches"],
-        },
+        "keypoints": {"score": keypoint_results["keypoint_match_score"], "good_matches": keypoint_results["good_matches"], "total_matches": keypoint_results["total_matches"]},
         "template": template_results,
         "color": color_results,
-        "embedding": {
-            "similarity_pct": vector_embedding_match,
-        },
+        "embedding": {"similarity_pct": vector_embedding_match},
     }
     evidence_summary = {
         "checked_components": checked_components,
