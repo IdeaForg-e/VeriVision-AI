@@ -412,7 +412,7 @@ def delete_inspection(
 
 @router.post("/multi-angle-fusion")
 def get_multi_angle_fusion(
-    case_ids: List[str],
+    payload: schemas.MultiAngleFusionRequest,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(utils.get_current_user)
 ):
@@ -421,6 +421,7 @@ def get_multi_angle_fusion(
     Receives 2-3 case IDs representing different capture angles of the same part.
     Calculates combined fused fraud score, joint confidence, and aggregated verdict.
     """
+    case_ids = payload.case_ids
     if not case_ids or len(case_ids) < 1:
         raise HTTPException(status_code=400, detail="At least one case_id must be provided for multi-angle fusion.")
 
@@ -443,6 +444,16 @@ def get_multi_angle_fusion(
 
     fused = services.fuse_multi_angle_decisions(angle_results)
     fused["individual_angles"] = angle_results
+
+    # Update primary inspection record with multi-angle fused decision metadata
+    primary_ins = db.query(models.Inspection).filter(models.Inspection.case_id == case_ids[0]).first()
+    if primary_ins and primary_ins.result:
+        primary_ins.result.fraud_score = fused.get("fused_fraud_score", primary_ins.result.fraud_score)
+        primary_ins.result.verdict = fused.get("fused_verdict", primary_ins.result.verdict)
+        primary_ins.result.confidence = fused.get("fused_confidence", primary_ins.result.confidence)
+        primary_ins.result.recommended_action = fused.get("fused_action", primary_ins.result.recommended_action)
+        db.commit()
+
     return fused
 
 
