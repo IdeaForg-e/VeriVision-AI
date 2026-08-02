@@ -31,11 +31,11 @@
 
 | Name | Role |
 |:---|:---|
-| **Disha** | Team Leader |
-| **Anil** | Team Member |
-| **Priyanka** | Team Member |
-| **Chaitanya** | Team Member |
-| **Jagruti** | Team Member |
+| **Disha** | Backend Dev |
+| **Anil** | Agents Dev |
+| **Priyanka** | Frontend Dev |
+| **Chaitanya** | DataSet Collection  |
+| **Jagruti** | Frontend Dev |
 
 ---
 
