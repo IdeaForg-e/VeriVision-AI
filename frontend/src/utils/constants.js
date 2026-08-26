@@ -2,7 +2,10 @@
 
 // During development the Vite proxy forwards /api/* → http://localhost:8000/api/*
 // so a relative path is sufficient. Override with VITE_API_BASE_URL for staging/prod.
-export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "/api";
+const rawBaseUrl = (import.meta.env.VITE_API_BASE_URL || "/api").trim().replace(/\/+$/, "");
+export const API_BASE_URL = rawBaseUrl.endsWith("/api")
+  ? rawBaseUrl
+  : rawBaseUrl === "" ? "/api" : `${rawBaseUrl}/api`;
 
 export const STORAGE_KEYS = {
   AUTH_TOKEN: "fraudshield_auth_token",
