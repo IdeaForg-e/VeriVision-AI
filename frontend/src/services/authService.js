@@ -107,15 +107,15 @@ export async function getCurrentUser() {
       role: data.role,
     };
   } catch {
-    // Token might be expired, try to restore from localStorage
-    let stored = null;
+    // Token is invalid or expired: clear local storage state
     try {
-      const raw = localStorage.getItem(STORAGE_KEYS.CURRENT_USER);
-      stored = raw ? JSON.parse(raw) : null;
+      localStorage.removeItem(STORAGE_KEYS.AUTH_TOKEN);
+      localStorage.removeItem(STORAGE_KEYS.REFRESH_TOKEN);
+      localStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
     } catch {
-      stored = null;
+      /* no-op */
     }
-    return stored;
+    return null;
   }
 }
 
