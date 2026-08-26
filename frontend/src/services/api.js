@@ -51,8 +51,15 @@ export async function apiRequest(path, { method = "GET", body, headers = {}, aut
   }
 
   if (!response.ok) {
-    // TODO(backend): on 401, trigger a token refresh via authService and retry once,
-    // rather than failing immediately. Left simple until refresh-token flow is confirmed.
+    if (response.status === 401) {
+      try {
+        localStorage.removeItem(STORAGE_KEYS.AUTH_TOKEN);
+        localStorage.removeItem(STORAGE_KEYS.REFRESH_TOKEN);
+        localStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
+      } catch {
+        /* no-op */
+      }
+    }
     throw new ApiError(data?.detail || data?.message || `Request failed (${response.status})`, response.status, data);
   }
 
