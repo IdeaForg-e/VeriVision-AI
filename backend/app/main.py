@@ -122,10 +122,33 @@ def start_background_warmup():
     t = threading.Thread(target=_bg_warmup, daemon=True)
     t.start()
 
-@app.get("/")
-def read_root():
+from fastapi import HTTPException
+from fastapi.responses import FileResponse
+
+# Mount frontend production build static files if present (for single-server / Render deployments)
+frontend_dist = os.path.abspath(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "..", "frontend", "dist"))
+if os.path.exists(frontend_dist):
+    assets_dir = os.path.join(frontend_dist, "assets")
+    if os.path.exists(assets_dir):
+        app.mount("/assets", StaticFiles(directory=assets_dir), name="assets")
+
+@app.get("/{full_path:path}")
+def serve_spa(full_path: str):
+    # Pass through backend API / static resource paths
+    if full_path.startswith(("api/", "data/", "dataset/", "docs", "openapi.json")):
+        raise HTTPException(status_code=404, detail="Endpoint not found")
+
+    if os.path.exists(frontend_dist):
+        file_path = os.path.join(frontend_dist, full_path)
+        if os.path.exists(file_path) and os.path.isfile(file_path):
+            return FileResponse(file_path)
+        index_file = os.path.join(frontend_dist, "index.html")
+        if os.path.exists(index_file):
+            return FileResponse(index_file)
+
     return {
         "status": "healthy",
         "service": "VeriVision-AI API Engine",
-        "version": "1.0.0"
+        "version": "1.0.0",
+        "message": f"Route '/{full_path}' is a frontend SPA route. Run Vite dev server on http://localhost:5173 or build frontend using 'npm run build'."
     }
